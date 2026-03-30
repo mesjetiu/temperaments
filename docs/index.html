@@ -1242,7 +1242,7 @@ function detectPitch(buf, sampleRate) {
   }
 
   // Step 3: absolute threshold — first tau where yin < threshold
-  const YIN_THRESH = 0.12;
+  const YIN_THRESH = 0.25;
   let tau = minTau;
   while (tau <= maxTau) {
     if (yin[tau] < YIN_THRESH) {
@@ -1425,7 +1425,7 @@ const TUNER = {
       this.rms = Math.sqrt(rmsSum / rmsN);
 
       const p = detectPitch(buf, getCtx().sampleRate);
-      if (p && p.clarity > 0.35) {
+      if (p) {
         this.detectedFreq = p.freq;
         this.clarity = p.clarity;
         if (this.mode === 'auto') {
@@ -1436,7 +1436,6 @@ const TUNER = {
         const tf = this.getTargetFreq();
         this.detectedCents = 1200 * Math.log2(p.freq / tf);
         freqError = p.freq - tf;
-        // Nota ref: seguir la nota detectada (afinada) en tiempo real
         if (this.refOn && this.refOsc) {
           this.refOsc.frequency.setTargetAtTime(tf, getCtx().currentTime, 0.02);
         }
