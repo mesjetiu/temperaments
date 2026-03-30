@@ -63,6 +63,9 @@
   #list::-webkit-scrollbar { width: 4px; }
   #list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
   .temp-item { padding: 6px 8px 6px 6px; cursor: pointer; border-radius: 4px; margin-bottom: 2px; border-left: 3px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11.5px; color: #d1d5db; -webkit-tap-highlight-color: transparent; display:flex; align-items:center; gap:4px; }
+  .src-tab { font-size:10px; padding:2px 7px; border-radius:10px; border:1px solid var(--border); background:none; color:#6b7280; cursor:pointer; white-space:nowrap; }
+  .src-tab:hover { color:var(--text); border-color:#4b5563; }
+  .src-tab.sel { background:#1e3a5f; color:#93c5fd; border-color:#3b82f6; }
   .fav-btn { flex-shrink:0; font-size:12px; color:#4b5563; cursor:pointer; padding:0 2px; line-height:1; }
   .fav-btn:hover { color:#fbbf24; }
   .fav-btn.fav-on { color:#fbbf24; }
@@ -171,6 +174,12 @@
     <div style="display:flex;gap:4px;align-items:center">
       <input id="search" type="text" placeholder="Buscar..." autocomplete="off" style="flex:1">
       <button id="fav-btn" title="Solo favoritos" onclick="toggleFavFilter()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 7px;cursor:pointer;font-size:13px;color:#9ca3af">★</button>
+    </div>
+    <div id="source-tabs" style="display:flex;gap:3px;flex-wrap:wrap;margin-top:4px">
+      <button class="src-tab sel" data-src="Todos"      onclick="setSrcFilter('Todos')">Todos</button>
+      <button class="src-tab"     data-src="Scala"      onclick="setSrcFilter('Scala')">Scala</button>
+      <button class="src-tab"     data-src="GrandOrgue" onclick="setSrcFilter('GrandOrgue')">GrandOrgue</button>
+      <button class="src-tab"     data-src="Otros"      onclick="setSrcFilter('Otros')">Otros</button>
     </div>
     <div id="count">Cargando...</div>
     <div id="list"><div style="padding:14px;font-size:11px;color:#6b7280">Cargando datos...</div></div>
@@ -283,6 +292,13 @@ function toggleFav(name, e) {
   refreshList();
 }
 let showFavsOnly = false;
+let srcFilter = 'Todos';
+
+function setSrcFilter(src) {
+  srcFilter = src;
+  document.querySelectorAll('.src-tab').forEach(b => b.classList.toggle('sel', b.dataset.src === src));
+  refreshList();
+}
 
 let pitchA      = 440;   // Hz del La de referencia
 let octaveShift = 0;     // desplazamiento de octava para gráficas
@@ -782,6 +798,9 @@ function itemHtml(t) {
 function getFilteredList() {
   const q = document.getElementById('search').value.toLowerCase();
   let f = all.filter(t => !q || t.name.toLowerCase().includes(q) || t.source.toLowerCase().includes(q));
+  if (srcFilter === 'Scala')      f = f.filter(t => t.source === 'Scala');
+  else if (srcFilter === 'GrandOrgue') f = f.filter(t => t.source === 'GrandOrgue');
+  else if (srcFilter === 'Otros') f = f.filter(t => t.source !== 'Scala' && t.source !== 'GrandOrgue');
   if (showFavsOnly) f = f.filter(t => favs.has(t.name));
   return f;
 }
@@ -1200,7 +1219,7 @@ const TUNER = {
   tunerOct: 4,
   refOn: false, refOsc: null, refGain: null,
   micOn: false, micStream: null, analyser: null,
-  strobePhase: 0, lastTs: 0, rafId: null,
+  strobePhase: 0, prevStrobePhase: 0, lastTs: 0, rafId: null,
   detectedFreq: null, detectedCents: null, clarity: 0, rms: 0,
 
   getTargetFreq() {
@@ -1215,12 +1234,12 @@ const TUNER = {
     if (kw) kw.style.display = m === 'manual' ? 'block' : 'none';
     const mc = document.getElementById('tuner-manual-ctrl');
     if (mc) mc.style.display = m === 'manual' ? 'flex' : 'none';
-    this.strobePhase = 0;
+    this.strobePhase = 0; this.prevStrobePhase = 0;
   },
 
   setTarget(ni, oct) {
     this.targetNi = ni; this.targetOct = oct;
-    this.strobePhase = 0;
+    this.strobePhase = 0; this.prevStrobePhase = 0;
     this.updateTargetDisplay();
     document.querySelectorAll('[data-tni]').forEach(el =>
       el.classList.toggle('ka', +el.dataset.tni === ni && +el.dataset.toct === oct));
@@ -1341,6 +1360,7 @@ const TUNER = {
       }
     }
 
+    this.prevStrobePhase = this.strobePhase;
     this.strobePhase += 2 * Math.PI * freqError * dt;
     this.strobePhase = this.strobePhase % (2 * Math.PI);
     this.renderStrobe();
@@ -1359,104 +1379,95 @@ const TUNER = {
     }
     const ctx = canvas.getContext('2d');
 
-    // Scroll
-    const SCROLL = 5;
+    // Scroll + new rows — interpolate phase between prev and current frame → no discrete steps
+    const SCROLL  = 20;
     ctx.drawImage(canvas, 0, 0, W, H - SCROLL, 0, SCROLL, W, H - SCROLL);
-
-    // New rows — single fundamental band
-    const row = ctx.createImageData(W, 1);
-    const d   = row.data;
+    const STRIPES = 6;
     const cents    = this.detectedCents;
     const has      = this.detectedFreq !== null;
     const hasMic   = this.micOn;
     const absCents = Math.abs(cents ?? 0);
+    const strip = ctx.createImageData(W, SCROLL);
+    const d = strip.data;
 
-    for (let x = 0; x < W; x++) {
-      const t   = x / W;
-      const val = (Math.sin(t * 2 * Math.PI + this.strobePhase) + 1) / 2;
-      let r, g, b;
-      if (!hasMic) {
-        r = g = b = Math.round(val * 18);
-      } else if (!has) {
-        r = Math.round(val * 10); g = Math.round(val * 40); b = Math.round(val * 55);
-      } else if (absCents < 1.5) {
-        r = Math.round(val * 15); g = Math.round(val * 245); b = Math.round(val * 55);
-      } else if (cents > 0) {
-        const s = Math.min(1, absCents / 40);
-        r = Math.round(val * (80 + s * 175)); g = Math.round(val * (220 - s * 180)); b = 0;
-      } else {
-        const s = Math.min(1, absCents / 40);
-        r = 0; g = Math.round(val * (180 - s * 130)); b = Math.round(val * (140 + s * 115));
+    for (let s = 0; s < SCROLL; s++) {
+      // row 0 = newest (current phase), row SCROLL-1 = oldest of this batch (prev phase)
+      const alpha = s / SCROLL;
+      const phase = this.strobePhase * (1 - alpha) + this.prevStrobePhase * alpha;
+
+      for (let x = 0; x < W; x++) {
+        const val = (Math.sin((x / W) * 2 * Math.PI * STRIPES + phase * STRIPES) + 1) / 2;
+        let r, g, b;
+        if (!hasMic) {
+          r = g = b = Math.round(val * 18);
+        } else if (!has) {
+          r = Math.round(val * 10); g = Math.round(val * 40); b = Math.round(val * 55);
+        } else if (absCents < 1.5) {
+          r = Math.round(val * 15); g = Math.round(val * 245); b = Math.round(val * 55);
+        } else if (cents > 0) {
+          const sv = Math.min(1, absCents / 40);
+          r = Math.round(val * (80 + sv * 175)); g = Math.round(val * (220 - sv * 180)); b = 0;
+        } else {
+          const sv = Math.min(1, absCents / 40);
+          r = 0; g = Math.round(val * (180 - sv * 130)); b = Math.round(val * (140 + sv * 115));
+        }
+        const i = (s * W + x) * 4;
+        d[i] = r; d[i+1] = g; d[i+2] = b; d[i+3] = 255;
       }
-      const i = x * 4;
-      d[i] = r; d[i+1] = g; d[i+2] = b; d[i+3] = 255;
     }
-    for (let s = 0; s < SCROLL; s++) ctx.putImageData(row, 0, s);
+    ctx.putImageData(strip, 0, 0);
 
-    // ── Texto superpuesto ──
-    const cx = W / 2, cy = H / 2;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    // Color según cents
-    let col;
-    if (!has) {
-      col = 'rgba(210,210,210,0.55)';
-    } else if (absCents < 2) {
-      col = '#4ade80';
-    } else if (absCents < 8) {
-      const t = (absCents - 2) / 6;
-      col = `rgb(${Math.round(74 + t*181)},${Math.round(222 - t*62)},${Math.round(128*(1-t))})`;
-    } else if (absCents < 25) {
-      const t = (absCents - 8) / 17;
-      col = `rgb(255,${Math.round(160 - t*160)},0)`;
-    } else {
-      col = '#ef4444';
-    }
-
-    ctx.shadowColor = 'rgba(0,0,0,0.9)';
-    ctx.shadowBlur  = 10;
-
-    // Nota grande
-    const noteSz = Math.round(Math.min(H * 0.38, W * 0.18));
-    ctx.font      = `bold ${noteSz}px sans-serif`;
-    ctx.fillStyle = col;
-    ctx.fillText(has ? NOTES[this.targetNi] + this.targetOct : '—', cx, cy - H * 0.04);
-
-    // Cents
-    if (has) {
-      const centsSz = Math.round(noteSz * 0.36);
-      ctx.font      = `${centsSz}px sans-serif`;
-      ctx.fillStyle = col;
-      ctx.fillText((cents >= 0 ? '+' : '') + cents.toFixed(1) + '¢', cx, cy + noteSz * 0.55);
-
-      // Frecuencia detectada
-      ctx.font      = `${Math.round(centsSz * 0.8)}px sans-serif`;
-      ctx.fillStyle = 'rgba(200,200,200,0.7)';
-      ctx.fillText(this.detectedFreq.toFixed(2) + ' Hz', cx, cy + noteSz * 0.55 + centsSz * 1.2);
-    }
-    ctx.shadowBlur = 0;
   },
 
   updateStatus() {
-    // Signal bar (presente siempre)
+    // Signal bar: cada frame. Texto: máx 4 veces/seg
+    const now = performance.now();
+    const textReady = !this._lastTextTs || (now - this._lastTextTs) > 250;
+
+    const has = this.detectedFreq !== null;
+    const c   = this.detectedCents;
+    const absCents = Math.abs(c ?? 0);
+
+    // Color según afinación
+    let col;
+    if (!has) { col = 'rgba(200,200,200,0.45)'; }
+    else if (absCents < 2)  { col = '#4ade80'; }
+    else if (absCents < 8)  { const t=(absCents-2)/6; col=`rgb(${Math.round(74+t*181)},${Math.round(222-t*62)},${Math.round(128*(1-t))})`; }
+    else if (absCents < 25) { const t=(absCents-8)/17; col=`rgb(255,${Math.round(160-t*160)},0)`; }
+    else { col = '#ef4444'; }
+
+    // Overlay superpuesto — texto throttled a 4 fps
+    if (textReady) {
+      this._lastTextTs = now;
+      const ov = document.getElementById('strobe-overlay');
+      if (ov) {
+        const noteStr  = has ? NOTES[this.targetNi] + this.targetOct : '—';
+        const centsStr = has && c !== null ? (c >= 0 ? '+' : '') + c.toFixed(1) + '¢' : '';
+        const freqStr  = has ? this.detectedFreq.toFixed(2) + ' Hz' : '';
+        ov.innerHTML = `
+          <span style="font-size:clamp(48px,12vw,110px);font-weight:bold;color:${col};text-shadow:0 0 12px rgba(0,0,0,0.9),0 0 3px rgba(0,0,0,1);line-height:1">${noteStr}</span>
+          ${centsStr ? `<span style="font-size:clamp(18px,4.5vw,38px);color:${col};text-shadow:0 0 8px rgba(0,0,0,0.9);margin-top:4px">${centsStr}</span>` : ''}
+          ${freqStr  ? `<span style="font-size:clamp(12px,3vw,22px);color:rgba(200,200,200,0.75);text-shadow:0 0 6px rgba(0,0,0,0.9);margin-top:2px">${freqStr}</span>` : ''}`;
+      }
+    }
+
+    // Signal bar
     const sigFil = document.getElementById('signal-fill');
     if (sigFil) {
       const s = Math.min(1, this.rms * 10);
       sigFil.style.width = (s * 100) + '%';
       sigFil.style.background = s > 0.6 ? '#4ade80' : s > 0.2 ? '#fbbf24' : '#ef4444';
     }
-    // Resto solo en desktop (needle, etc.)
-    const has = this.detectedFreq !== null;
-    const c   = this.detectedCents;
+
+    // Needle y status (solo desktop)
     const needle = document.getElementById('cents-needle');
     if (needle) {
       const pct = has && c !== null ? 50 + Math.max(-50, Math.min(50, c)) * 0.9 : 50;
       needle.style.left = pct + '%';
-      needle.style.background = !has ? '#374151' : Math.abs(c) < 2 ? '#4ade80' : Math.abs(c) < 10 ? '#fbbf24' : '#f87171';
+      needle.style.background = !has ? '#374151' : absCents < 2 ? '#4ade80' : absCents < 10 ? '#fbbf24' : '#f87171';
     }
     const cEl = document.getElementById('det-cents');
-    if (cEl) { cEl.textContent = has && c !== null ? (c >= 0 ? '+' : '') + c.toFixed(1) + '¢' : '—'; cEl.style.color = !has ? '' : Math.abs(c) < 2 ? '#4ade80' : Math.abs(c) < 10 ? '#fbbf24' : '#f87171'; }
+    if (cEl) { cEl.textContent = has && c !== null ? (c >= 0 ? '+' : '') + c.toFixed(1) + '¢' : '—'; cEl.style.color = col; }
     const fEl = document.getElementById('det-freq');
     if (fEl) fEl.textContent = has ? this.detectedFreq.toFixed(2) + ' Hz' : '—';
     const nEl = document.getElementById('det-note-auto');
@@ -1489,7 +1500,7 @@ const TUNER = {
 function viewTuner() {
   const mob = isMobile();
   const BAR_H = 46;
-  const strobeH = mob ? (window.innerHeight - BAR_H) : 220;
+  const strobeH = mob ? (window.innerHeight - BAR_H) : Math.max(400, Math.round(window.innerHeight * 0.65));
 
   document.getElementById('content').innerHTML = `
     <div style="display:flex;flex-direction:column;${mob?'margin:-12px -12px 0;':'gap:10px;'}">
@@ -1510,7 +1521,10 @@ function viewTuner() {
       </div>
 
       <!-- Canvas principal: ocupa todo en móvil -->
-      <canvas id="strobe-canvas" style="width:100%;height:${strobeH}px;display:block"></canvas>
+      <div style="position:relative;width:100%;height:${strobeH}px;flex-shrink:0">
+        <canvas id="strobe-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;display:block"></canvas>
+        <div id="strobe-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;gap:0"></div>
+      </div>
 
       <!-- Teclado manual: solo desktop -->
       ${!mob ? `<div id="tuner-kb-wrap" style="display:${TUNER.mode==='manual'?'block':'none'};background:var(--panel);border-radius:8px;padding:10px">
