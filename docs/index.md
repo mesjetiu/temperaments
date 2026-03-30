@@ -1,6 +1,6 @@
 # Temperamentos de 12 notas — offsets en cents (La = 0)
 
-**1649 temperamentos** recopilados de diversas fuentes. Desviaciones en cents respecto al temperamento igual, con La = 0 como referencia.
+**1650 temperamentos** recopilados de diversas fuentes. Desviaciones en cents respecto al temperamento igual, con La = 0 como referencia.
 
 
 | Source | Name | C | C# | D | D# | E | F | F# | G | G# | A | B♭ | B |
@@ -1655,6 +1655,8 @@
 | [Scala](https://www.huygens-fokker.org/scala/) | Henri Arnaut De Zwolle. Pythagorean on G flat. | -5.865 | -15.64 | -1.955 | -11.73 | +1.955 | -7.82 | -17.595 | -3.91 | -13.685 | +0.0 | -9.775 | +3.91 |
 | [Scala](https://www.huygens-fokker.org/scala/) | Henri Arnaut De Zwolle's modified meantone tuning (c. 1440) | +10.265 | -13.686 | +3.422 | +13.361 | -3.422 | +13.686 | -10.265 | +6.843 | -17.108 | +0.0 | +13.524 | -6.843 |
 
+| [Bernal Ripoll 2007](https://miguelbernalripoll.com/wp-content/uploads/2015/09/el-temple-de-soler.pdf) | Antonio Soler — corrected mathematical reconstruction (Bernal Ripoll 2007) | +10.264 | +6.847 | +3.421 | +0.004 | -3.422 | +13.686 | +10.265 | +6.843 | +3.422 | +0.0 | -3.421 | -6.843 |
+
 ---
 
-*Fuente: [Scala scale library](https://www.huygens-fokker.org/scala/) — Manuel Op de Coul*
+*Fuente principal: [Scala scale library](https://www.huygens-fokker.org/scala/) — Manuel Op de Coul*
