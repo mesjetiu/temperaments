@@ -1,6 +1,6 @@
 {
-  "name": "Temperament Visualizer",
-  "short_name": "Temperaments",
+  "name": "Salinas",
+  "short_name": "Salinas",
   "description": "Historical and microtonal temperament explorer with tuner",
   "start_url": "/temperaments/",
   "scope": "/temperaments/",
