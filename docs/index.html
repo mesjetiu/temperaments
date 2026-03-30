@@ -262,6 +262,8 @@
 </div>
 
 <script>
+const APP_VERSION = '34387d8 · 2026-03-31';
+
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () =>
@@ -1487,7 +1489,7 @@ const TUNER = {
     }
     const ctx = canvas.getContext('2d');
 
-    const SCROLL  = 20;
+    const SCROLL  = 35;
     ctx.drawImage(canvas, 0, 0, W, H - SCROLL, 0, SCROLL, W, H - SCROLL);
 
     const STRIPES = 3;
@@ -1672,6 +1674,9 @@ function buildTunerScreen() {
         ${!window.matchMedia('(display-mode: standalone)').matches ? `<div style="border-top:1px solid #334155;padding-top:8px;margin-top:2px">
           <button onclick="(document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen())" style="width:100%;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:6px;padding:7px;cursor:pointer;font-size:12px">⛶ Pantalla completa</button>
         </div>` : ''}
+        <div style="border-top:1px solid #1e293b;padding-top:8px;margin-top:2px;text-align:center;font-size:9px;color:#334155;line-height:1.6">
+          Temperament Visualizer<br>${APP_VERSION}
+        </div>
       </div>
     </div>
     <div style="position:relative;flex:1;min-height:0">
