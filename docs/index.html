@@ -1466,7 +1466,7 @@ const TUNER = {
     const ctx = canvas.getContext('2d');
 
     // Scroll: push existing rows down, draw new row at top
-    const ROWS = 2;
+    const ROWS = 10;
     ctx.drawImage(canvas, 0, 0, W, H - ROWS, 0, ROWS, W, H - ROWS);
 
     if (!this.analyser || !this._fftBuf) {
