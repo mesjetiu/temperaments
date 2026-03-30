@@ -1,34 +1,73 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#111827"/>
-  <!-- Círculo de quintas estilizado: 12 puntos -->
+  <rect width="512" height="512" rx="80" fill="#111827"/>
+
+  <!-- Círculo de quintas: 12 segmentos de arco estilo radar de temperamentos -->
+  <!-- Valores de desviación (cents) simulando Werckmeister III:
+       C-G:-5.9  G-D:-5.9  D-A:-5.9  A-E:0  E-B:0  B-F#:0  F#-C#:+2.0
+       C#-G#:0  G#-Eb:0  Eb-Bb:0  Bb-F:-5.9  F-C:0  -->
+
   <g transform="translate(256,256)">
-    <!-- Arcos de fondo -->
-    <circle cx="0" cy="0" r="185" fill="none" stroke="#1f2937" stroke-width="28"/>
-    <circle cx="0" cy="0" r="120" fill="none" stroke="#1f2937" stroke-width="18"/>
-    <!-- 12 notas en círculo exterior -->
-    <circle cx="0"      cy="-185"  r="14" fill="#60a5fa"/>
-    <circle cx="90"     cy="-160"  r="11" fill="#4b5563"/>
-    <circle cx="160"    cy="-90"   r="11" fill="#4b5563"/>
-    <circle cx="185"    cy="0"     r="11" fill="#4b5563"/>
-    <circle cx="160"    cy="90"    r="11" fill="#4b5563"/>
-    <circle cx="90"     cy="160"   r="14" fill="#60a5fa"/>
-    <circle cx="0"      cy="185"   r="11" fill="#4b5563"/>
-    <circle cx="-90"    cy="160"   r="11" fill="#4b5563"/>
-    <circle cx="-160"   cy="90"    r="11" fill="#4b5563"/>
-    <circle cx="-185"   cy="0"     r="11" fill="#4b5563"/>
-    <circle cx="-160"   cy="-90"   r="11" fill="#4b5563"/>
-    <circle cx="-90"    cy="-160"  r="14" fill="#60a5fa"/>
-    <!-- Líneas de quinta (C→G→D→A→E→B) -->
-    <line x1="0" y1="-185"  x2="90"  y2="-160" stroke="#60a5fa" stroke-width="3" opacity="0.5"/>
-    <line x1="90" y1="-160" x2="185" y2="0"    stroke="#60a5fa" stroke-width="3" opacity="0.5"/>
-    <line x1="185" y1="0"   x2="90"  y2="160"  stroke="#60a5fa" stroke-width="3" opacity="0.5"/>
-    <line x1="90" y1="160"  x2="0"   y2="185"  stroke="#60a5fa" stroke-width="3" opacity="0.5"/>
-    <!-- Diapasón central -->
-    <path d="M-10,-55 L10,-55 L14,10 Q14,28 0,34 Q-14,28 -14,10 Z" fill="#60a5fa" opacity="0.9"/>
-    <rect x="-18" y="34" width="36" height="8" rx="4" fill="#60a5fa" opacity="0.9"/>
-    <line x1="0" y1="34" x2="0" y2="-90" stroke="#60a5fa" stroke-width="3" opacity="0.4"/>
-    <!-- Aguja afinación -->
-    <line x1="0" y1="0" x2="62" y2="-80" stroke="#4ade80" stroke-width="5" stroke-linecap="round"/>
-    <circle cx="0" cy="0" r="8" fill="#4ade80"/>
+    <!-- Anillo exterior -->
+    <circle r="195" fill="none" stroke="#1f2937" stroke-width="3"/>
+    <circle r="108" fill="none" stroke="#1f2937" stroke-width="2"/>
+    <circle r="60"  fill="#0d1520" stroke="#1f2937" stroke-width="1.5"/>
+
+    <!-- Segmentos: cada uno ocupa 30° (360/12). Arco desde r=112 a r=191 -->
+    <!-- gap de 2° en cada lado → arco neto 26° -->
+    <!-- Usando path de arco SVG. Centro en 0,0. -->
+    <!-- Orden de quintas: C G D A E B F# C# G# D# Bb F -->
+    <!-- Desviaciones Werckmeister III aprox (dev en cents):
+         C-G: -5.9 → rojo-naranja  rgb(239,100,30) aprox
+         G-D: -5.9
+         D-A: -5.9
+         A-E:  0   → verde         rgb(0,180,30)
+         E-B:  0
+         B-F#: 0
+         F#-C#:+2  → azul leve     rgb(140,80,130)
+         C#-G#: 0
+         G#-D#: 0
+         D#-Bb: 0
+         Bb-F: -5.9
+         F-C:  0
+    -->
+
+    <!-- Segmento 0: C→G  dev=-5.9  angle: -90° a -60° -->
+    <path d="M 0,-191 A 191,191 0 0,1 95.5,-165.4 L 54,-93.3 A 108,108 0 0,0 0,-108 Z" fill="rgb(210,135,30)" stroke="#111827" stroke-width="1.5"/>
+    <!-- Segmento 1: G→D  dev=-5.9  angle: -60° a -30° -->
+    <path d="M 95.5,-165.4 A 191,191 0 0,1 165.4,-95.5 L 93.5,-54 A 108,108 0 0,0 54,-93.3 Z" fill="rgb(210,135,30)" stroke="#111827" stroke-width="1.5"/>
+    <!-- Segmento 2: D→A  dev=-5.9  angle: -30° a 0° -->
+    <path d="M 165.4,-95.5 A 191,191 0 0,1 191,0 L 108,0 A 108,108 0 0,0 93.5,-54 Z" fill="rgb(210,135,30)" stroke="#111827" stroke-width="1.5"/>
+    <!-- Segmento 3: A→E  dev=0  angle: 0° a 30° -->
+    <path d="M 191,0 A 191,191 0 0,1 165.4,95.5 L 93.5,54 A 108,108 0 0,0 108,0 Z" fill="rgb(0,180,30)" stroke="#111827" stroke-width="1.5"/>
+    <!-- Segmento 4: E→B  dev=0  angle: 30° a 60° -->
+    <path d="M 165.4,95.5 A 191,191 0 0,1 95.5,165.4 L 54,93.3 A 108,108 0 0,0 93.5,54 Z" fill="rgb(0,180,30)" stroke="#111827" stroke-width="1.5"/>
+    <!-- Segmento 5: B→F#  dev=0  angle: 60° a 90° -->
+    <path d="M 95.5,165.4 A 191,191 0 0,1 0,191 L 0,108 A 108,108 0 0,0 54,93.3 Z" fill="rgb(0,180,30)" stroke="#111827" stroke-width="1.5"/>
+    <!-- Segmento 6: F#→C#  dev=+2  angle: 90° a 120° -->
+    <path d="M 0,191 A 191,191 0 0,1 -95.5,165.4 L -54,93.3 A 108,108 0 0,0 0,108 Z" fill="rgb(140,68,180)" stroke="#111827" stroke-width="1.5"/>
+    <!-- Segmento 7: C#→G#  dev=0  angle: 120° a 150° -->
+    <path d="M -95.5,165.4 A 191,191 0 0,1 -165.4,95.5 L -93.5,54 A 108,108 0 0,0 -54,93.3 Z" fill="rgb(0,180,30)" stroke="#111827" stroke-width="1.5"/>
+    <!-- Segmento 8: G#→D#  dev=0  angle: 150° a 180° -->
+    <path d="M -165.4,95.5 A 191,191 0 0,1 -191,0 L -108,0 A 108,108 0 0,0 -93.5,54 Z" fill="rgb(0,180,30)" stroke="#111827" stroke-width="1.5"/>
+    <!-- Segmento 9: D#→Bb  dev=0  angle: 180° a 210° -->
+    <path d="M -191,0 A 191,191 0 0,1 -165.4,-95.5 L -93.5,-54 A 108,108 0 0,0 -108,0 Z" fill="rgb(0,180,30)" stroke="#111827" stroke-width="1.5"/>
+    <!-- Segmento 10: Bb→F  dev=-5.9  angle: 210° a 240° -->
+    <path d="M -165.4,-95.5 A 191,191 0 0,1 -95.5,-165.4 L -54,-93.3 A 108,108 0 0,0 -93.5,-54 Z" fill="rgb(210,135,30)" stroke="#111827" stroke-width="1.5"/>
+    <!-- Segmento 11: F→C  dev=0  angle: 240° a 270° -->
+    <path d="M -95.5,-165.4 A 191,191 0 0,1 0,-191 L 0,-108 A 108,108 0 0,0 -54,-93.3 Z" fill="rgb(0,180,30)" stroke="#111827" stroke-width="1.5"/>
+
+    <!-- Etiquetas de notas (radio 218) -->
+    <text x="0"    y="-218" text-anchor="middle" dominant-baseline="middle" font-size="28" font-weight="bold" fill="#e2e8f0" font-family="sans-serif">C</text>
+    <text x="109"  y="-189" text-anchor="middle" dominant-baseline="middle" font-size="24" fill="#94a3b8" font-family="sans-serif">G</text>
+    <text x="189"  y="-109" text-anchor="middle" dominant-baseline="middle" font-size="24" fill="#94a3b8" font-family="sans-serif">D</text>
+    <text x="218"  y="0"    text-anchor="middle" dominant-baseline="middle" font-size="24" fill="#94a3b8" font-family="sans-serif">A</text>
+    <text x="189"  y="109"  text-anchor="middle" dominant-baseline="middle" font-size="24" fill="#94a3b8" font-family="sans-serif">E</text>
+    <text x="109"  y="189"  text-anchor="middle" dominant-baseline="middle" font-size="24" fill="#94a3b8" font-family="sans-serif">B</text>
+    <text x="0"    y="218"  text-anchor="middle" dominant-baseline="middle" font-size="22" fill="#94a3b8" font-family="sans-serif">F♯</text>
+    <text x="-109" y="189"  text-anchor="middle" dominant-baseline="middle" font-size="22" fill="#94a3b8" font-family="sans-serif">C♯</text>
+    <text x="-189" y="109"  text-anchor="middle" dominant-baseline="middle" font-size="22" fill="#94a3b8" font-family="sans-serif">G♯</text>
+    <text x="-218" y="0"    text-anchor="middle" dominant-baseline="middle" font-size="22" fill="#94a3b8" font-family="sans-serif">E♭</text>
+    <text x="-189" y="-109" text-anchor="middle" dominant-baseline="middle" font-size="22" fill="#94a3b8" font-family="sans-serif">B♭</text>
+    <text x="-109" y="-189" text-anchor="middle" dominant-baseline="middle" font-size="26" fill="#94a3b8" font-family="sans-serif">F</text>
   </g>
 </svg>
