@@ -1299,6 +1299,7 @@ const TUNER = {
   mode: 'auto',    // 'auto' | 'manual'
   targetNi: 9, targetOct: 4,
   tunerOct: 4,
+  _refNi: null, _refOct: null,
   refOn: false, refOsc: null, refGain: null,
   micOn: false, micStream: null, analyser: null,
   strobePhase: 0, prevStrobePhase: 0, lastTs: 0, rafId: null,
@@ -1451,7 +1452,16 @@ const TUNER = {
         this.detectedCents = 1200 * Math.log2(p.freq / tf);
         freqError = p.freq - tf;
         if (this.refOn && this.refOsc) {
-          this.refOsc.frequency.setTargetAtTime(tf, getCtx().currentTime, 0.02);
+          const noteChanged = (this.targetNi !== this._refNi || this.targetOct !== this._refOct);
+          this._refNi = this.targetNi; this._refOct = this.targetOct;
+          if (noteChanged) {
+            // Nota nueva: salto inmediato sin glide
+            this.refOsc.frequency.cancelScheduledValues(getCtx().currentTime);
+            this.refOsc.frequency.setValueAtTime(tf, getCtx().currentTime);
+          } else {
+            // Misma nota: smooth lento para seguir el temperamento sin glide audible
+            this.refOsc.frequency.setTargetAtTime(tf, getCtx().currentTime, 0.08);
+          }
         }
       } else {
         this.detectedFreq = null; this.detectedCents = null; this.clarity = 0;
