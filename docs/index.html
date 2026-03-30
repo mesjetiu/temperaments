@@ -1464,52 +1464,21 @@ const TUNER = {
     }
     const ctx = canvas.getContext('2d');
 
-    const SCROLL = 10;
+    const SCROLL  = 10;
     ctx.drawImage(canvas, 0, 0, W, H - SCROLL, 0, SCROLL, W, H - SCROLL);
 
-    const strip = ctx.createImageData(W, SCROLL);
-    const d = strip.data;
-
-    if (!this.analyser) { ctx.putImageData(strip, 0, 0); return; }
-
-    // Muestras reales del dominio del tiempo
-    const timeBuf = new Float32Array(this.analyser.fftSize);
-    this.analyser.getFloatTimeDomainData(timeBuf);
-    const N = timeBuf.length;
-
-    const sampleRate    = getCtx().sampleRate;
-    const tf            = this.getTargetFreq();
-    const periodSamples = sampleRate / tf;
-    const PERIODS_SHOWN = 2;           // cuántos periodos caben en el ancho
-    const windowSamples = periodSamples * PERIODS_SHOWN;
-
-    // Buscar cruce por cero ascendente cerca del centro para estabilizar imagen
-    const searchStart = Math.max(1, Math.floor(N / 2 - periodSamples));
-    const searchEnd   = Math.min(N - 1, Math.floor(searchStart + periodSamples * 2));
-    let triggerIdx    = Math.floor(N / 2);
-    for (let i = searchStart; i < searchEnd; i++) {
-      if (timeBuf[i - 1] < 0 && timeBuf[i] >= 0) { triggerIdx = i; break; }
-    }
+    const STRIPES = 6;
+    const has     = this.detectedFreq !== null;
+    const strip   = ctx.createImageData(W, SCROLL);
+    const d       = strip.data;
 
     for (let s = 0; s < SCROLL; s++) {
-      // Interpolar fase acumulada entre frame anterior y actual
-      const alpha         = s / SCROLL;
-      const phase         = this.strobePhase * (1 - alpha) + this.prevStrobePhase * alpha;
-      // Convertir fase en desplazamiento de muestras: si hay error, la imagen se desplaza
-      const phaseInSamples = (phase / (2 * Math.PI)) * periodSamples;
-
+      const alpha = s / SCROLL;
+      const phase = this.strobePhase * (1 - alpha) + this.prevStrobePhase * alpha;
       for (let x = 0; x < W; x++) {
-        const pos  = triggerIdx + phaseInSamples + (x / W) * windowSamples;
-        const si0  = Math.floor(pos);
-        const si1  = si0 + 1;
-        const frac = pos - si0;
-        const a0   = (si0 >= 0 && si0 < N) ? timeBuf[si0] : 0;
-        const a1   = (si1 >= 0 && si1 < N) ? timeBuf[si1] : 0;
-        const amp  = a0 * (1 - frac) + a1 * frac;   // interpolación lineal
-        // gamma 2.8: fondo negro, sólo los picos brillan
-        // abs + gamma alta: fondo negro, solo picos brillan
-        const v    = Math.round(Math.pow(Math.abs(amp), 0.4) * 255);
-        const i    = (s * W + x) * 4;
+        const val = (Math.sin((x / W) * 2 * Math.PI * STRIPES + phase * STRIPES) + 1) / 2;
+        const v   = has ? Math.round(val * 255) : Math.round(val * 18);
+        const i   = (s * W + x) * 4;
         d[i] = v; d[i+1] = v; d[i+2] = v; d[i+3] = 255;
       }
     }
