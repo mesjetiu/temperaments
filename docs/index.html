@@ -62,7 +62,10 @@
   #list { flex: 1; overflow-y: auto; }
   #list::-webkit-scrollbar { width: 4px; }
   #list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-  .temp-item { padding: 6px 8px; cursor: pointer; border-radius: 4px; margin-bottom: 2px; border-left: 3px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11.5px; color: #d1d5db; -webkit-tap-highlight-color: transparent; }
+  .temp-item { padding: 6px 8px 6px 6px; cursor: pointer; border-radius: 4px; margin-bottom: 2px; border-left: 3px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11.5px; color: #d1d5db; -webkit-tap-highlight-color: transparent; display:flex; align-items:center; gap:4px; }
+  .fav-btn { flex-shrink:0; font-size:12px; color:#4b5563; cursor:pointer; padding:0 2px; line-height:1; }
+  .fav-btn:hover { color:#fbbf24; }
+  .fav-btn.fav-on { color:#fbbf24; }
   .temp-item:hover, .temp-item:active { background: #1a2535; color: #fff; }
   .temp-item.sel0 { border-left-color: var(--c0); background: #1e3a5f; color: #bfdbfe; }
   .temp-item.sel1 { border-left-color: var(--c1); background: #3f1f1f; color: #fecaca; }
@@ -165,7 +168,10 @@
   <!-- ═══ SIDEBAR ═══ -->
   <div id="sidebar">
     <h2>Temperamentos</h2>
-    <input id="search" type="text" placeholder="Buscar..." autocomplete="off">
+    <div style="display:flex;gap:4px;align-items:center">
+      <input id="search" type="text" placeholder="Buscar..." autocomplete="off" style="flex:1">
+      <button id="fav-btn" title="Solo favoritos" onclick="toggleFavFilter()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 7px;cursor:pointer;font-size:13px;color:#9ca3af">★</button>
+    </div>
     <div id="count">Cargando...</div>
     <div id="list"><div style="padding:14px;font-size:11px;color:#6b7280">Cargando datos...</div></div>
   </div>
@@ -261,6 +267,22 @@ let selected  = [null, null, null];
 let activeTab = 'overview';
 let charts    = {};
 let chartMeta = {};
+
+// ── Favoritos ──
+const FAV_DEFAULTS = [
+  'Equal temperament','Werckmeister III','Kirnberger III','Valotti',
+  'Bach (Bradley Lehman)','1/4 comma meantone (Aaron 1523)','Pythagorean'
+];
+const _favRaw = localStorage.getItem('tempFavs');
+let favs = new Set(_favRaw ? JSON.parse(_favRaw) : FAV_DEFAULTS);
+function saveFavs() { localStorage.setItem('tempFavs', JSON.stringify([...favs])); }
+function toggleFav(name, e) {
+  e.stopPropagation();
+  favs.has(name) ? favs.delete(name) : favs.add(name);
+  saveFavs();
+  refreshList();
+}
+let showFavsOnly = false;
 
 let pitchA      = 440;   // Hz del La de referencia
 let octaveShift = 0;     // desplazamiento de octava para gráficas
@@ -726,8 +748,7 @@ function parseMarkdown(text) {
     temps.push({ source: m ? m[1] : cells[1], name: cells[2], offsets });
   }
   all = temps;
-  renderList(all);
-  document.getElementById('count').textContent = `${all.length} temperamentos`;
+  refreshList();
 }
 
 // ══════════════════════════════════════════════
@@ -738,18 +759,46 @@ function selClass(t) { const i=selected.findIndex(s=>s&&s.name===t.name); return
 function renderList(temps) {
   const el = document.getElementById('list');
   if (!temps.length) { el.innerHTML='<div style="padding:12px;font-size:11px;color:#6b7280">Sin resultados</div>'; return; }
-  el.innerHTML = temps.map(t => {
-    const i = all.indexOf(t);
-    return `<div class="temp-item ${selClass(t)}" onclick="toggleSelect(${i})" title="${t.name} [${t.source}]">${t.name}</div>`;
-  }).join('');
+  // Favoritos primero
+  const fav = temps.filter(t => favs.has(t.name));
+  const rest = temps.filter(t => !favs.has(t.name));
+  const ordered = [...fav, ...rest];
+  let html = '';
+  if (fav.length && rest.length) html += `<div style="font-size:9px;color:#6b7280;padding:4px 8px 2px;letter-spacing:.5px">★ FAVORITOS</div>`;
+  html += fav.map(t => itemHtml(t)).join('');
+  if (fav.length && rest.length) html += `<div style="font-size:9px;color:#6b7280;padding:6px 8px 2px;letter-spacing:.5px">TODOS</div>`;
+  html += rest.map(t => itemHtml(t)).join('');
+  el.innerHTML = html;
+}
+function itemHtml(t) {
+  const i = all.indexOf(t);
+  const isFav = favs.has(t.name);
+  return `<div class="temp-item ${selClass(t)}" onclick="toggleSelect(${i})" title="${t.name} [${t.source}]">
+    <span class="fav-btn${isFav?' fav-on':''}" onclick="toggleFav('${t.name.replace(/'/g,"\\'")}',event)" title="${isFav?'Quitar de favoritos':'Añadir a favoritos'}">${isFav?'★':'☆'}</span>
+    ${t.name}
+  </div>`;
 }
 
-document.getElementById('search').addEventListener('input', function() {
-  const q = this.value.toLowerCase();
-  const f = all.filter(t => t.name.toLowerCase().includes(q) || t.source.toLowerCase().includes(q));
-  document.getElementById('count').textContent = `${f.length} / ${all.length}`;
+function getFilteredList() {
+  const q = document.getElementById('search').value.toLowerCase();
+  let f = all.filter(t => !q || t.name.toLowerCase().includes(q) || t.source.toLowerCase().includes(q));
+  if (showFavsOnly) f = f.filter(t => favs.has(t.name));
+  return f;
+}
+function refreshList() {
+  const f = getFilteredList();
+  document.getElementById('count').textContent = showFavsOnly
+    ? `${f.length} favoritos` : (f.length < all.length ? `${f.length} / ${all.length}` : `${all.length} temperamentos`);
   renderList(f);
-});
+}
+function toggleFavFilter() {
+  showFavsOnly = !showFavsOnly;
+  const btn = document.getElementById('fav-btn');
+  btn.style.color    = showFavsOnly ? '#fbbf24' : '#9ca3af';
+  btn.style.borderColor = showFavsOnly ? '#fbbf24' : '';
+  refreshList();
+}
+document.getElementById('search').addEventListener('input', refreshList);
 
 // ══════════════════════════════════════════════
 // SELECCIÓN
@@ -760,8 +809,7 @@ function toggleSelect(idx) {
   if (ei >= 0) { selected[ei] = null; }
   else { const e2=selected.findIndex(s=>!s); if(e2>=0) selected[e2]=t; else selected=[t,null,null]; }
   renderBadges();
-  const q = document.getElementById('search').value.toLowerCase();
-  renderList(all.filter(t2 => !q || t2.name.toLowerCase().includes(q) || t2.source.toLowerCase().includes(q)));
+  refreshList();
   if (isMobile()) closeSidebar();
   renderContent();
 }
@@ -773,7 +821,7 @@ function renderBadges() {
   document.getElementById('desk-badges').innerHTML = html;
   document.getElementById('mob-badges').innerHTML  = html;
 }
-function clearSel(i) { selected[i]=null; renderBadges(); const q=document.getElementById('search').value.toLowerCase(); renderList(all.filter(t=>!q||t.name.toLowerCase().includes(q))); renderContent(); }
+function clearSel(i) { selected[i]=null; renderBadges(); refreshList(); renderContent(); }
 
 // ══════════════════════════════════════════════
 // TABS
