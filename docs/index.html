@@ -1507,7 +1507,8 @@ const TUNER = {
         const a1   = (si1 >= 0 && si1 < N) ? timeBuf[si1] : 0;
         const amp  = a0 * (1 - frac) + a1 * frac;   // interpolación lineal
         // gamma 2.8: fondo negro, sólo los picos brillan
-        const v    = Math.round(Math.pow((amp + 1) * 0.5, 2.8) * 255);
+        // abs + gamma alta: fondo negro, solo picos brillan
+        const v    = Math.round(Math.pow(Math.abs(amp), 0.4) * 255);
         const i    = (s * W + x) * 4;
         d[i] = v; d[i+1] = v; d[i+2] = v; d[i+3] = 255;
       }
