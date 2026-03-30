@@ -1328,9 +1328,10 @@ const TUNER = {
       const ctx = getCtx();
       const src = ctx.createMediaStreamSource(stream);
       this.analyser = ctx.createAnalyser();
-      this.analyser.fftSize = 4096;
-      this.analyser.smoothingTimeConstant = 0;
+      this.analyser.fftSize = 8192;
+      this.analyser.smoothingTimeConstant = 0.78;
       src.connect(this.analyser);
+      this._fftBuf = new Uint8Array(this.analyser.frequencyBinCount);
       this.micOn = true;
       if (btn) { btn.textContent = '🎤 Mic ON'; btn.classList.add('sel'); }
       if (!this.rafId) { this.lastTs = performance.now(); this.loop(this.lastTs); }
@@ -1410,44 +1411,54 @@ const TUNER = {
     }
     const ctx = canvas.getContext('2d');
 
-    // Scroll + new rows — interpolate phase between prev and current frame → no discrete steps
-    const SCROLL  = 20;
-    ctx.drawImage(canvas, 0, 0, W, H - SCROLL, 0, SCROLL, W, H - SCROLL);
-    const STRIPES = 6;
-    const cents    = this.detectedCents;
-    const has      = this.detectedFreq !== null;
-    const hasMic   = this.micOn;
-    const absCents = Math.abs(cents ?? 0);
-    const strip = ctx.createImageData(W, SCROLL);
+    // Scroll: push existing rows down, draw new row at top
+    const ROWS = 2;
+    ctx.drawImage(canvas, 0, 0, W, H - ROWS, 0, ROWS, W, H - ROWS);
+
+    if (!this.analyser || !this._fftBuf) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, W, ROWS);
+      return;
+    }
+
+    this.analyser.getByteFrequencyData(this._fftBuf);
+    const sampleRate = getCtx().sampleRate;
+    const binCount   = this._fftBuf.length; // fftSize / 2
+
+    // Log frequency scale: 40 Hz → 8 kHz
+    const FMIN = 40, FMAX = Math.min(8000, sampleRate / 2);
+    const logMin = Math.log2(FMIN), logMax = Math.log2(FMAX);
+
+    const strip = ctx.createImageData(W, ROWS);
     const d = strip.data;
 
-    for (let s = 0; s < SCROLL; s++) {
-      // row 0 = newest (current phase), row SCROLL-1 = oldest of this batch (prev phase)
-      const alpha = s / SCROLL;
-      const phase = this.strobePhase * (1 - alpha) + this.prevStrobePhase * alpha;
-
-      for (let x = 0; x < W; x++) {
-        const val = (Math.sin((x / W) * 2 * Math.PI * STRIPES + phase * STRIPES) + 1) / 2;
-        let r, g, b;
-        if (!hasMic) {
-          r = g = b = Math.round(val * 18);
-        } else if (!has) {
-          r = Math.round(val * 10); g = Math.round(val * 40); b = Math.round(val * 55);
-        } else if (absCents < 1.5) {
-          r = Math.round(val * 15); g = Math.round(val * 245); b = Math.round(val * 55);
-        } else if (cents > 0) {
-          const sv = Math.min(1, absCents / 40);
-          r = Math.round(val * (80 + sv * 175)); g = Math.round(val * (220 - sv * 180)); b = 0;
-        } else {
-          const sv = Math.min(1, absCents / 40);
-          r = 0; g = Math.round(val * (180 - sv * 130)); b = Math.round(val * (140 + sv * 115));
-        }
-        const i = (s * W + x) * 4;
-        d[i] = r; d[i+1] = g; d[i+2] = b; d[i+3] = 255;
+    for (let x = 0; x < W; x++) {
+      const r    = x / (W - 1);
+      const freq = Math.pow(2, logMin + r * (logMax - logMin));
+      const binF = freq / (sampleRate / 2) * binCount;
+      const b0   = Math.min(Math.floor(binF), binCount - 1);
+      const b1   = Math.min(b0 + 1, binCount - 1);
+      const t    = binF - Math.floor(binF);
+      const mag  = this._fftBuf[b0] * (1 - t) + this._fftBuf[b1] * t; // 0–255
+      // sqrt gamma: brings out weak harmonics
+      const v    = Math.round(Math.pow(mag / 255, 0.55) * 255);
+      for (let row = 0; row < ROWS; row++) {
+        const i = (row * W + x) * 4;
+        d[i] = v; d[i+1] = v; d[i+2] = v; d[i+3] = 255;
       }
     }
     ctx.putImageData(strip, 0, 0);
 
+    // Marker line for detected / target note
+    if (this.detectedFreq !== null) {
+      const tf  = this.getTargetFreq();
+      const rx  = (Math.log2(tf) - logMin) / (logMax - logMin);
+      if (rx >= 0 && rx <= 1) {
+        const px = Math.round(rx * W);
+        ctx.fillStyle = 'rgba(96,165,250,0.65)';
+        ctx.fillRect(Math.max(0, px - 1), 0, 3, ROWS);
+      }
+    }
   },
 
   updateStatus() {
