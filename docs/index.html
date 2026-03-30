@@ -1511,9 +1511,9 @@ const TUNER = {
         const centsStr = has && c !== null ? (c >= 0 ? '+' : '') + c.toFixed(1) + '¢' : '';
         const freqStr  = has ? this.detectedFreq.toFixed(2) + ' Hz' : '';
         ov.innerHTML = `
-          <span style="font-size:clamp(48px,12vw,110px);font-weight:bold;color:${col};text-shadow:0 0 12px rgba(0,0,0,0.9),0 0 3px rgba(0,0,0,1);line-height:1">${noteStr}</span>
-          ${centsStr ? `<span style="font-size:clamp(18px,4.5vw,38px);color:${col};text-shadow:0 0 8px rgba(0,0,0,0.9);margin-top:4px">${centsStr}</span>` : ''}
-          ${freqStr  ? `<span style="font-size:clamp(12px,3vw,22px);color:rgba(200,200,200,0.75);text-shadow:0 0 6px rgba(0,0,0,0.9);margin-top:2px">${freqStr}</span>` : ''}`;
+          <span style="font-size:clamp(80px,22vw,180px);font-weight:bold;color:${col};text-shadow:0 0 16px rgba(0,0,0,0.95),0 0 4px rgba(0,0,0,1);line-height:1">${noteStr}</span>
+          ${centsStr ? `<span style="font-size:clamp(32px,8vw,64px);color:${col};text-shadow:0 0 10px rgba(0,0,0,0.95);margin-top:6px">${centsStr}</span>` : ''}
+          ${freqStr  ? `<span style="font-size:clamp(20px,5vw,40px);color:rgba(200,200,200,0.85);text-shadow:0 0 8px rgba(0,0,0,0.95);margin-top:4px">${freqStr}</span>` : ''}`;
       }
     }
 
