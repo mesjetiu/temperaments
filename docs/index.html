@@ -1419,6 +1419,9 @@ const TUNER = {
       src.connect(this.analyser);
       this.micOn = true;
       if (btn) { btn.textContent = '🎤 Mic ON'; btn.classList.add('sel'); }
+      // Quitar el botón grande del overlay
+      const ov = document.getElementById('strobe-overlay');
+      if (ov) ov.innerHTML = '';
       if (!this.rafId) { this.lastTs = performance.now(); this.loop(this.lastTs); }
     } catch(e) {
       if (btn) btn.textContent = '🎤 Sin permiso';
@@ -1696,7 +1699,12 @@ function buildTunerScreen() {
     </div>
     <div style="position:relative;flex:1;min-height:0">
       <canvas id="strobe-canvas" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
-      <div id="strobe-overlay" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none"></div>
+      <div id="strobe-overlay" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none">
+        ${!TUNER.micOn ? `<button onclick="TUNER.toggleMic()" style="pointer-events:auto;background:rgba(29,78,216,0.92);border:3px solid #60a5fa;border-radius:50%;width:min(180px,40vw);height:min(180px,40vw);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;box-shadow:0 0 40px rgba(96,165,250,0.4)">
+          <span style="font-size:clamp(48px,12vw,80px);line-height:1">🎤</span>
+          <span style="font-size:clamp(13px,3.5vw,18px);color:#bfdbfe;font-weight:600">Iniciar mic</span>
+        </button>` : ''}
+      </div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;padding:0 14px;background:#0f172a;flex-shrink:0;height:42px;box-sizing:border-box">
       <span style="font-size:11px;color:#64748b">${isManual?'Manual':'Auto'}</span>
