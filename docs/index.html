@@ -1586,6 +1586,9 @@ function buildTunerScreen() {
           <button id="ref-btn" class="icon-btn${TUNER.refOn?' sel':''}" onclick="TUNER.toggleRef()" style="flex:1;font-size:12px">♪ Nota ref.</button>
           <button id="mic-btn" class="icon-btn${TUNER.micOn?' sel':''}" onclick="TUNER.toggleMic()" style="flex:1;font-size:12px">🎤 ${TUNER.micOn?'ON':'Mic'}</button>
         </div>
+        <div style="border-top:1px solid #334155;padding-top:8px;margin-top:2px">
+          <button onclick="(document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen())" style="width:100%;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:6px;padding:7px;cursor:pointer;font-size:12px">⛶ Pantalla completa</button>
+        </div>
       </div>
     </div>
     <div style="position:relative;flex:1;min-height:0">
