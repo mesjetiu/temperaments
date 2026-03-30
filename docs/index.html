@@ -80,6 +80,8 @@
 
   /* ═══ TABS ═══ */
   #tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--surface); padding: 0 18px; overflow-x: auto; flex-shrink: 0; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  #tuner-screen { position:fixed;top:0;left:0;width:100%;height:100%;z-index:500;background:#000;display:flex;flex-direction:column;overflow:hidden; }
+  #sidebar { z-index: 600; }
   #tabs::-webkit-scrollbar { display: none; }
   .tab { padding: 10px 15px; cursor: pointer; font-size: 12px; color: #6b7280; border-bottom: 2px solid transparent; white-space: nowrap; transition: color 0.15s; -webkit-tap-highlight-color: transparent; }
   .tab:hover { color: #9ca3af; }
@@ -273,6 +275,7 @@ const COLORS_A= ['rgba(96,165,250,0.18)','rgba(248,113,113,0.18)','rgba(74,222,1
 // ══════════════════════════════════════════════
 let all       = [];
 let selected  = [null, null, null];
+let lastSelected = null;   // último temperamento elegido (teclado + afinador lo usan)
 let activeTab = 'overview';
 let charts    = {};
 let chartMeta = {};
@@ -476,7 +479,7 @@ const KB = {
 
   key(ni, oct) { return `${ni}_${oct}`; },
 
-  getOffsets() { return selected.find(Boolean)?.offsets ?? new Array(12).fill(0); },
+  getOffsets() { return (lastSelected ?? selected.find(Boolean))?.offsets ?? new Array(12).fill(0); },
 
   freq(ni, oct) {
     const cents = ET_FROM_A[ni] + this.getOffsets()[ni] + (oct - 4) * 1200;
@@ -761,7 +764,7 @@ function parseMarkdown(text) {
     for (let i = 3; i <= 14; i++) { const v = parseFloat(cells[i]); if (isNaN(v)) { ok=false; break; } offsets.push(v); }
     if (!ok || offsets.length !== 12) continue;
     const m = cells[1].match(/\[([^\]]+)\]/);
-    temps.push({ source: m ? m[1] : cells[1], name: cells[2], offsets });
+    temps.push({ source: (m ? m[1] : cells[1]).trim(), name: cells[2], offsets });
   }
   all = temps;
   refreshList();
@@ -825,14 +828,25 @@ document.getElementById('search').addEventListener('input', refreshList);
 function toggleSelect(idx) {
   const t = all[idx];
   const ei = selected.findIndex(s => s && s.name === t.name);
-  if (ei >= 0) { selected[ei] = null; }
-  else { const e2=selected.findIndex(s=>!s); if(e2>=0) selected[e2]=t; else selected=[t,null,null]; }
+  if (ei >= 0) {
+    selected[ei] = null;
+    if (lastSelected?.name === t.name) lastSelected = selected.find(Boolean) ?? null;
+  } else {
+    const e2 = selected.findIndex(s => !s);
+    if (e2 >= 0) selected[e2] = t; else selected = [t, null, null];
+    lastSelected = t;
+  }
   renderBadges();
   refreshList();
+  updateTunerTempName();
   if (isMobile()) closeSidebar();
   renderContent();
 }
 
+function updateTunerTempName() {
+  const el = document.getElementById('tuner-temp-name');
+  if (el) el.textContent = tunerTempName();
+}
 function renderBadges() {
   const html = selected.map((t,i) =>
     t ? `<span class="badge badge${i}" onclick="clearSel(${i})" title="Quitar">${shortName(t,28)} ×</span>` : ''
@@ -851,6 +865,7 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
   }
   if (activeTab === 'tuner' && this.dataset.tab !== 'tuner') {
     TUNER.stop();
+    document.getElementById('tuner-screen')?.remove();
   }
   document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
   this.classList.add('active'); activeTab = this.dataset.tab; renderContent();
@@ -1005,7 +1020,7 @@ function renderContent() {
   if (activeTab !== 'keyboard') { /* KB keeps its chord */ }
   const act=selected.filter(Boolean);
   const el=document.getElementById('content');
-  if (activeTab !== 'keyboard' && !act.length) {
+  if (activeTab !== 'keyboard' && activeTab !== 'tuner' && !act.length) {
     el.innerHTML='<div class="empty-state">Selecciona un temperamento de la lista para empezar.</div>'; return;
   }
   ({overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,keyboard:viewKeyboard,tuner:viewTuner}[activeTab])?.(act);
@@ -1199,7 +1214,7 @@ function detectPitch(buf, sampleRate) {
 
 function findClosestNote(freq) {
   const centsFromA4 = 1200 * Math.log2(freq / pitchA);
-  const off = selected.find(Boolean)?.offsets ?? new Array(12).fill(0);
+  const off = (lastSelected ?? selected.find(Boolean))?.offsets ?? new Array(12).fill(0);
   let bestNi = 9, bestOct = 4, bestDiff = Infinity;
   for (let oct = 0; oct <= 8; oct++) {
     for (let ni = 0; ni < 12; ni++) {
@@ -1223,18 +1238,23 @@ const TUNER = {
   detectedFreq: null, detectedCents: null, clarity: 0, rms: 0,
 
   getTargetFreq() {
-    const off = selected.find(Boolean)?.offsets ?? new Array(12).fill(0);
+    const off = (lastSelected ?? selected.find(Boolean))?.offsets ?? new Array(12).fill(0);
     return pitchA * Math.pow(2, (ET_FROM_A[this.targetNi] + off[this.targetNi] + (this.targetOct - 4) * 1200) / 1200);
   },
 
   setMode(m) {
     this.mode = m;
+    this.strobePhase = 0; this.prevStrobePhase = 0;
+    if (document.getElementById('tuner-screen')) {
+      cancelAnimationFrame(this.rafId); this.rafId = null;
+      closeTunerMenu();
+      buildTunerScreen(); return;
+    }
     document.querySelectorAll('.tmode-btn').forEach(b => b.classList.toggle('sel', b.dataset.tmode === m));
     const kw = document.getElementById('tuner-kb-wrap');
     if (kw) kw.style.display = m === 'manual' ? 'block' : 'none';
     const mc = document.getElementById('tuner-manual-ctrl');
     if (mc) mc.style.display = m === 'manual' ? 'flex' : 'none';
-    this.strobePhase = 0; this.prevStrobePhase = 0;
   },
 
   setTarget(ni, oct) {
@@ -1497,67 +1517,93 @@ const TUNER = {
 };
 
 // ─── VISTA AFINADOR ───
-function viewTuner() {
-  const mob = isMobile();
-  const BAR_H = 46;
-  const strobeH = mob ? (window.innerHeight - BAR_H) : Math.max(400, Math.round(window.innerHeight * 0.65));
+function toggleTunerMenu() {
+  const m = document.getElementById('tuner-menu');
+  if (!m) return;
+  m.style.display = m.style.display === 'none' ? 'flex' : 'none';
+}
+function closeTunerMenu() {
+  const m = document.getElementById('tuner-menu');
+  if (m) m.style.display = 'none';
+}
+function tunerTempName() {
+  const t = lastSelected ?? selected.find(Boolean);
+  return t ? t.name : '(sin temperamento)';
+}
 
-  document.getElementById('content').innerHTML = `
-    <div style="display:flex;flex-direction:column;${mob?'margin:-12px -12px 0;':'gap:10px;'}">
+function exitTuner() {
+  TUNER.stop();
+  document.getElementById('tuner-screen')?.remove();
+  const prev = document.querySelector('.tab:not([data-tab="tuner"])');
+  if (prev) prev.click(); else document.querySelector('.tab')?.click();
+}
 
-      <!-- Barra superior compacta -->
-      <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--panel);flex-wrap:wrap;min-height:${BAR_H}px;box-sizing:border-box;${mob?'':'border-radius:8px;'}">
-        <button class="tmode-btn${TUNER.mode==='auto'?' sel':''}" data-tmode="auto" onclick="TUNER.setMode('auto')" style="font-size:11px;padding:4px 8px">Auto</button>
-        <button class="tmode-btn${TUNER.mode==='manual'?' sel':''}" data-tmode="manual" onclick="TUNER.setMode('manual')" style="font-size:11px;padding:4px 8px">Manual</button>
-        <span id="tuner-manual-ctrl" style="display:${TUNER.mode==='manual'?'flex':'none'};align-items:center;gap:4px">
-          <button class="icon-btn" onclick="TUNER.shiftOct(-1)" style="font-size:11px;padding:2px 6px">◀</button>
-          <span id="tuner-oct-lbl" style="font-size:11px;color:var(--muted)">Oct ${TUNER.tunerOct}</span>
-          <button class="icon-btn" onclick="TUNER.shiftOct(+1)" style="font-size:11px;padding:2px 6px">▶</button>
-        </span>
-        <div style="flex:1"></div>
-        <button id="ref-btn" class="icon-btn${TUNER.refOn?' sel':''}" onclick="TUNER.toggleRef()" style="font-size:11px">♪</button>
-        <button id="mic-btn" class="icon-btn${TUNER.micOn?' sel':''}" onclick="TUNER.toggleMic()" style="font-size:11px">🎤 ${TUNER.micOn?'ON':'Mic'}</button>
-        <div id="signal-bar" style="width:48px"><div id="signal-fill"></div></div>
-      </div>
-
-      <!-- Canvas principal: ocupa todo en móvil -->
-      <div style="position:relative;width:100%;height:${strobeH}px;flex-shrink:0">
-        <canvas id="strobe-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;display:block"></canvas>
-        <div id="strobe-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;gap:0"></div>
-      </div>
-
-      <!-- Teclado manual: solo desktop -->
-      ${!mob ? `<div id="tuner-kb-wrap" style="display:${TUNER.mode==='manual'?'block':'none'};background:var(--panel);border-radius:8px;padding:10px">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-          <button class="icon-btn" onclick="TUNER.shiftOct(-1)">◀</button>
-          <span id="tuner-oct-lbl2" style="font-size:11px;color:var(--muted)">Oct. ${TUNER.tunerOct}</span>
-          <button class="icon-btn" onclick="TUNER.shiftOct(+1)">▶</button>
+function buildTunerScreen() {
+  document.getElementById('tuner-screen')?.remove();
+  const isManual = TUNER.mode === 'manual';
+  const sc = document.createElement('div');
+  sc.id = 'tuner-screen';
+  sc.innerHTML = `
+    <div style="position:relative;display:flex;align-items:center;gap:8px;padding:0 10px;background:#0f172a;flex-shrink:0;height:46px;box-sizing:border-box">
+      <button onclick="exitTuner()" style="background:none;border:none;color:#93c5fd;font-size:24px;cursor:pointer;line-height:1;padding:0 4px">‹</button>
+      <span id="tuner-temp-name" style="flex:1;font-size:11px;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${tunerTempName()}</span>
+      <div id="signal-bar" style="width:44px"><div id="signal-fill"></div></div>
+      <button onclick="toggleTunerMenu()" style="background:none;border:none;color:#93c5fd;cursor:pointer;padding:4px;display:flex;flex-direction:column;gap:4px">
+        <span style="width:18px;height:2px;background:currentColor;display:block;border-radius:1px"></span>
+        <span style="width:18px;height:2px;background:currentColor;display:block;border-radius:1px"></span>
+        <span style="width:18px;height:2px;background:currentColor;display:block;border-radius:1px"></span>
+      </button>
+      <!-- Menú desplegable -->
+      <div id="tuner-menu" style="display:none;position:absolute;top:46px;right:0;width:240px;background:#1e293b;border:1px solid #334155;border-radius:0 0 0 10px;z-index:10;padding:10px;box-sizing:border-box;flex-direction:column;gap:8px">
+        <div style="font-size:10px;color:#64748b;margin-bottom:2px">MODO</div>
+        <div style="display:flex;gap:6px">
+          <button class="tmode-btn${isManual?'':' sel'}" data-tmode="auto" onclick="TUNER.setMode('auto')" style="flex:1;font-size:12px">Auto</button>
+          <button class="tmode-btn${isManual?' sel':''}" data-tmode="manual" onclick="TUNER.setMode('manual')" style="flex:1;font-size:12px">Manual</button>
         </div>
-        <div id="tuner-mini-kb"></div>
+        <div id="tmenu-oct" style="display:${isManual?'flex':'none'};align-items:center;gap:8px;margin-top:2px">
+          <span style="font-size:10px;color:#64748b;flex:1">Octava</span>
+          <button class="icon-btn" onclick="TUNER.shiftOct(-1)" style="padding:2px 8px">◀</button>
+          <span id="tuner-oct-lbl" style="font-size:12px;color:#cbd5e1;min-width:36px;text-align:center">Oct ${TUNER.tunerOct}</span>
+          <button class="icon-btn" onclick="TUNER.shiftOct(+1)" style="padding:2px 8px">▶</button>
+        </div>
+        <div style="border-top:1px solid #334155;padding-top:8px;margin-top:2px">
+          <div style="font-size:10px;color:#64748b;margin-bottom:4px">TEMPERAMENTO</div>
+          <div style="font-size:11px;color:#93c5fd;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${tunerTempName()}</div>
+          <button onclick="closeTunerMenu();openSidebar()" style="width:100%;background:#1d4ed8;border:none;color:#fff;border-radius:6px;padding:7px;cursor:pointer;font-size:12px">☰ Cambiar temperamento</button>
+        </div>
+        <div style="border-top:1px solid #334155;padding-top:8px;margin-top:2px;display:flex;gap:6px">
+          <button id="ref-btn" class="icon-btn${TUNER.refOn?' sel':''}" onclick="TUNER.toggleRef()" style="flex:1;font-size:12px">♪ Nota ref.</button>
+          <button id="mic-btn" class="icon-btn${TUNER.micOn?' sel':''}" onclick="TUNER.toggleMic()" style="flex:1;font-size:12px">🎤 ${TUNER.micOn?'ON':'Mic'}</button>
+        </div>
       </div>
-      <!-- Medidor de cents desktop -->
-      <div style="background:var(--panel);border-radius:8px;padding:10px 8px">
-        <div id="cents-track" style="margin:14px 8px 16px">
-          ${[-40,-20,0,20,40].map(v=>`<div class="ct-tick" style="left:${50+v*0.9}%"></div><div class="ct-label" style="left:${50+v*0.9}%">${v>0?'+':''}${v}¢</div>`).join('')}
-          <div id="cents-needle"></div>
-        </div>
-        <div id="tuner-status-bar">
-          <span>Nota: <b id="det-note-auto">—</b></span>
-          <span>Frec: <b id="det-freq">—</b></span>
-          <span>Desv: <b id="det-cents">—</b></span>
-        </div>
-      </div>` : ''}
-
+    </div>
+    <div style="position:relative;flex:1;min-height:0">
+      <canvas id="strobe-canvas" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+      <div id="strobe-overlay" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;padding:0 14px;background:#0f172a;flex-shrink:0;height:42px;box-sizing:border-box">
+      <span style="font-size:11px;color:#64748b">${isManual?'Manual':'Auto'}</span>
+      <div style="flex:1"></div>
+      <button id="mic-btn" class="icon-btn${TUNER.micOn?' sel':''}" onclick="TUNER.toggleMic()" style="font-size:12px">🎤 ${TUNER.micOn?'ON':'Mic'}</button>
+    </div>
+    <div id="tuner-kb-wrap" style="display:${isManual?'block':'none'};background:#0f172a;flex-shrink:0;padding:4px 8px 8px;box-sizing:border-box">
+      <div id="tuner-mini-kb"></div>
     </div>`;
+  document.body.appendChild(sc);
+  if (isManual) TUNER.renderMiniKb();
+  requestAnimationFrame(() => {
+    const cv = document.getElementById('strobe-canvas');
+    cv.width = cv.clientWidth || window.innerWidth;
+    cv.height = cv.clientHeight || 300;
+    cv.getContext('2d').fillStyle = '#000';
+    cv.getContext('2d').fillRect(0, 0, cv.width, cv.height);
+    if (!TUNER.rafId) { TUNER.lastTs = performance.now(); TUNER.loop(TUNER.lastTs); }
+  });
+}
 
-  if (!mob) { TUNER.renderMiniKb(); }
-
-  const canvas = document.getElementById('strobe-canvas');
-  canvas.width  = canvas.clientWidth || (mob ? window.innerWidth : 600);
-  canvas.height = strobeH;
-  const c = canvas.getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, canvas.width, canvas.height);
-
-  if (!TUNER.rafId) { TUNER.lastTs = performance.now(); TUNER.loop(TUNER.lastTs); }
+function viewTuner() {
+  document.getElementById('content').innerHTML = '';
+  buildTunerScreen();
 }
 
 // ══════════════════════════════════════════════
