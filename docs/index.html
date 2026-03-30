@@ -213,13 +213,18 @@
       <div id="desk-badges" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
     </div>
 
-    <div id="tabs">
+    <div id="tabs" style="position:relative">
       <div class="tab active" data-tab="overview">Vista general</div>
       <div class="tab" data-tab="fifths">Quintas</div>
       <div class="tab" data-tab="thirds">Terceras</div>
       <div class="tab" data-tab="compare">Comparar</div>
       <div class="tab" data-tab="keyboard">Teclado</div>
-      <div class="tab" data-tab="tuner">Afinador</div>
+      <button id="tuner-fab" onclick="document.querySelector('.tab[data-tab=tuner]').click()"
+        title="Afinador"
+        style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:#1d4ed8;border:none;border-radius:8px;padding:5px 12px;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0">
+        &#9881; Afinar
+      </button>
+      <div class="tab" data-tab="tuner" style="display:none">Afinador</div>
     </div>
 
     <!-- AUDIO BAR -->
@@ -937,7 +942,14 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
     document.getElementById('tuner-screen')?.remove();
   }
   document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-  this.classList.add('active'); activeTab = this.dataset.tab; renderContent();
+  this.classList.add('active'); activeTab = this.dataset.tab;
+  // Actualizar aspecto del botón FAB del afinador
+  const fab = document.getElementById('tuner-fab');
+  if (fab) {
+    fab.style.background = activeTab === 'tuner' ? '#166534' : '#1d4ed8';
+    fab.textContent = activeTab === 'tuner' ? '✕ Cerrar' : '⚙ Afinar';
+  }
+  renderContent();
 }));
 
 // ══════════════════════════════════════════════
