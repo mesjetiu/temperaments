@@ -1619,6 +1619,11 @@ function buildTunerScreen() {
   const isManual = TUNER.mode === 'manual';
   const sc = document.createElement('div');
   sc.id = 'tuner-screen';
+  // En desktop el sidebar (280px) es estático: el tuner-screen no debe taparlo
+  if (!isMobile()) {
+    sc.style.left  = '280px';
+    sc.style.width = 'calc(100% - 280px)';
+  }
   sc.innerHTML = `
     <div style="position:relative;display:flex;align-items:center;gap:8px;padding:0 10px;background:#0f172a;flex-shrink:0;height:46px;box-sizing:border-box">
       <button onclick="exitTuner()" style="background:none;border:none;color:#93c5fd;font-size:24px;cursor:pointer;line-height:1;padding:0 4px">‹</button>
