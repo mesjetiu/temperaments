@@ -1,11 +1,10 @@
 # Temperamentos de 12 notas — offsets en cents (La = 0)
 
-**1650 temperamentos** convertidos desde la librería Scala (Manuel Op de Coul). Desviaciones en cents respecto al temperamento igual, con La = 0 como referencia.
+**1649 temperamentos** convertidos desde la librería Scala (Manuel Op de Coul). Desviaciones en cents respecto al temperamento igual, con La = 0 como referencia.
 
 
 | Name | C | C# | D | D# | E | F | F# | G | G# | A | B♭ | B |
 |------|---|----|----|-----|---|---|-----|---|-----|---|-----|---|
-| bach Lehman | +5.9 | +3.9 | +2.0 | +3.9 | -2.0 | +7.8 | +2.0 | +3.9 | +3.9 | +0.0 | +3.9 | +0.0 |
 | 12 out of 17-tET, chain of fifths | +52.941 | +23.529 | -5.882 | +35.294 | +5.882 | +47.059 | +17.647 | -11.765 | +29.412 | +0.0 | +41.176 | +11.765 |
 | 12 out of 19-tET scale from Mandelbaum's dissertation | +15.79 | -21.053 | +5.263 | -31.579 | -5.263 | +21.053 | -15.79 | +10.526 | -26.316 | +0.0 | -36.842 | -10.526 |
 | 12 out of 22-tET, chain of fifths | -27.273 | +36.364 | -9.091 | +54.545 | +9.091 | -36.364 | +27.273 | -18.182 | +45.455 | +0.0 | +63.636 | +18.182 |
