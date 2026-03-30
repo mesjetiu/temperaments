@@ -1418,6 +1418,7 @@ const TUNER = {
       this.analyser.smoothingTimeConstant = 0;
       src.connect(this.analyser);
       this.micOn = true;
+      localStorage.setItem('micAutoStart', '1');
       if (btn) { btn.textContent = '🎤 Mic ON'; btn.classList.add('sel'); }
       // Quitar el botón grande del overlay
       const ov = document.getElementById('strobe-overlay');
@@ -1734,6 +1735,10 @@ function buildTunerScreen() {
 function viewTuner() {
   document.getElementById('content').innerHTML = '';
   buildTunerScreen();
+  // Auto-arrancar mic si el usuario ya lo autorizó antes
+  if (localStorage.getItem('micAutoStart') === '1') {
+    TUNER.startMic();
+  }
 }
 
 // ══════════════════════════════════════════════
