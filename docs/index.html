@@ -1589,7 +1589,19 @@ const TUNER = {
 function toggleTunerMenu() {
   const m = document.getElementById('tuner-menu');
   if (!m) return;
-  m.style.display = m.style.display === 'none' ? 'flex' : 'none';
+  const opening = m.style.display === 'none';
+  m.style.display = opening ? 'flex' : 'none';
+  if (opening) {
+    // Cierra al pulsar fuera del menú
+    setTimeout(() => {
+      document.addEventListener('pointerdown', function _close(e) {
+        if (!m.contains(e.target) && !e.target.closest('[onclick="toggleTunerMenu()"]')) {
+          m.style.display = 'none';
+          document.removeEventListener('pointerdown', _close);
+        }
+      });
+    }, 0);
+  }
 }
 function closeTunerMenu() {
   const m = document.getElementById('tuner-menu');
