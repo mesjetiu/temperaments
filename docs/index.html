@@ -1313,6 +1313,8 @@ const TUNER = {
   },
 
   setMode(m) {
+    // Si salimos de manual y el sonido lo puso el teclado (no el botón ref.), pararlo
+    if (this.mode === 'manual' && m !== 'manual' && !this.refOn) this.stopRef();
     this.mode = m;
     savePrefs({ tunerMode: m });
     this.strobePhase = 0; this.prevStrobePhase = 0;
@@ -1334,7 +1336,8 @@ const TUNER = {
     this.updateTargetDisplay();
     document.querySelectorAll('[data-tni]').forEach(el =>
       el.classList.toggle('ka', +el.dataset.tni === ni && +el.dataset.toct === oct));
-    if (this.refOn) {
+    // En modo manual el teclado siempre suena (con o sin "Nota ref.")
+    if (this.mode === 'manual' || this.refOn) {
       if (this.refOsc) {
         // Legato: cambio suave de frecuencia sin reataque
         this.refOsc.frequency.setTargetAtTime(this.getTargetFreq(), getCtx().currentTime, 0.015);
