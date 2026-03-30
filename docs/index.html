@@ -271,9 +271,20 @@ const APP_VERSION = '34387d8 · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () =>
-    navigator.serviceWorker.register('./sw.js').catch(() => {})
-  );
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      // Si ya había un SW activo y se detecta uno nuevo, recargar al activarse
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        if (!newSW) return;
+        newSW.addEventListener('statechange', () => {
+          if (newSW.state === 'activated' && navigator.serviceWorker.controller) {
+            window.location.reload();
+          }
+        });
+      });
+    }).catch(() => {});
+  });
 }
 
 // ══════════════════════════════════════════════
