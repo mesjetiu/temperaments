@@ -1657,9 +1657,9 @@ function buildTunerScreen() {
               oninput="pitchA=parseFloat(this.value)||pitchA;document.getElementById('pitch-input').value=this.value;if(TUNER.refOsc)TUNER.refOsc.frequency.setTargetAtTime(TUNER.getTargetFreq(),getCtx().currentTime,0.01)">
           </div>
         </div>
-        <div style="border-top:1px solid #334155;padding-top:8px;margin-top:2px">
+        ${!window.matchMedia('(display-mode: standalone)').matches ? `<div style="border-top:1px solid #334155;padding-top:8px;margin-top:2px">
           <button onclick="(document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen())" style="width:100%;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:6px;padding:7px;cursor:pointer;font-size:12px">⛶ Pantalla completa</button>
-        </div>
+        </div>` : ''}
       </div>
     </div>
     <div style="position:relative;flex:1;min-height:0">
