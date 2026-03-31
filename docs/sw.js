@@ -1,4 +1,4 @@
-const CACHE = 'temp-fb96aca';
+const CACHE = 'temp-58c88d4';
 
 const STATIC = [
   './icon-192.png',
@@ -52,9 +52,10 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // HTML y MD: network-first, actualiza caché si hay red
+  // HTML y MD: network-first con cache:'no-cache' para saltarse la caché HTTP
+  // del navegador (evita que GitHub Pages/CDN devuelva contenido obsoleto)
   e.respondWith(
-    fetch(e.request)
+    fetch(new Request(e.request, { cache: 'no-cache' }))
       .then(res => {
         if (res.ok) {
           const clone = res.clone();
