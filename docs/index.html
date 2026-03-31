@@ -48,7 +48,10 @@
     .panel canvas { max-height: 220px; }
     #circle-wrap svg { width: min(270px,90vw); height: auto; }
     #audio-hint { display: none; }
-    /* .ab-preset removed */
+    #audio-bar { gap: 5px; padding: 6px 10px; }
+    #audio-bar .ab-sep { display: none; }
+    #vol-sl { width: 70px; }
+    #pitch-input { width: 58px; }
   }
 
   /* ═══ MOB HEADER ═══ */
@@ -261,7 +264,7 @@
       <div class="ab-sep"></div>
 
       <!-- Octava gráficas -->
-      <label>Oct.gráf.:</label>
+      <label>Octava:</label>
       <button class="icon-btn" onclick="octShift(-1)">−</button>
       <span id="oct-disp">0</span>
       <button class="icon-btn" onclick="octShift(+1)">+</button>
@@ -294,7 +297,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'ad0e95b · 2026-03-31';
+const APP_VERSION = '15d1d2a · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
@@ -1094,6 +1097,29 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
   if (fab) fab.style.display = activeTab === 'tuner' ? 'none' : 'flex';
   renderContent();
 }));
+
+// ══════════════════════════════════════════════
+// SWIPE HORIZONTAL EN CONTENT PARA CAMBIAR PESTAÑA (móvil)
+// ══════════════════════════════════════════════
+(function() {
+  const TABS_ORDER = ['overview','fifths','thirds','compare','keyboard'];
+  let sx = 0, sy = 0, swiping = false;
+  document.getElementById('content').addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY; swiping = true;
+  }, { passive: true });
+  document.getElementById('content').addEventListener('touchend', e => {
+    if (!swiping) return; swiping = false;
+    const dx = e.changedTouches[0].clientX - sx;
+    const dy = e.changedTouches[0].clientY - sy;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.5) return; // ignorar si es más vertical
+    if (activeTab === 'tuner') return; // el afinador tiene su propia pantalla
+    const idx = TABS_ORDER.indexOf(activeTab);
+    const next = dx < 0 ? TABS_ORDER[idx + 1] : TABS_ORDER[idx - 1];
+    if (!next) return;
+    document.querySelector(`.tab[data-tab="${next}"]`)?.click();
+  }, { passive: true });
+})();
 
 // ══════════════════════════════════════════════
 // CÁLCULOS MUSICALES
