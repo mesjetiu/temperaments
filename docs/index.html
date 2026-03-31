@@ -299,7 +299,7 @@
 </div>
 
 <script>
-const APP_VERSION = '6b77ed9 · 2026-03-31';
+const APP_VERSION = 'a1489d2 · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
@@ -1746,7 +1746,6 @@ const TUNER = {
 
     this.prevStrobePhase = this.strobePhase;
     this.strobePhase += 2 * Math.PI * freqError * dt;
-    this.strobePhase = this.strobePhase % (2 * Math.PI);
     this.renderStrobe();
     this.updateStatus();
   },
