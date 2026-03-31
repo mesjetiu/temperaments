@@ -43,8 +43,8 @@
     #overlay.open { display: block; opacity: 1; }
     #main { flex: 1; overflow: hidden; }
     #mob-header { display: flex !important; }
-    #content { flex-direction: column !important; padding: 12px !important; gap: 12px !important; }
-    .panel { width: 100% !important; min-width: unset !important; flex: none !important; box-sizing: border-box; }
+    #content { flex-direction: column !important; flex-wrap: nowrap !important; padding: 12px !important; gap: 12px !important; }
+    .panel { width: 100% !important; max-width: 100% !important; min-width: unset !important; flex: none !important; box-sizing: border-box !important; }
     .panel canvas { max-height: 220px; }
     #circle-wrap svg { width: min(270px,90vw); height: auto; }
     #audio-hint { display: none; }
@@ -198,6 +198,9 @@
     </div>
     <div id="count">Cargando...</div>
     <div id="list"><div style="padding:14px;font-size:11px;color:#6b7280">Cargando datos...</div></div>
+    <div style="border-top:1px solid var(--border);padding:10px 4px 4px;margin-top:4px">
+      <button onclick="showAbout()" style="width:100%;background:none;border:none;color:#475569;font-size:11px;cursor:pointer;text-align:left;padding:4px 6px;border-radius:4px">ℹ Acerca de Salinas…</button>
+    </div>
   </div>
 
   <!-- ═══ MAIN ═══ -->
@@ -291,7 +294,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'e5df093 · 2026-03-31';
+const APP_VERSION = 'ad0e95b · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
