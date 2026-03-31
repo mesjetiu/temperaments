@@ -299,7 +299,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'c88b697 · 2026-03-31';
+const APP_VERSION = '6b77ed9 · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
@@ -1816,8 +1816,8 @@ const TUNER = {
                               : this._lastFreq.toFixed(2) + ' Hz';
         ov.innerHTML = `
           <span style="font-size:clamp(80px,22vw,180px);font-weight:bold;color:${noteCol};text-shadow:0 0 16px rgba(0,0,0,0.95),0 0 4px rgba(0,0,0,1);line-height:1">${NOTES[dispNi] + dispOct}</span>
-          ${centsStr ? `<span style="font-size:clamp(32px,8vw,64px);color:${col};text-shadow:0 0 10px rgba(0,0,0,0.95);margin-top:6px">${centsStr}</span>` : ''}
-          <span style="font-size:clamp(20px,5vw,40px);color:${has?'rgba(200,200,200,0.85)':'rgba(150,150,150,0.3)'};text-shadow:0 0 8px rgba(0,0,0,0.95);margin-top:4px">${freqStr}</span>`;
+          ${centsStr ? `<span style="font-size:clamp(32px,8vw,64px);color:${col};margin-top:6px;background:rgba(0,0,0,0.45);border-radius:6px;padding:2px 10px;backdrop-filter:blur(2px)">${centsStr}</span>` : ''}
+          <span style="font-size:clamp(20px,5vw,40px);color:${has?'rgba(200,200,200,0.9)':'rgba(150,150,150,0.3)'};margin-top:4px;background:rgba(0,0,0,0.45);border-radius:6px;padding:2px 10px;backdrop-filter:blur(2px)">${freqStr}</span>`;
       }
     }
 
