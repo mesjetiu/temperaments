@@ -285,7 +285,7 @@
 </div>
 
 <script>
-const APP_VERSION = '44f302b · 2026-03-31';
+const APP_VERSION = 'f77d511 · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
@@ -1483,7 +1483,7 @@ const TUNER = {
       const ctx = getCtx();
       const src = ctx.createMediaStreamSource(stream);
       this.analyser = ctx.createAnalyser();
-      this.analyser.fftSize = 8192;
+      this.analyser.fftSize = 4096;
       this.analyser.smoothingTimeConstant = 0;
       src.connect(this.analyser);
       this.micOn = true;
@@ -1585,51 +1585,17 @@ const TUNER = {
     const strip = ctx.createImageData(W, SCROLL);
     const d = strip.data;
 
-    if (!this.analyser) {
-      ctx.putImageData(strip, 0, 0);
-      return;
-    }
-
-    // Siempre leer muestras reales — el ruido se ve siempre
-    const buf        = new Float32Array(this.analyser.fftSize);
-    this.analyser.getFloatTimeDomainData(buf);
-    const N          = buf.length;
-    const sampleRate = getCtx().sampleRate;
-    const hasPitch = this.detectedFreq !== null;
-
-    // Brillo: pleno con pitch activo, atenuado cuando usamos el último conocido
-    const gain = hasPitch ? 1.0 : 0.22;
-
-    // Usar último pitch válido (A4 si nunca se ha detectado nada)
-    const freq = hasPitch ? this.detectedFreq : this._lastFreq;
-    const periodSamples = sampleRate / freq;
-
-    // Trigger: cruce por cero ascendente en zona central
-    const searchCenter = Math.floor(N / 2);
-    const searchRange  = Math.floor(periodSamples * 2);
-    const searchStart  = Math.max(1, searchCenter - searchRange);
-    const searchEnd    = Math.min(N - 1, searchCenter + searchRange);
-    let triggerIdx = searchCenter;
-    for (let i = searchStart; i < searchEnd; i++) {
-      if (buf[i - 1] < 0 && buf[i] >= 0) { triggerIdx = i; break; }
-    }
+    const STRIPES = 6;
+    const has     = this.detectedFreq !== null;
 
     for (let s = 0; s < SCROLL; s++) {
-      const alpha   = s / SCROLL;
-      const phase_s = this.strobePhase * (1 - alpha) + this.prevStrobePhase * alpha;
-      const offset  = (phase_s / (2 * Math.PI)) * periodSamples;
-
+      const alpha = s / SCROLL;
+      const phase = this.strobePhase * (1 - alpha) + this.prevStrobePhase * alpha;
       for (let x = 0; x < W; x++) {
-        const pos = triggerIdx + offset + (x / W) * periodSamples;
-        const si0 = Math.floor(pos);
-        const si1 = si0 + 1;
-        const frac = pos - si0;
-        const a0  = (si0 >= 0 && si0 < N) ? buf[si0] : 0;
-        const a1  = (si1 >= 0 && si1 < N) ? buf[si1] : 0;
-        const amp = a0 * (1 - frac) + a1 * frac;
-        const v   = Math.round(Math.pow(Math.abs(amp), 0.5) * 255 * gain);
-        const i4  = (s * W + x) * 4;
-        d[i4] = v; d[i4+1] = v; d[i4+2] = v; d[i4+3] = 255;
+        const val = (Math.sin((x / W) * 2 * Math.PI * STRIPES + phase * STRIPES) + 1) / 2;
+        const v   = has ? Math.round(val * 255) : Math.round(val * 18);
+        const i   = (s * W + x) * 4;
+        d[i] = v; d[i+1] = v; d[i+2] = v; d[i+3] = 255;
       }
     }
     ctx.putImageData(strip, 0, 0);
