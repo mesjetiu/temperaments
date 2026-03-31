@@ -213,19 +213,19 @@
       <div id="desk-badges" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
     </div>
 
-    <div id="tabs" style="position:relative">
-      <div class="tab active" data-tab="overview">Vista general</div>
+    <div id="tabs">
+      <div class="tab" data-tab="overview">Vista general</div>
       <div class="tab" data-tab="fifths">Quintas</div>
       <div class="tab" data-tab="thirds">Terceras</div>
       <div class="tab" data-tab="compare">Comparar</div>
       <div class="tab" data-tab="keyboard">Teclado</div>
-      <button id="tuner-fab" onclick="document.querySelector('.tab[data-tab=tuner]').click()"
-        title="Afinador"
-        style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:#1d4ed8;border:none;border-radius:8px;padding:5px 12px;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0">
-        &#9881; Afinar
-      </button>
-      <div class="tab" data-tab="tuner" style="display:none">Afinador</div>
+      <div class="tab active" data-tab="tuner" style="display:none">Afinador</div>
     </div>
+    <!-- FAB flotante del afinador -->
+    <button id="tuner-fab" onclick="document.querySelector('.tab[data-tab=tuner]').click()" title="Abrir afinador"
+      style="position:fixed;bottom:24px;right:20px;z-index:800;background:#1d4ed8;border:none;border-radius:50px;padding:14px 22px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(29,78,216,0.5);white-space:nowrap">
+      🎵 Afinar
+    </button>
 
     <!-- AUDIO BAR -->
     <div id="audio-bar">
@@ -285,7 +285,7 @@
 </div>
 
 <script>
-const APP_VERSION = '15de87a · 2026-03-31';
+const APP_VERSION = '5989883 · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
@@ -365,7 +365,7 @@ const COLORS_A= ['rgba(96,165,250,0.18)','rgba(248,113,113,0.18)','rgba(74,222,1
 let all       = [];
 let selected  = [null, null, null];
 let lastSelected = null;   // último temperamento elegido (teclado + afinador lo usan)
-let activeTab = 'overview';
+let activeTab = 'tuner';
 let charts    = {};
 let chartMeta = {};
 
@@ -1080,12 +1080,9 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
   // Hint de selección según pestaña
   const hint = document.getElementById('desk-header-hint');
   if (hint) hint.textContent = activeTab === 'compare' ? 'Selecciona 1–3 para comparar:' : 'Selecciona un temperamento:';
-  // Actualizar aspecto del botón FAB del afinador
+  // FAB: ocultar cuando el afinador está activo
   const fab = document.getElementById('tuner-fab');
-  if (fab) {
-    fab.style.background = activeTab === 'tuner' ? '#166534' : '#1d4ed8';
-    fab.textContent = activeTab === 'tuner' ? '✕ Cerrar' : '⚙ Afinar';
-  }
+  if (fab) fab.style.display = activeTab === 'tuner' ? 'none' : 'flex';
   renderContent();
 }));
 
