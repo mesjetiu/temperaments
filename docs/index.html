@@ -235,7 +235,7 @@
     </div>
     <!-- FAB flotante del afinador -->
     <button id="tuner-fab" onclick="document.querySelector('.tab[data-tab=tuner]').click()" title="Abrir afinador"
-      style="position:fixed;bottom:24px;right:20px;z-index:800;background:#1d4ed8;border:none;border-radius:50px;padding:14px 22px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(29,78,216,0.5);white-space:nowrap">
+      style="position:fixed;bottom:24px;right:20px;z-index:800;background:#1d4ed8;border:none;border-radius:50px;padding:14px 22px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;display:none;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(29,78,216,0.5);white-space:nowrap">
       🎵 Afinar
     </button>
 
@@ -299,7 +299,7 @@
 </div>
 
 <script>
-const APP_VERSION = '73a4409 · 2026-03-31';
+const APP_VERSION = 'dba0742 · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
