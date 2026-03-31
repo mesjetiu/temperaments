@@ -299,7 +299,7 @@
 </div>
 
 <script>
-const APP_VERSION = '3df19cf · 2026-03-31';// ── Service Worker ──
+const APP_VERSION = 'de04da9 · 2026-03-31';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1560,6 +1560,7 @@ const TUNER = {
   micOn: false, micStream: null, analyser: null,
   vizMode: 'waterfall',
   strobePhase: 0, prevStrobePhase: 0, lastTs: 0, rafId: null,
+  _wavePhase: 0, _smoothedError: 0,
   detectedFreq: null, detectedCents: null, clarity: 0, rms: 0,
   _lastFreq: 440, _lastNi: 9, _lastOct: 4,  // último pitch válido (A4 inicial)
   _octCandidate: null, _octCandidateMs: 0,  // candidato de octava pendiente de confirmar
@@ -1774,6 +1775,10 @@ const TUNER = {
 
     this.prevStrobePhase = this.strobePhase;
     this.strobePhase += 2 * Math.PI * freqError * dt;
+    // Fase suavizada para la forma de onda (tau=0.3s filtra el jitter del detector)
+    const _wAlpha = Math.exp(-dt / 0.3);
+    this._smoothedError = this._smoothedError * _wAlpha + freqError * (1 - _wAlpha);
+    this._wavePhase += 2 * Math.PI * this._smoothedError * dt;
     this.renderStrobe();
     this.updateStatus();
   },
@@ -1782,6 +1787,7 @@ const TUNER = {
     this.vizMode = mode;
     savePrefs({ tunerVizMode: mode });
     this.strobePhase = 0; this.prevStrobePhase = 0;
+    this._wavePhase = 0; this._smoothedError = 0;
     const cv = document.getElementById('strobe-canvas');
     if (cv) { const c = cv.getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, cv.width, cv.height); }
   },
@@ -1846,10 +1852,10 @@ const TUNER = {
     const targetFreq = this.getTargetFreq();
     const periodSamples = sampleRate / targetFreq;
     // Mostrar 3 períodos de la onda (estirado a todo el ancho)
-    const displaySamples = Math.min(Math.round(periodSamples * 3), buf.length - 1);
+    const displaySamples = Math.min(Math.round(periodSamples * 6), buf.length - 1);
 
-    // Offset estroboscópico: desplaza inicio de la lectura según el error de fase acumulado
-    const phaseShiftSamples = (this.strobePhase / (2 * Math.PI)) * periodSamples;
+    // Offset estroboscópico suavizado: filtra el jitter del detector de pitch
+    const phaseShiftSamples = (this._wavePhase / (2 * Math.PI)) * periodSamples;
     const startSample = ((Math.round(phaseShiftSamples) % buf.length) + buf.length) % buf.length;
 
     // Color según afinación
