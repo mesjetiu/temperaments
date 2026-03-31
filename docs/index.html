@@ -299,7 +299,7 @@
 </div>
 
 <script>
-const APP_VERSION = '7e067fa · 2026-03-31';// ── Service Worker ──
+const APP_VERSION = 'caaed7c · 2026-03-31';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1768,7 +1768,7 @@ const TUNER = {
       }
     }
 
-    const SUB = 20;
+    const SUB = 40;
     const phaseStep = 2 * Math.PI * freqError * dt / SUB;
     for (let i = 0; i < SUB; i++) {
       this.prevStrobePhase = this.strobePhase;
@@ -1790,7 +1790,7 @@ const TUNER = {
     }
     const ctx = canvas.getContext('2d');
 
-    const SCROLL = 2;
+    const SCROLL = 1;
     ctx.drawImage(canvas, 0, 0, W, H - SCROLL, 0, SCROLL, W, H - SCROLL);
 
     const strip = ctx.createImageData(W, SCROLL);
