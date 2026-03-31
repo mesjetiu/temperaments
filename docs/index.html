@@ -266,8 +266,26 @@
   </div>
 </div>
 
+<!-- About modal -->
+<div id="about-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);align-items:center;justify-content:center" onclick="if(event.target===this)hideAbout()">
+  <div style="background:#1e293b;border:1px solid #334155;border-radius:14px;padding:28px 32px;max-width:360px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,0.6);text-align:center">
+    <img src="icon.svg" width="64" height="64" style="margin-bottom:12px;border-radius:12px" alt="Salinas">
+    <div style="font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:4px">Salinas</div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:16px" id="about-version"></div>
+    <div style="font-size:13px;color:#94a3b8;line-height:1.6;margin-bottom:20px">
+      Explorador de temperamentos históricos y microtonales.<br>
+      Afinador estroboscópico con detección de tono en tiempo real.
+    </div>
+    <div style="border-top:1px solid #334155;padding-top:16px;font-size:12px;color:#64748b;line-height:1.8">
+      <div style="color:#cbd5e1;font-weight:600">Carlos A. Guerra Parra</div>
+      <div><a href="https://github.com/mesjetiu/temperaments" style="color:#60a5fa;text-decoration:none">github.com/mesjetiu/temperaments</a></div>
+    </div>
+    <button onclick="hideAbout()" style="margin-top:20px;background:#1d4ed8;border:none;color:#fff;border-radius:8px;padding:8px 28px;cursor:pointer;font-size:14px">Cerrar</button>
+  </div>
+</div>
+
 <script>
-const APP_VERSION = '34387d8 · 2026-03-31';
+const APP_VERSION = '6c54c5d · 2026-03-30';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
@@ -1689,6 +1707,14 @@ function closeTunerMenu() {
   const m = document.getElementById('tuner-menu');
   if (m) m.style.display = 'none';
 }
+function showAbout() {
+  const el = document.getElementById('about-modal');
+  document.getElementById('about-version').textContent = APP_VERSION;
+  el.style.display = 'flex';
+}
+function hideAbout() {
+  document.getElementById('about-modal').style.display = 'none';
+}
 function tunerTempName() {
   const t = lastSelected ?? selected.find(Boolean);
   return t ? t.name : '(sin temperamento)';
@@ -1754,8 +1780,8 @@ function buildTunerScreen() {
         ${!window.matchMedia('(display-mode: standalone)').matches ? `<div style="border-top:1px solid #334155;padding-top:8px;margin-top:2px">
           <button onclick="(document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen())" style="width:100%;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:6px;padding:7px;cursor:pointer;font-size:12px">⛶ Pantalla completa</button>
         </div>` : ''}
-        <div style="border-top:1px solid #1e293b;padding-top:8px;margin-top:2px;text-align:center;font-size:9px;color:#334155;line-height:1.6">
-          Salinas<br>${APP_VERSION}
+        <div style="border-top:1px solid #1e293b;padding-top:8px;margin-top:2px;text-align:center">
+          <button onclick="closeTunerMenu();showAbout()" style="background:none;border:none;color:#475569;font-size:10px;cursor:pointer;padding:2px 8px">ℹ Acerca de…</button>
         </div>
       </div>
     </div>
