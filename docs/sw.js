@@ -1,24 +1,27 @@
-const CACHE = 'temp-v2';
+const CACHE = 'temp-v3';
 
-// Recursos estáticos que no cambian (cache-first)
 const STATIC = [
   './icon-192.png',
   './icon-512.png',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
 ];
 
-// Recursos que pueden actualizarse (network-first, fallback a caché)
 const DYNAMIC = [
   './index.html',
   './temperaments.md',
   './'
 ];
 
+// Permitir que la página pida skipWaiting explícitamente
+self.addEventListener('message', e => {
+  if (e.data?.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE).then(c => c.addAll([...STATIC, ...DYNAMIC]))
   );
-  self.skipWaiting();
+  // NO llamar skipWaiting() aquí — lo pide la página cuando está lista
 });
 
 self.addEventListener('activate', e => {
@@ -33,7 +36,6 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = e.request.url;
 
-  // Estáticos (CDN e iconos): cache-first
   if (STATIC.some(s => url.includes(s.replace('./', '')))) {
     e.respondWith(
       caches.match(e.request).then(cached => cached || fetch(e.request))
@@ -41,7 +43,7 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Dinámicos (HTML, MD): network-first — siempre intenta red primero
+  // HTML y MD: network-first, actualiza caché si hay red
   e.respondWith(
     fetch(e.request)
       .then(res => {
