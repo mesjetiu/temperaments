@@ -300,7 +300,6 @@
 
 <script>
 const APP_VERSION = '47b23ca · 2026-03-31';
-
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
@@ -1718,18 +1717,13 @@ const TUNER = {
         this._lastNi = this.targetNi; this._lastOct = this.targetOct;
         this.clarity = p.clarity;
 
-        // Snap detected freq to the octave closest to current target (prevents octave jumps
-        // from harmonics/noise from affecting note display and waterfall)
-        const tf_cur = this.getTargetFreq();
-        let snapFreq = p.freq;
-        while (snapFreq < tf_cur * Math.SQRT1_2) snapFreq *= 2;
-        while (snapFreq > tf_cur * Math.SQRT2)   snapFreq /= 2;
 
         if (this.mode === 'auto') {
-          const c = findClosestNote(snapFreq);
+          // Detección de nota: usar freq cruda para que los cambios reales de octava puedan acumularse
+          const c = findClosestNote(p.freq);
           const OCT_HOLD_MS = 900;
           if (c.ni !== this.targetNi) {
-            // Cambio de nota: aceptar inmediatamente con la octava más cercana a la actual
+            // Cambio de nota: aceptar inmediatamente
             this.targetNi = c.ni; this.targetOct = c.oct;
             this._octCandidate = null; this._octCandidateMs = 0;
           } else if (c.oct !== this.targetOct) {
@@ -1749,8 +1743,12 @@ const TUNER = {
           this.updateTargetDisplay();
         }
         const tf = this.getTargetFreq();
+        // Snap solo para waterfall: evitar pliegues por armónicos sin bloquear detección de octava
+        let snapFreq = p.freq;
+        while (snapFreq < tf * Math.SQRT1_2) snapFreq *= 2;
+        while (snapFreq > tf * Math.SQRT2)   snapFreq /= 2;
         this.detectedCents = 1200 * Math.log2(snapFreq / tf);
-        freqError = snapFreq - tf;  // waterfall usa freq estabilizada, no la cruda
+        freqError = snapFreq - tf;
         if (this.refOn && this.refOsc) {
           const now = getCtx().currentTime;
           const noteChanged = (this.targetNi !== this._refNi || this.targetOct !== this._refOct);
