@@ -1525,46 +1525,55 @@ const TUNER = {
     const strip = ctx.createImageData(W, SCROLL);
     const d = strip.data;
 
-    if (!this.analyser || !this.detectedFreq) {
-      // Sin señal: fila negra
+    if (!this.analyser) {
       ctx.putImageData(strip, 0, 0);
       return;
     }
 
-    const buf          = new Float32Array(this.analyser.fftSize);
+    // Siempre leer muestras reales — el ruido se ve siempre
+    const buf        = new Float32Array(this.analyser.fftSize);
     this.analyser.getFloatTimeDomainData(buf);
-    const N            = buf.length;
-    const sampleRate   = getCtx().sampleRate;
-    const periodSamples = sampleRate / this.detectedFreq;  // muestras por período
+    const N          = buf.length;
+    const sampleRate = getCtx().sampleRate;
+    const hasPitch   = this.detectedFreq !== null;
 
-    // Trigger: cruce por cero ascendente en zona central del buffer
-    const searchCenter = Math.floor(N / 2);
-    const searchRange  = Math.floor(periodSamples * 2);
-    const searchStart  = Math.max(1, searchCenter - searchRange);
-    const searchEnd    = Math.min(N - 1, searchCenter + searchRange);
-    let triggerIdx = searchCenter;
-    for (let i = searchStart; i < searchEnd; i++) {
-      if (buf[i - 1] < 0 && buf[i] >= 0) { triggerIdx = i; break; }
+    // Brillo: pleno con pitch, muy atenuado sin pitch (ruido visible pero no molesto)
+    const gain = hasPitch ? 1.0 : 0.18;
+
+    let periodSamples, triggerIdx;
+    if (hasPitch) {
+      periodSamples = sampleRate / this.detectedFreq;
+      // Trigger: cruce por cero ascendente en zona central
+      const searchCenter = Math.floor(N / 2);
+      const searchRange  = Math.floor(periodSamples * 2);
+      const searchStart  = Math.max(1, searchCenter - searchRange);
+      const searchEnd    = Math.min(N - 1, searchCenter + searchRange);
+      triggerIdx = searchCenter;
+      for (let i = searchStart; i < searchEnd; i++) {
+        if (buf[i - 1] < 0 && buf[i] >= 0) { triggerIdx = i; break; }
+      }
+    } else {
+      // Sin pitch: ventana fija centrada, sin fase — muestra ruido sin repetición
+      periodSamples = W;   // mapear el ancho de pantalla a W muestras del buffer
+      triggerIdx    = Math.floor(N / 2) - Math.floor(W / 2);
     }
 
     for (let s = 0; s < SCROLL; s++) {
-      // Interpolar fase entre frame anterior y actual → suavidad entre filas
       const alpha   = s / SCROLL;
-      const phase_s = this.strobePhase * (1 - alpha) + this.prevStrobePhase * alpha;
-      // Convertir fase a desplazamiento de muestras
-      const offset  = (phase_s / (2 * Math.PI)) * periodSamples;
+      const phase_s = hasPitch
+        ? this.strobePhase * (1 - alpha) + this.prevStrobePhase * alpha
+        : 0;
+      const offset  = hasPitch ? (phase_s / (2 * Math.PI)) * periodSamples : s * 2;
 
       for (let x = 0; x < W; x++) {
-        // 1 período de la fundamental distribuido por todo el ancho
         const pos = triggerIdx + offset + (x / W) * periodSamples;
         const si0 = Math.floor(pos);
         const si1 = si0 + 1;
         const frac = pos - si0;
         const a0  = (si0 >= 0 && si0 < N) ? buf[si0] : 0;
         const a1  = (si1 >= 0 && si1 < N) ? buf[si1] : 0;
-        const amp = a0 * (1 - frac) + a1 * frac;  // onda cruda interpolada
-        // abs + gamma 0.5: silencio→negro, picos→blanco, armónicos débiles visibles
-        const v   = Math.round(Math.pow(Math.abs(amp), 0.5) * 255);
+        const amp = a0 * (1 - frac) + a1 * frac;
+        const v   = Math.round(Math.pow(Math.abs(amp), 0.5) * 255 * gain);
         const i4  = (s * W + x) * 4;
         d[i4] = v; d[i4+1] = v; d[i4+2] = v; d[i4+3] = 255;
       }
