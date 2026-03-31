@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deploy.sh — Actualiza versión en sw.js e index.html, commitea y sube
+# deploy.sh — Actualiza versión en sw.js, index.html y version.json, commitea y sube
 # Uso: ./deploy.sh "mensaje del commit"
 set -e
 
@@ -10,13 +10,16 @@ VERSION="$HASH · $DATE"
 
 echo "→ Versión: $VERSION"
 
-# Actualizar CACHE en sw.js
+# Actualizar CACHE en sw.js (el browser detecta byte-diff → instala nuevo SW)
 sed -i "s/const CACHE = 'temp-[^']*'/const CACHE = 'temp-$HASH'/" docs/sw.js
 
 # Actualizar APP_VERSION en index.html
 sed -i "s/const APP_VERSION = '[^']*'/const APP_VERSION = '$VERSION'/" docs/index.html
 
-git add docs/sw.js docs/index.html
+# Actualizar version.json (mecanismo de detección de versión independiente del SW)
+printf '{"v":"%s"}\n' "$VERSION" > docs/version.json
+
+git add docs/sw.js docs/index.html docs/version.json
 git commit -m "$MSG
 
 CACHE: temp-$HASH
