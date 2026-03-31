@@ -299,7 +299,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'dba0742 · 2026-03-31';
+const APP_VERSION = '597c730 · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
@@ -1596,7 +1596,7 @@ const TUNER = {
       src.connect(this.analyser);
       this.micOn = true;
       localStorage.setItem('micAutoStart', '1');
-      if (btn) { btn.textContent = '🎤 Mic ON'; btn.classList.add('sel'); }
+      if (btn) { btn.textContent = '🎤 Mic ON'; btn.title = 'Apagar micrófono'; btn.classList.add('sel'); }
       // Quitar el botón grande del overlay
       const ov = document.getElementById('strobe-overlay');
       if (ov) ov.innerHTML = '';
@@ -1611,7 +1611,7 @@ const TUNER = {
     if (this.analyser) { try { this.analyser.disconnect(); } catch(e){} this.analyser = null; }
     this.micOn = false;
     const btn = document.getElementById('mic-btn');
-    if (btn) { btn.textContent = '🎤 Micrófono'; btn.classList.remove('sel'); }
+    if (btn) { btn.textContent = '🎤 Mic OFF'; btn.title = 'Encender micrófono'; btn.classList.remove('sel'); }
   },
 
   stop() {
@@ -1879,7 +1879,7 @@ function buildTunerScreen() {
         </div>
         <div style="border-top:1px solid #334155;padding-top:8px;margin-top:2px;display:flex;gap:6px">
           <button id="ref-btn" class="icon-btn${TUNER.refOn?' sel':''}" onclick="TUNER.toggleRef()" style="flex:1;font-size:12px">♪ Nota ref.</button>
-          <button id="mic-btn" class="icon-btn${TUNER.micOn?' sel':''}" onclick="TUNER.toggleMic()" style="flex:1;font-size:12px">🎤 ${TUNER.micOn?'ON':'Mic'}</button>
+          <button id="mic-btn" class="icon-btn${TUNER.micOn?' sel':''}" onclick="TUNER.toggleMic()" title="${TUNER.micOn?'Apagar micrófono':'Encender micrófono'}" style="flex:1;font-size:12px">🎤 ${TUNER.micOn?'Mic ON':'Mic OFF'}</button>
         </div>
         <div style="border-top:1px solid #334155;padding-top:8px;margin-top:2px">
           <div style="font-size:10px;color:#64748b;margin-bottom:4px">La (Hz)</div>
@@ -1909,7 +1909,7 @@ function buildTunerScreen() {
     <div style="display:flex;align-items:center;gap:8px;padding:0 14px;background:#0f172a;flex-shrink:0;height:42px;box-sizing:border-box">
       <span style="font-size:11px;color:#64748b">${isManual?'Manual':'Auto'}</span>
       <div style="flex:1"></div>
-      <button id="mic-btn" class="icon-btn${TUNER.micOn?' sel':''}" onclick="TUNER.toggleMic()" style="font-size:12px">🎤 ${TUNER.micOn?'ON':'Mic'}</button>
+      <button id="mic-btn" class="icon-btn${TUNER.micOn?' sel':''}" onclick="TUNER.toggleMic()" title="${TUNER.micOn?'Apagar micrófono':'Encender micrófono'}" style="font-size:12px">🎤 ${TUNER.micOn?'Mic ON':'Mic OFF'}</button>
     </div>
     <div id="tuner-kb-wrap" style="display:${isManual?'block':'none'};background:#0f172a;flex-shrink:0;padding:4px 8px 8px;box-sizing:border-box">
       <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:5px">
