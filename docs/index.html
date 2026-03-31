@@ -121,6 +121,12 @@
   #content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   .panel { background: var(--surface); border-radius: 10px; padding: 16px; border: 1px solid var(--border); }
   .panel h3 { font-size: 12px; color: var(--accent); margin-bottom: 12px; font-weight: 600; }
+  /* Paneles plegables en móvil */
+  .panel-hdr { display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent; margin-bottom:12px; }
+  .panel-hdr h3 { margin-bottom:0; }
+  .panel-hdr .panel-chevron { font-size:11px; color:#6b7280; transition:transform 0.2s; flex-shrink:0; }
+  .panel.collapsed .panel-chevron { transform:rotate(-90deg); }
+  .panel.collapsed .panel-body { display:none; }
   .empty-state { color: #4b5563; font-style: italic; padding: 60px; text-align: center; width: 100%; }
   .playable { cursor: crosshair; }
   table { border-collapse: collapse; width: 100%; font-size: 11px; }
@@ -285,7 +291,7 @@
 </div>
 
 <script>
-const APP_VERSION = '5989883 · 2026-03-31';
+const APP_VERSION = 'b0cb065 · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
@@ -1228,6 +1234,23 @@ function mkRadar(id, datasets) {
 }
 
 // ══════════════════════════════════════════════
+// PANEL PLEGABLE (móvil)
+// ══════════════════════════════════════════════
+// En móvil genera un panel con header clicable que colapsa el contenido.
+// En desktop devuelve el HTML tal cual (sin wrapper extra).
+function panel(title, bodyHtml, style = '') {
+  if (!isMobile()) {
+    return `<div class="panel" style="${style}"><h3>${title}</h3>${bodyHtml}</div>`;
+  }
+  return `<div class="panel" style="width:100%;box-sizing:border-box">
+    <div class="panel-hdr" onclick="this.closest('.panel').classList.toggle('collapsed')">
+      <h3>${title}</h3><span class="panel-chevron">▼</span>
+    </div>
+    <div class="panel-body">${bodyHtml}</div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════
 // VISTAS
 // ══════════════════════════════════════════════
 function renderContent() {
@@ -1244,19 +1267,17 @@ function renderContent() {
 // ─── VISTA GENERAL ───
 function viewOverview(act) {
   const mob=isMobile();
-  document.getElementById('content').innerHTML=`
-    <div class="panel" style="${mob?'width:100%':'width:290px'}">
-      <h3>Círculo de quintas <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un sector</small></h3>
-      <div class="grad-bar"><span>−8¢</span><div class="grad-strip"></div><span>+4¢</span><span style="color:#4b5563">● pura=701.955¢</span></div>
-      <div id="circle-wrap">${drawCircle(selected)}</div>
-    </div>
-    <div class="panel" style="flex:1;min-width:${mob?'0':'280px'};${mob?'width:100%':''}">
-      <h3>Radar — offsets <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un punto</small></h3>
-      <canvas id="c-radar" ${mob?'height="200"':'height="240"'}></canvas>
-    </div>
-    ${act.length===1?`<div class="panel" style="${mob?'width:100%':'width:320px'}">
-      <h3>Estadísticas</h3><div style="font-size:10px;color:#6b7280;margin-bottom:8px">${act[0].name}</div>
-      ${statsTable(act[0])}</div>`:''}`;
+  document.getElementById('content').innerHTML=
+    panel('Círculo de quintas <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un sector</small>',
+      `<div class="grad-bar"><span>−8¢</span><div class="grad-strip"></div><span>+4¢</span><span style="color:#4b5563">● pura=701.955¢</span></div>
+       <div id="circle-wrap">${drawCircle(selected)}</div>`,
+      mob?'':'width:290px')
+    + panel('Radar — offsets <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un punto</small>',
+      `<canvas id="c-radar" ${mob?'height="200"':'height="240"'}></canvas>`,
+      mob?'':'flex:1;min-width:280px')
+    + (act.length===1 ? panel('Estadísticas',
+      `<div style="font-size:10px;color:#6b7280;margin-bottom:8px">${act[0].name}</div>${statsTable(act[0])}`,
+      mob?'':'width:320px') : '');
   mkRadar('c-radar',selected.map((t,i)=>!t?null:({label:shortName(t),data:t.offsets,backgroundColor:COLORS_A[i],borderColor:COLORS[i],borderWidth:2,pointRadius:4})).filter(Boolean));
   bindCircleAudio();
 }
@@ -1264,18 +1285,16 @@ function viewOverview(act) {
 // ─── QUINTAS ───
 function viewFifths(act) {
   const mob=isMobile(), fl=FIFTH_LBL.map((n,i)=>`${n}→${FIFTH_LBL[(i+1)%12]}`);
-  document.getElementById('content').innerHTML=`
-    <div class="panel" style="width:100%">
-      <h3>Desviación de las 12 quintas respecto a la quinta pura (701.955 ¢) <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small></h3>
-      <canvas id="c-fifths" ${mob?'height="160"':'height="110"'}></canvas>
-    </div>
-    <div class="panel" style="${mob?'width:100%':'width:290px'}">
-      <h3>Círculo de quintas</h3>
-      <div class="grad-bar"><span>−8¢</span><div class="grad-strip"></div><span>+4¢</span></div>
-      <div id="circle-wrap">${drawCircle(selected)}</div>
-    </div>
-    ${act.map(t=>{const ci=selected.indexOf(t);return`<div class="panel" style="flex:1;min-width:${mob?'0':'190px'};${mob?'width:100%':''}">
-      <h3 style="color:${COLORS[ci]}">${shortName(t,40)}</h3>${fifthsTable(t)}</div>`;}).join('')}`;
+  document.getElementById('content').innerHTML=
+    panel('Desviación de las 12 quintas respecto a la quinta pura (701.955 ¢) <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
+      `<canvas id="c-fifths" ${mob?'height="160"':'height="110"'}></canvas>`, 'width:100%')
+    + panel('Círculo de quintas',
+      `<div class="grad-bar"><span>−8¢</span><div class="grad-strip"></div><span>+4¢</span></div>
+       <div id="circle-wrap">${drawCircle(selected)}</div>`,
+      mob?'':'width:290px')
+    + act.map(t=>{const ci=selected.indexOf(t);
+      return panel(`<span style="color:${COLORS[ci]}">${shortName(t,40)}</span>`, fifthsTable(t),
+        mob?'':'flex:1;min-width:190px');}).join('');
   mkBar('c-fifths',fl,selected.map((t,i)=>!t?null:({...ds(t,i,getFifths(t.offsets).map(f=>f.dev)),borderWidth:1})).filter(Boolean),
     'Desv. de quinta pura (¢)',ctx=>`${ctx.dataset.label}: ${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(3)}¢  (${(PURE_FIFTH+ctx.parsed.y).toFixed(2)}¢)`,'fifths');
   bindCircleAudio();
@@ -1284,17 +1303,14 @@ function viewFifths(act) {
 // ─── TERCERAS ───
 function viewThirds(act) {
   const mob=isMobile();
-  document.getElementById('content').innerHTML=`
-    <div class="panel" style="width:100%">
-      <h3>Terceras mayores — desv. de la 3ª mayor pura (386.314 ¢) <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small></h3>
-      <canvas id="c-maj3" ${mob?'height="160"':'height="110"'}></canvas>
-    </div>
-    <div class="panel" style="width:100%">
-      <h3>Terceras menores — desv. de la 3ª menor pura (315.641 ¢) <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small></h3>
-      <canvas id="c-min3" ${mob?'height="160"':'height="110"'}></canvas>
-    </div>
-    ${act.map(t=>{const ci=selected.indexOf(t);return`<div class="panel" style="flex:1;min-width:${mob?'0':'190px'};${mob?'width:100%':''}">
-      <h3 style="color:${COLORS[ci]}">${shortName(t,40)}</h3>${thirdsTableFn(t)}</div>`;}).join('')}`;
+  document.getElementById('content').innerHTML=
+    panel('Terceras mayores — desv. de la 3ª mayor pura (386.314 ¢) <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
+      `<canvas id="c-maj3" ${mob?'height="160"':'height="110"'}></canvas>`, 'width:100%')
+    + panel('Terceras menores — desv. de la 3ª menor pura (315.641 ¢) <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
+      `<canvas id="c-min3" ${mob?'height="160"':'height="110"'}></canvas>`, 'width:100%')
+    + act.map(t=>{const ci=selected.indexOf(t);
+      return panel(`<span style="color:${COLORS[ci]}">${shortName(t,40)}</span>`, thirdsTableFn(t),
+        mob?'':'flex:1;min-width:190px');}).join('');
   mkBar('c-maj3',NOTES,selected.map((t,i)=>!t?null:({...ds(t,i,getMaj3(t.offsets).map(x=>x.dev)),borderWidth:1})).filter(Boolean),
     'Desv. de 3ª mayor pura (¢)',ctx=>`${ctx.dataset.label}: ${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢  (${(PURE_MAJ3+ctx.parsed.y).toFixed(2)}¢)`,'maj3');
   mkBar('c-min3',NOTES,selected.map((t,i)=>!t?null:({...ds(t,i,getMin3(t.offsets).map(x=>x.dev)),borderWidth:1})).filter(Boolean),
@@ -1304,19 +1320,13 @@ function viewThirds(act) {
 // ─── COMPARAR ───
 function viewCompare(act) {
   const mob=isMobile(), fl=FIFTH_LBL.map((n,i)=>`${n}→${FIFTH_LBL[(i+1)%12]}`);
-  document.getElementById('content').innerHTML=`
-    <div class="panel" style="width:100%">
-      <h3>Offsets de las 12 notas <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un punto</small></h3>
-      <canvas id="c-off" ${mob?'height="180"':'height="100"'}></canvas>
-    </div>
-    <div class="panel" style="width:100%">
-      <h3>Quintas — desviación de pura <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small></h3>
-      <canvas id="c-fif" ${mob?'height="180"':'height="100"'}></canvas>
-    </div>
-    <div class="panel" style="width:100%">
-      <h3>Terceras mayores — desviación de pura <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small></h3>
-      <canvas id="c-3rd" ${mob?'height="180"':'height="100"'}></canvas>
-    </div>`;
+  document.getElementById('content').innerHTML=
+    panel('Offsets de las 12 notas <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un punto</small>',
+      `<canvas id="c-off" ${mob?'height="180"':'height="100"'}></canvas>`, 'width:100%')
+    + panel('Quintas — desviación de pura <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
+      `<canvas id="c-fif" ${mob?'height="180"':'height="100"'}></canvas>`, 'width:100%')
+    + panel('Terceras mayores — desviación de pura <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
+      `<canvas id="c-3rd" ${mob?'height="180"':'height="100"'}></canvas>`, 'width:100%');
   mkLine('c-off',NOTES,selected.map((t,i)=>!t?null:({...ds(t,i,t.offsets,{pointRadius:5,tension:0.3,fill:i===0})})).filter(Boolean),
     'Desviación del ET (¢)',ctx=>`${ctx.dataset.label}: ${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(3)}¢`,'offsets');
   mkBar('c-fif',fl,selected.map((t,i)=>!t?null:({...ds(t,i,getFifths(t.offsets).map(f=>f.dev)),borderWidth:1})).filter(Boolean),
