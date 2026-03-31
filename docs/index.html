@@ -299,7 +299,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'cbfbf52 · 2026-03-31';// ── Service Worker ──
+const APP_VERSION = '3df19cf · 2026-03-31';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -994,6 +994,7 @@ function restoreSession() {
   }
   // Restaurar modo tuner
   if (p.tunerMode) TUNER.mode = p.tunerMode;
+  if (p.tunerVizMode) TUNER.vizMode = p.tunerVizMode;
   // Restaurar octava del afinador
   if (p.tunerOct !== undefined) TUNER.tunerOct = p.tunerOct;
   // Restaurar temperamento seleccionado
@@ -1557,6 +1558,7 @@ const TUNER = {
   _refNi: null, _refOct: null,
   refOn: false, refOsc: null, refGain: null,
   micOn: false, micStream: null, analyser: null,
+  vizMode: 'waterfall',
   strobePhase: 0, prevStrobePhase: 0, lastTs: 0, rafId: null,
   detectedFreq: null, detectedCents: null, clarity: 0, rms: 0,
   _lastFreq: 440, _lastNi: 9, _lastOct: 4,  // último pitch válido (A4 inicial)
@@ -1776,7 +1778,17 @@ const TUNER = {
     this.updateStatus();
   },
 
+  setVizMode(mode) {
+    this.vizMode = mode;
+    savePrefs({ tunerVizMode: mode });
+    this.strobePhase = 0; this.prevStrobePhase = 0;
+    const cv = document.getElementById('strobe-canvas');
+    if (cv) { const c = cv.getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, cv.width, cv.height); }
+  },
+
   renderStrobe() {
+    if (this.vizMode === 'waveform') { this.renderWaveformStrobe(); return; }
+
     const canvas = document.getElementById('strobe-canvas');
     if (!canvas) return;
     const W = canvas.clientWidth || 400;
@@ -1808,6 +1820,59 @@ const TUNER = {
       }
     }
     ctx.putImageData(strip, 0, 0);
+  },
+
+  renderWaveformStrobe() {
+    const canvas = document.getElementById('strobe-canvas');
+    if (!canvas) return;
+    const W = canvas.clientWidth || 400;
+    const H = canvas.clientHeight || 220;
+    if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#030712';
+    ctx.fillRect(0, 0, W, H);
+
+    // Línea central de referencia
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke();
+
+    const buf = this._buf;
+    if (!buf) return;
+
+    const has = this.detectedFreq !== null;
+    const sampleRate = getCtx().sampleRate;
+    const targetFreq = this.getTargetFreq();
+    const periodSamples = sampleRate / targetFreq;
+    // Mostrar 3 períodos de la onda (estirado a todo el ancho)
+    const displaySamples = Math.min(Math.round(periodSamples * 3), buf.length - 1);
+
+    // Offset estroboscópico: desplaza inicio de la lectura según el error de fase acumulado
+    const phaseShiftSamples = (this.strobePhase / (2 * Math.PI)) * periodSamples;
+    const startSample = ((Math.round(phaseShiftSamples) % buf.length) + buf.length) % buf.length;
+
+    // Color según afinación
+    const c = this.detectedCents;
+    const absCents = Math.abs(c ?? 0);
+    let col;
+    if (!has)            col = 'rgba(100,116,139,0.5)';
+    else if (absCents < 2)  col = '#4ade80';
+    else if (absCents < 8)  col = `rgb(${Math.round(74+(absCents-2)/6*181)},${Math.round(222-(absCents-2)/6*62)},0)`;
+    else if (absCents < 25) col = `rgb(255,${Math.round(160-(absCents-8)/17*160)},0)`;
+    else col = '#ef4444';
+
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2;
+    if (has && absCents < 5) { ctx.shadowBlur = 10; ctx.shadowColor = col; }
+    ctx.beginPath();
+    for (let x = 0; x <= W; x++) {
+      const si = (startSample + Math.round((x / W) * displaySamples)) % buf.length;
+      const y = H / 2 - buf[si] * (H * 0.42);
+      if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
   },
 
   updateStatus() {
@@ -1959,6 +2024,13 @@ function buildTunerScreen() {
         <div style="display:flex;gap:6px">
           <button class="tmode-btn${isManual?'':' sel'}" data-tmode="auto" onclick="TUNER.setMode('auto')" style="flex:1;font-size:12px">Auto</button>
           <button class="tmode-btn${isManual?' sel':''}" data-tmode="manual" onclick="TUNER.setMode('manual')" style="flex:1;font-size:12px">Manual</button>
+        </div>
+        <div style="border-top:1px solid #334155;padding-top:8px;margin-top:2px">
+          <div style="font-size:10px;color:#64748b;margin-bottom:4px">VISUALIZACIÓN</div>
+          <select onchange="TUNER.setVizMode(this.value)" style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:5px 8px;font-size:12px;cursor:pointer">
+            <option value="waterfall"${TUNER.vizMode==='waterfall'?' selected':''}>Estroboscopio waterfall</option>
+            <option value="waveform"${TUNER.vizMode==='waveform'?' selected':''}>Forma de onda estroboscópica</option>
+          </select>
         </div>
         <div id="tmenu-oct" style="display:${isManual?'flex':'none'};align-items:center;gap:8px;margin-top:2px">
           <span style="font-size:10px;color:#64748b;flex:1">Octava</span>
