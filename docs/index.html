@@ -209,7 +209,7 @@
     </div>
 
     <div id="desk-header">
-      <span style="font-size:12px;color:#6b7280;white-space:nowrap">Selecciona 1–3 temperamentos:</span>
+      <span id="desk-header-hint" style="font-size:12px;color:#6b7280;white-space:nowrap">Selecciona un temperamento:</span>
       <div id="desk-badges" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
     </div>
 
@@ -285,7 +285,7 @@
 </div>
 
 <script>
-const APP_VERSION = '3965fc6 · 2026-03-31';
+const APP_VERSION = '15de87a · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
@@ -1021,14 +1021,28 @@ document.getElementById('search').addEventListener('input', refreshList);
 function toggleSelect(idx) {
   const t = all[idx];
   const ei = selected.findIndex(s => s && s.name === t.name);
-  if (ei >= 0) {
-    selected[ei] = null;
-    if (lastSelected?.name === t.name) lastSelected = selected.find(Boolean) ?? null;
+  if (activeTab === 'compare') {
+    // En Comparar: multi-selección hasta 3 (añadir/quitar)
+    if (ei >= 0) {
+      selected[ei] = null;
+      if (lastSelected?.name === t.name) lastSelected = selected.find(Boolean) ?? null;
+    } else {
+      const e2 = selected.findIndex(s => !s);
+      if (e2 >= 0) selected[e2] = t; else selected = [t, null, null];
+      lastSelected = t;
+      savePrefs({ selectedName: t.name });
+    }
   } else {
-    const e2 = selected.findIndex(s => !s);
-    if (e2 >= 0) selected[e2] = t; else selected = [t, null, null];
-    lastSelected = t;
-    savePrefs({ selectedName: t.name });
+    // En el resto: selección simple — sustituye al anterior
+    if (ei >= 0) {
+      // Pulsar el mismo → deseleccionar
+      selected = [null, null, null];
+      lastSelected = null;
+    } else {
+      selected = [t, null, null];
+      lastSelected = t;
+      savePrefs({ selectedName: t.name });
+    }
   }
   renderBadges();
   refreshList();
@@ -1063,6 +1077,9 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
   }
   document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
   this.classList.add('active'); activeTab = this.dataset.tab;
+  // Hint de selección según pestaña
+  const hint = document.getElementById('desk-header-hint');
+  if (hint) hint.textContent = activeTab === 'compare' ? 'Selecciona 1–3 para comparar:' : 'Selecciona un temperamento:';
   // Actualizar aspecto del botón FAB del afinador
   const fab = document.getElementById('tuner-fab');
   if (fab) {
