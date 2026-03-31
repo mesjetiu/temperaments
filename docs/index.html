@@ -44,7 +44,7 @@
     #main { flex: 1; overflow: hidden; }
     #mob-header { display: flex !important; }
     #content { flex-direction: column !important; padding: 12px !important; gap: 12px !important; }
-    .panel { width: 100% !important; min-width: unset !important; }
+    .panel { width: 100% !important; min-width: unset !important; flex: none !important; box-sizing: border-box; }
     .panel canvas { max-height: 220px; }
     #circle-wrap svg { width: min(270px,90vw); height: auto; }
     #audio-hint { display: none; }
@@ -291,7 +291,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'b0cb065 · 2026-03-31';
+const APP_VERSION = 'e5df093 · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
