@@ -299,7 +299,7 @@
 </div>
 
 <script>
-const APP_VERSION = '79b37e7 · 2026-03-31';// ── Service Worker ──
+const APP_VERSION = '5bcd99b · 2026-03-31';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1560,7 +1560,9 @@ const TUNER = {
   micOn: false, micStream: null, analyser: null,
   vizMode: 'waterfall',
   strobePhase: 0, prevStrobePhase: 0, lastTs: 0, rafId: null,
-  _wavePhase: 0, _smoothedError: 0, _needleCents: 0,
+  _wavePhase: 0, _smoothedError: 0,
+  _needlePos: 0, _needleVel: 0,  // simulación física muelle-masa para la aguja
+  _emojiCents: 50,                // promedio lento para el emoji (τ=2s)
   detectedFreq: null, detectedCents: null, clarity: 0, rms: 0,
   _lastFreq: 440, _lastNi: 9, _lastOct: 4,  // último pitch válido (A4 inicial)
   _octCandidate: null, _octCandidateMs: 0,  // candidato de octava pendiente de confirmar
@@ -1779,10 +1781,15 @@ const TUNER = {
     const _wAlpha = Math.exp(-dt / 0.3);
     this._smoothedError = this._smoothedError * _wAlpha + freqError * (1 - _wAlpha);
     this._wavePhase += 2 * Math.PI * this._smoothedError * dt;
-    // Cents suavizados para la aguja (tau=0.08s: responsivo pero sin jitter)
-    const _nAlpha = Math.exp(-dt / 0.08);
+    // Aguja: simulación muelle-masa amortiguado (near-critically damped)
     const _nTarget = this.detectedCents !== null ? Math.max(-50, Math.min(50, this.detectedCents)) : 0;
-    this._needleCents = this._needleCents * _nAlpha + _nTarget * (1 - _nAlpha);
+    const _spring = 55, _damp = 14;  // omega_n≈7.4 Hz, zeta≈0.95 (casi crítico)
+    this._needleVel += (_spring * (_nTarget - this._needlePos) - _damp * this._needleVel) * dt;
+    this._needlePos += this._needleVel * dt;
+    // Emoji: promedio lento independiente (τ=2s) para que no parpadee
+    const _eAlpha = Math.exp(-dt / 2.0);
+    const _eTarget = this.detectedCents !== null ? Math.abs(this.detectedCents) : 50;
+    this._emojiCents = this._emojiCents * _eAlpha + _eTarget * (1 - _eAlpha);
     this.renderStrobe();
     this.updateStatus();
   },
@@ -1791,7 +1798,8 @@ const TUNER = {
     this.vizMode = mode;
     savePrefs({ tunerVizMode: mode });
     this.strobePhase = 0; this.prevStrobePhase = 0;
-    this._wavePhase = 0; this._smoothedError = 0; this._needleCents = 0;
+    this._wavePhase = 0; this._smoothedError = 0;
+    this._needlePos = 0; this._needleVel = 0; this._emojiCents = 50;
     const cv = document.getElementById('strobe-canvas');
     if (cv) { const c = cv.getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, cv.width, cv.height); }
   },
@@ -1849,9 +1857,10 @@ const TUNER = {
     if (ov) ov.innerHTML = '';
 
     const has  = this.detectedFreq !== null;
-    const nc   = this._needleCents;                         // suavizado para la aguja
+    const nc   = this._needlePos;          // posición física de la aguja (muelle-masa)
     const raw  = this.detectedCents ?? 0;
     const absC = Math.abs(raw);
+    const emojiA = this._emojiCents;       // promedio lento para el emoji
 
     // Color según afinación
     const colorFor = (a) => {
@@ -1863,10 +1872,10 @@ const TUNER = {
     };
     const col = colorFor(absC);
 
-    // Geometría del arco
+    // Geometría del arco — cy bajo para que la nota quepa encima dentro del canvas
     const cx = W / 2;
-    const cy = H * 0.84;
-    const R  = Math.min(W * 0.42, cy * 0.94);
+    const cy = H * 0.90;
+    const R  = Math.min(W * 0.42, H * 0.52);
 
     // c=-50 → ángulo π (izq), c=0 → 3π/2 (arriba), c=+50 → 2π (der)
     const toAngle = (c) => Math.PI * (1 + (Math.max(-50, Math.min(50, c)) + 50) / 100);
@@ -1937,26 +1946,29 @@ const TUNER = {
     ctx.fillStyle = '#1e293b'; ctx.fill();
     ctx.strokeStyle = '#64748b'; ctx.lineWidth = 1.5; ctx.stroke();
 
-    // Nota (grande, encima del arco)
+    // Nota (grande, dentro del arco, centrada entre emoji y arco)
     const dispNi  = has ? this.targetNi  : this._lastNi;
     const dispOct = has ? this.targetOct : this._lastOct;
+    const arcTop  = cy - R;          // y del vértice superior del arco
+    const noteFontPx = Math.round(Math.min((arcTop - 28) * 0.72, R * 0.48, H * 0.22));
     ctx.fillStyle = has ? col : '#374151';
-    ctx.font = `bold ${Math.round(Math.min(H * 0.26, R * 0.55))}px sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    ctx.fillText(NOTES[dispNi] + dispOct, cx, cy - R * 1.02);
+    ctx.font = `bold ${noteFontPx}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(NOTES[dispNi] + dispOct, cx, arcTop * 0.54 + 14);
 
-    // Cents
-    const cStr = has ? (raw >= 0 ? '+' : '') + raw.toFixed(1) + '¢' : '';
+    // Cents (debajo del pivote)
+    const cStr = has ? (raw >= 0 ? '+' : '') + raw.toFixed(1) + '¢' : '—';
     ctx.fillStyle = col;
-    ctx.font = `${Math.round(H * 0.075)}px monospace`;
+    ctx.font = `${Math.round(H * 0.065)}px monospace`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText(cStr || '—', cx, cy + R * 0.08 + 4);
+    ctx.fillText(cStr, cx, cy + R * 0.06 + 2);
 
-    // Emoji
-    const emoji = !has ? '🎤' : absC < 2 ? '😄' : absC < 6 ? '😊' : absC < 15 ? '😐' : absC < 30 ? '😕' : '😬';
-    ctx.font = `${Math.round(Math.min(H * 0.13, R * 0.28))}px sans-serif`;
+    // Emoji — reacciona al promedio lento para no parpadear
+    const emoji = !has ? '🎤' : emojiA < 2 ? '😄' : emojiA < 6 ? '😊' : emojiA < 15 ? '😐' : emojiA < 30 ? '😕' : '😬';
+    const emojiFontPx = Math.round(Math.min(H * 0.10, 28));
+    ctx.font = `${emojiFontPx}px sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText(emoji, cx, 6);
+    ctx.fillText(emoji, cx, 5);
   },
 
   renderWaveformStrobe() {
