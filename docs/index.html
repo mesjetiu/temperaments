@@ -289,16 +289,22 @@ const APP_VERSION = 'd4f46fc · 2026-03-30';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
-  // controllerchange se dispara cuando el nuevo SW toma el control → recarga fiable
   let reloading = false;
+  // controllerchange se dispara cuando el nuevo SW toma el control → recarga fiable
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!reloading) { reloading = true; window.location.reload(); }
   });
 
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').then(reg => {
-      // SW esperando (instalado pero no activo): activarlo ahora
+    // updateViaCache:'none' → el navegador SIEMPRE descarga sw.js desde red,
+    // ignorando la caché HTTP (clave para que GitHub Pages/CDN no bloquee updates)
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(reg => {
+      // Forzar comprobación de actualización en cada carga de página
+      reg.update().catch(() => {});
+
       function activateWaiting(sw) {
+        // Solo activar si ya hay un SW controlando (update real, no primera instalación)
+        if (!navigator.serviceWorker.controller) return;
         sw.postMessage({ type: 'SKIP_WAITING' });
       }
       if (reg.waiting) activateWaiting(reg.waiting);
