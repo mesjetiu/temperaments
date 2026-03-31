@@ -299,7 +299,7 @@
 </div>
 
 <script>
-const APP_VERSION = '528f674 · 2026-03-31';
+const APP_VERSION = '35af6ed · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
@@ -715,28 +715,38 @@ const KB = {
   },
 
   shiftOct(d) {
-    // En legato: recordar la nota activa (ni + posición relativa en el rango) para reanudarla
-    let savedNi = null, savedRel = 0;
+    const prevOctave = this.octave;
+    this.octave = Math.max(1, Math.min(7, this.octave + d));
+
     if (this.mode === 'legato' && this.singleNode) {
-      savedNi  = this.singleNode.ni;
-      savedRel = this.singleNode.oct - this.octave; // 0 ó 1
+      // Legato: transponer la nota activa a la nueva octava
+      const savedNi  = this.singleNode.ni;
+      const savedRel = this.singleNode.oct - prevOctave;
       this.stopNode(this.singleNode);
       this.singleNode = null; this.singleKey = null;
-    } else {
-      this.clearAll();
-    }
-    this.octave = Math.max(1, Math.min(7, this.octave + d));
-    const lbl = document.getElementById('kb-oct-lbl');
-    if (lbl) lbl.textContent = `Oct. ${this.octave}–${this.octave+1}`;
-    this.render();
-    // Reanudar nota legato en la nueva octava (misma posición relativa)
-    if (savedNi !== null) {
       const newOct = this.octave + savedRel;
       this.singleNode = this.startNode(savedNi, newOct);
       this.singleKey  = this.key(savedNi, newOct);
-      this.updateKeys();
-      this.showLabel(savedNi, newOct);
+    } else if (this.mode === 'chord' && this.chordMap.size > 0) {
+      // Acorde: transponer todas las notas activas a la nueva octava
+      const saved = [...this.chordMap.entries()].map(([k, node]) => ({
+        ni: node.ni, rel: node.oct - prevOctave
+      }));
+      this.chordMap.forEach(n => this.stopNode(n));
+      this.chordMap.clear();
+      saved.forEach(({ ni, rel }) => {
+        const newOct = this.octave + rel;
+        const node = this.startNode(ni, newOct);
+        this.chordMap.set(this.key(ni, newOct), node);
+      });
+    } else {
+      this.clearAll();
     }
+
+    const lbl = document.getElementById('kb-oct-lbl');
+    if (lbl) lbl.textContent = `Oct. ${this.octave}–${this.octave+1}`;
+    this.render();
+    this.updateKeys();
   },
 
   // ── state ──
