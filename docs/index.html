@@ -285,39 +285,64 @@
 </div>
 
 <script>
-const APP_VERSION = 'ce1ea5f · 2026-03-31';
+const APP_VERSION = 'ce1b9f1 · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
-  // controllerchange se dispara cuando el nuevo SW toma el control → recarga fiable
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!reloading) { reloading = true; window.location.reload(); }
   });
 
+  function activateSW(sw) {
+    if (!sw) return;
+    if (navigator.serviceWorker.controller) {
+      // Update real: hay un SW antiguo controlando → forzar relevo
+      sw.postMessage({ type: 'SKIP_WAITING' });
+    }
+    // Sin controller (primera instalación): el activate + claim() lo gestiona solo
+  }
+
   window.addEventListener('load', () => {
-    // updateViaCache:'none' → el navegador SIEMPRE descarga sw.js desde red,
-    // ignorando la caché HTTP (clave para que GitHub Pages/CDN no bloquee updates)
     navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(reg => {
-      // Forzar comprobación de actualización en cada carga de página
       reg.update().catch(() => {});
 
-      function activateWaiting(sw) {
-        // Solo activar si ya hay un SW controlando (update real, no primera instalación)
-        if (!navigator.serviceWorker.controller) return;
-        sw.postMessage({ type: 'SKIP_WAITING' });
-      }
-      if (reg.waiting) activateWaiting(reg.waiting);
+      // SW ya esperando (de una visita anterior que no completó la transición)
+      if (reg.waiting) activateSW(reg.waiting);
+
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
         if (!newSW) return;
+        // Race condition fix: comprobar estado actual antes de esperar eventos
+        if (newSW.state === 'installed') { activateSW(newSW); return; }
         newSW.addEventListener('statechange', () => {
-          if (newSW.state === 'installed') activateWaiting(newSW);
+          if (newSW.state === 'installed') activateSW(newSW);
         });
       });
     }).catch(() => {});
   });
 }
+
+// ── Chequeo de versión independiente del ciclo SW ──────────────────────────
+// Garantía adicional: si el SW no detecta la actualización, este chequeo sí lo hace.
+// version.json siempre se sirve desde red (el SW nunca lo cachea).
+async function checkForNewVersion() {
+  try {
+    // Query param único → bypasea cualquier caché intermedia
+    const r = await fetch('./version.json?_=' + Date.now(), { cache: 'no-cache' });
+    if (!r.ok) return;
+    const { v } = await r.json();
+    if (!v || v === APP_VERSION) return;
+    // Nueva versión detectada: activar SW en espera si existe, luego recargar
+    const reg = await navigator.serviceWorker.getRegistration('./');
+    if (reg?.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    setTimeout(() => window.location.reload(), 400);
+  } catch (e) {}
+}
+window.addEventListener('load', () => setTimeout(checkForNewVersion, 3000));
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') checkForNewVersion();
+});
 
 // ══════════════════════════════════════════════
 // CONSTANTES

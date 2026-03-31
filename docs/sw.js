@@ -1,4 +1,4 @@
-const CACHE = 'temp-ce1ea5f';
+const CACHE = 'temp-ce1b9f1';
 
 const STATIC = [
   './icon-192.png',
@@ -45,6 +45,13 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = e.request.url;
 
+  // version.json: nunca cachear, siempre red — es el mecanismo de detección de actualizaciones
+  if (url.includes('version.json')) {
+    e.respondWith(fetch(new Request(url, { cache: 'no-cache' }))
+      .catch(() => new Response('{}', { headers: { 'Content-Type': 'application/json' } })));
+    return;
+  }
+
   if (STATIC.some(s => url.includes(s.replace('./', '')))) {
     e.respondWith(
       caches.match(e.request).then(cached => cached || fetch(e.request))
@@ -52,8 +59,7 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // HTML y MD: network-first con cache:'no-cache' para saltarse la caché HTTP
-  // del navegador (evita que GitHub Pages/CDN devuelva contenido obsoleto)
+  // HTML y MD: network-first con cache:'no-cache'
   e.respondWith(
     fetch(new Request(e.request, { cache: 'no-cache' }))
       .then(res => {
