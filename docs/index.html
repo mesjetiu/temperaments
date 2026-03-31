@@ -299,7 +299,7 @@
 </div>
 
 <script>
-const APP_VERSION = '39814d2 · 2026-03-31';// ── Service Worker ──
+const APP_VERSION = '1092f2d · 2026-03-31';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1783,7 +1783,7 @@ const TUNER = {
     this._wavePhase += 2 * Math.PI * this._smoothedError * dt;
     // Aguja: simulación muelle-masa amortiguado (near-critically damped)
     const _nTarget = this.detectedCents !== null ? Math.max(-50, Math.min(50, this.detectedCents)) : 0;
-    const _spring = 55, _damp = 14;  // omega_n≈7.4 Hz, zeta≈0.95 (casi crítico)
+    const _spring = 30, _damp = 18;  // omega_n≈5.5 Hz, zeta≈1.64 (sobreamortiguado, lento y suave)
     this._needleVel += (_spring * (_nTarget - this._needlePos) - _damp * this._needleVel) * dt;
     this._needlePos += this._needleVel * dt;
     // Emoji: promedio lento independiente (τ=2s) para que no parpadee
@@ -1956,12 +1956,16 @@ const TUNER = {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(NOTES[dispNi] + dispOct, cx, arcTop * 0.54 + 14);
 
-    // Cents (debajo del pivote)
-    const cStr = has ? (raw >= 0 ? '+' : '') + raw.toFixed(1) + '¢' : '—';
+    // Cents (debajo del pivote) — throttled a 4fps para que se pueda leer
+    const nowMs = performance.now();
+    if (!this._needleTextTs || nowMs - this._needleTextTs > 250) {
+      this._needleTextTs = nowMs;
+      this._needleTextStr = has ? (raw >= 0 ? '+' : '') + raw.toFixed(1) + '¢' : '—';
+    }
     ctx.fillStyle = col;
     ctx.font = `${Math.round(H * 0.065)}px monospace`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText(cStr, cx, cy + R * 0.06 + 2);
+    ctx.fillText(this._needleTextStr || '—', cx, cy + R * 0.06 + 2);
 
   },
 
