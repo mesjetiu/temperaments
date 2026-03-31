@@ -299,7 +299,7 @@
 </div>
 
 <script>
-const APP_VERSION = '11dab07 · 2026-03-31';
+const APP_VERSION = '11ddc35 · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
@@ -1224,6 +1224,40 @@ function statsTable(temp) {
   </table>`;
 }
 
+// Color según desviación de quinta pura
+function fifthDevColor(dev) {
+  if (dev < -8)  return '#ef4444'; // muy estrecha
+  if (dev < -4)  return '#fb923c'; // estrecha
+  if (dev < -0.5) return '#facc15'; // levemente estrecha
+  if (dev < 0.5) return '#4ade80'; // casi pura
+  if (dev < 3)   return '#c084fc'; // levemente ancha
+  return '#a21caf';                 // muy ancha
+}
+// Color según desviación de 3ª mayor pura
+function maj3DevColor(dev) {
+  if (dev < -4)  return '#60a5fa'; // muy plana (rara, casi no existe)
+  if (dev < 0)   return '#4ade80'; // más pura que ET - lo mejor
+  if (dev < 6)   return '#a3e635'; // levemente alta
+  if (dev < 12)  return '#fb923c'; // alta
+  return '#ef4444';                 // muy alta (como ET +14¢)
+}
+// Tabla de offsets respecto al ET
+function offsetsTable(temps) {
+  const rows = NOTES.map((n, i) =>
+    `<tr><td style="color:#94a3b8;font-weight:600;padding:3px 8px">${n}</td>${
+      temps.map(t => {
+        const v = t.offsets[i];
+        const c = Math.abs(v) < 1 ? '#4ade80' : Math.abs(v) < 5 ? '#facc15' : '#f87171';
+        return `<td style="text-align:right;padding:3px 8px;color:${c}">${v >= 0 ? '+' : ''}${v.toFixed(3)}</td>`;
+      }).join('')
+    }</tr>`
+  ).join('');
+  return `<table>
+    <tr><th>Nota</th>${temps.map(t => `<th style="text-align:right">${shortName(t, 22)}</th>`).join('')}</tr>
+    ${rows}
+  </table>`;
+}
+
 function fifthsTable(temp) {
   return `<table><tr><th>Quinta</th><th>¢</th><th>Desv.</th></tr>${getFifths(temp.offsets).map(f=>{
     const c=f.dev<-5?'#f87171':f.dev>2?'#a78bfa':f.dev<-1?'#fb923c':'#4ade80';
@@ -1251,12 +1285,15 @@ function activeSlotMap() { return selected.map((t,i)=>({t,i})).filter(x=>x.t).ma
 const gridColor='#374151', tickColor='#9ca3af';
 const baseOpts = { responsive:true, animation:{duration:250},
   plugins:{legend:{labels:{color:'#d1d5db',font:{size:11},boxWidth:14}}} };
-const ds = (t,i,data,extra={}) => ({ label:shortName(t), data, backgroundColor:COLORS_A[i], borderColor:COLORS[i], borderWidth:isMobile()?1.5:2, ...extra });
+const ds = (t,i,data,extra={}) => ({ label:shortName(t), data, backgroundColor:COLORS_A[i], borderColor:COLORS[i], borderWidth:isMobile()?1.5:2, minBarLength:3, ...extra });
+const dsFifth = (t,i,devs) => ({ label:shortName(t), data:devs, backgroundColor:devs.map(fifthDevColor), borderColor:devs.map(fifthDevColor), borderWidth:1, minBarLength:3 });
+const dsMaj3  = (t,i,devs) => ({ label:shortName(t), data:devs, backgroundColor:devs.map(maj3DevColor),  borderColor:devs.map(maj3DevColor),  borderWidth:1, minBarLength:3 });
 
 function mkBar(id, labels, datasets, yLabel, tipFmt, audioType) {
   const c=document.getElementById(id); if(!c) return;
   charts[id]=new Chart(c,{type:'bar',data:{labels,datasets},options:{...baseOpts,
     plugins:{...baseOpts.plugins,tooltip:{callbacks:{label:tipFmt}}},
+    datasets:{bar:{minBarLength:4}},
     scales:{x:{ticks:{color:tickColor,font:{size:9},maxRotation:40},grid:{color:gridColor}},
             y:{ticks:{color:tickColor,callback:v=>`${v>=0?'+':''}${v}¢`},grid:{color:gridColor},
                title:{display:true,text:yLabel,color:'#6b7280',font:{size:10}}}}}});
@@ -1326,7 +1363,10 @@ function viewOverview(act) {
       mob?'':'flex:1;min-width:280px')
     + (act.length===1 ? panel('Estadísticas',
       `<div style="font-size:10px;color:#6b7280;margin-bottom:8px">${act[0].name}</div>${statsTable(act[0])}`,
-      mob?'':'width:320px') : '');
+      mob?'':'width:320px') : '')
+    + panel('Offsets respecto al ET (¢)',
+      offsetsTable(act),
+      mob?'':'width:100%');
   mkRadar('c-radar',selected.map((t,i)=>!t?null:({label:shortName(t),data:t.offsets,backgroundColor:COLORS_A[i],borderColor:COLORS[i],borderWidth:2,pointRadius:4})).filter(Boolean));
   bindCircleAudio();
 }
@@ -1344,8 +1384,8 @@ function viewFifths(act) {
     + act.map(t=>{const ci=selected.indexOf(t);
       return panel(`<span style="color:${COLORS[ci]}">${shortName(t,40)}</span>`, fifthsTable(t),
         mob?'':'flex:1;min-width:190px');}).join('');
-  mkBar('c-fifths',fl,selected.map((t,i)=>!t?null:({...ds(t,i,getFifths(t.offsets).map(f=>f.dev)),borderWidth:1})).filter(Boolean),
-    'Desv. de quinta pura (¢)',ctx=>`${ctx.dataset.label}: ${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(3)}¢  (${(PURE_FIFTH+ctx.parsed.y).toFixed(2)}¢)`,'fifths');
+  mkBar('c-fifths',fl,selected.map((t,i)=>!t?null:dsFifth(t,i,getFifths(t.offsets).map(f=>f.dev))).filter(Boolean),
+    'Desv. de quinta pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(3)}¢  (${(PURE_FIFTH+ctx.parsed.y).toFixed(2)}¢)`,'fifths');
   bindCircleAudio();
 }
 
@@ -1360,10 +1400,10 @@ function viewThirds(act) {
     + act.map(t=>{const ci=selected.indexOf(t);
       return panel(`<span style="color:${COLORS[ci]}">${shortName(t,40)}</span>`, thirdsTableFn(t),
         mob?'':'flex:1;min-width:190px');}).join('');
-  mkBar('c-maj3',NOTES,selected.map((t,i)=>!t?null:({...ds(t,i,getMaj3(t.offsets).map(x=>x.dev)),borderWidth:1})).filter(Boolean),
-    'Desv. de 3ª mayor pura (¢)',ctx=>`${ctx.dataset.label}: ${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢  (${(PURE_MAJ3+ctx.parsed.y).toFixed(2)}¢)`,'maj3');
-  mkBar('c-min3',NOTES,selected.map((t,i)=>!t?null:({...ds(t,i,getMin3(t.offsets).map(x=>x.dev)),borderWidth:1})).filter(Boolean),
-    'Desv. de 3ª menor pura (¢)',ctx=>`${ctx.dataset.label}: ${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢  (${(PURE_MIN3+ctx.parsed.y).toFixed(2)}¢)`,'min3');
+  mkBar('c-maj3',NOTES,selected.map((t,i)=>!t?null:dsMaj3(t,i,getMaj3(t.offsets).map(x=>x.dev))).filter(Boolean),
+    'Desv. de 3ª mayor pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢  (${(PURE_MAJ3+ctx.parsed.y).toFixed(2)}¢)`,'maj3');
+  mkBar('c-min3',NOTES,selected.map((t,i)=>!t?null:dsMaj3(t,i,getMin3(t.offsets).map(x=>x.dev))).filter(Boolean),
+    'Desv. de 3ª menor pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢  (${(PURE_MIN3+ctx.parsed.y).toFixed(2)}¢)`,'min3');
 }
 
 // ─── COMPARAR ───
@@ -1378,10 +1418,10 @@ function viewCompare(act) {
       `<canvas id="c-3rd" ${mob?'height="180"':'height="100"'}></canvas>`, 'width:100%');
   mkLine('c-off',NOTES,selected.map((t,i)=>!t?null:({...ds(t,i,t.offsets,{pointRadius:5,tension:0.3,fill:i===0})})).filter(Boolean),
     'Desviación del ET (¢)',ctx=>`${ctx.dataset.label}: ${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(3)}¢`,'offsets');
-  mkBar('c-fif',fl,selected.map((t,i)=>!t?null:({...ds(t,i,getFifths(t.offsets).map(f=>f.dev)),borderWidth:1})).filter(Boolean),
-    'Desv. de quinta pura (¢)',ctx=>`${ctx.dataset.label}: ${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(3)}¢`,'fifths');
-  mkBar('c-3rd',NOTES,selected.map((t,i)=>!t?null:({...ds(t,i,getMaj3(t.offsets).map(x=>x.dev)),borderWidth:1})).filter(Boolean),
-    'Desv. de 3ª mayor pura (¢)',ctx=>`${ctx.dataset.label}: ${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢`,'maj3');
+  mkBar('c-fif',fl,selected.map((t,i)=>!t?null:dsFifth(t,i,getFifths(t.offsets).map(f=>f.dev))).filter(Boolean),
+    'Desv. de quinta pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(3)}¢`,'fifths');
+  mkBar('c-3rd',NOTES,selected.map((t,i)=>!t?null:dsMaj3(t,i,getMaj3(t.offsets).map(x=>x.dev))).filter(Boolean),
+    'Desv. de 3ª mayor pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢`,'maj3');
 }
 
 // ─── TECLADO ───
