@@ -285,7 +285,7 @@
 </div>
 
 <script>
-const APP_VERSION = '37eacc0 · 2026-03-31';
+const APP_VERSION = '3965fc6 · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
@@ -1653,7 +1653,7 @@ const TUNER = {
       const alpha = s / SCROLL;
       const phase = this.strobePhase * (1 - alpha) + this.prevStrobePhase * alpha;
       for (let x = 0; x < W; x++) {
-        const val = (Math.sin((x / W) * 2 * Math.PI * STRIPES + phase * STRIPES) + 1) / 2;
+        const val = (Math.sin((x / W) * 2 * Math.PI * STRIPES - phase * STRIPES) + 1) / 2;
         const v   = has ? Math.round(val * 255) : Math.round(val * 18);
         const i   = (s * W + x) * 4;
         d[i] = v; d[i+1] = v; d[i+2] = v; d[i+3] = 255;
