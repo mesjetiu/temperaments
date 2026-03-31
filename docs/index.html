@@ -1603,25 +1603,13 @@ const TUNER = {
       this._lastTextTs = now;
       const ov = document.getElementById('strobe-overlay');
       if (ov) {
+        const noteStr  = has ? NOTES[this.targetNi] + this.targetOct : '—';
         const centsStr = has && c !== null ? (c >= 0 ? '+' : '') + c.toFixed(1) + '¢' : '';
         const freqStr  = has ? this.detectedFreq.toFixed(2) + ' Hz' : '';
-        ov.innerHTML = has ? `
-          <span style="font-size:clamp(80px,22vw,180px);font-weight:bold;color:${col};text-shadow:0 0 16px rgba(0,0,0,0.95),0 0 4px rgba(0,0,0,1);line-height:1">${NOTES[this.targetNi] + this.targetOct}</span>
+        ov.innerHTML = `
+          <span style="font-size:clamp(80px,22vw,180px);font-weight:bold;color:${col};text-shadow:0 0 16px rgba(0,0,0,0.95),0 0 4px rgba(0,0,0,1);line-height:1">${noteStr}</span>
           ${centsStr ? `<span style="font-size:clamp(32px,8vw,64px);color:${col};text-shadow:0 0 10px rgba(0,0,0,0.95);margin-top:6px">${centsStr}</span>` : ''}
-          ${freqStr  ? `<span style="font-size:clamp(20px,5vw,40px);color:rgba(200,200,200,0.85);text-shadow:0 0 8px rgba(0,0,0,0.95);margin-top:4px">${freqStr}</span>` : ''}` : `
-          <svg viewBox="0 0 120 115" width="clamp(60px,16vw,120px)" style="opacity:0.30;filter:drop-shadow(0 0 10px #000)" fill="#f59e0b" xmlns="http://www.w3.org/2000/svg">
-            <rect x="34" y="10" width="10" height="52" rx="5" fill="#f59e0b"/>
-            <rect x="76" y="10" width="10" height="52" rx="5" fill="#f59e0b"/>
-            <path d="M34 55 Q34 72 60 72 Q86 72 86 55" stroke="#f59e0b" stroke-width="10" stroke-linecap="round" fill="none"/>
-            <rect x="55" y="72" width="10" height="30" rx="5" fill="#f59e0b"/>
-            <circle cx="60" cy="107" r="7" fill="#f59e0b"/>
-            <path d="M28 22 Q14 40 28 58" stroke="#f59e0b" stroke-width="5.5" stroke-linecap="round" fill="none"/>
-            <path d="M18 14 Q-2 40 18 66" stroke="#f59e0b" stroke-width="5.5" stroke-linecap="round" fill="none"/>
-            <path d="M8 6 Q-18 40 8 74" stroke="#f59e0b" stroke-width="5.5" stroke-linecap="round" fill="none"/>
-            <path d="M92 22 Q106 40 92 58" stroke="#f59e0b" stroke-width="5.5" stroke-linecap="round" fill="none"/>
-            <path d="M102 14 Q122 40 102 66" stroke="#f59e0b" stroke-width="5.5" stroke-linecap="round" fill="none"/>
-            <path d="M112 6 Q138 40 112 74" stroke="#f59e0b" stroke-width="5.5" stroke-linecap="round" fill="none"/>
-          </svg>`;
+          ${freqStr  ? `<span style="font-size:clamp(20px,5vw,40px);color:rgba(200,200,200,0.85);text-shadow:0 0 8px rgba(0,0,0,0.95);margin-top:4px">${freqStr}</span>` : ''}`;
       }
     }
 
