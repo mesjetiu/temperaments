@@ -299,7 +299,7 @@
 </div>
 
 <script>
-const APP_VERSION = '35af6ed · 2026-03-31';
+const APP_VERSION = 'c88b697 · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
@@ -1492,7 +1492,7 @@ function detectPitch(buf, sampleRate) {
   let rms = 0;
   for (let i = 0; i < W; i++) rms += buf[i] * buf[i];
   rms = Math.sqrt(rms / W);
-  if (rms < 0.001) return null;
+  if (rms < 0.0003) return null;
 
   const minTau = Math.max(2, Math.ceil(sampleRate / 1400)); // ~1400 Hz max
   const maxTau = Math.min(W - 1, Math.floor(sampleRate / 50));  // ~50 Hz min
@@ -1513,7 +1513,7 @@ function detectPitch(buf, sampleRate) {
   }
 
   // Step 3: absolute threshold — first tau where yin < threshold
-  const YIN_THRESH = 0.25;
+  const YIN_THRESH = 0.30;
   let tau = minTau;
   while (tau <= maxTau) {
     if (yin[tau] < YIN_THRESH) {
