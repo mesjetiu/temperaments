@@ -285,7 +285,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'e3bee8a · 2026-03-31';
+const APP_VERSION = 'ce1ea5f · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
@@ -406,12 +406,37 @@ function getCtx() {
 }
 
 function playFreqs(freqs) {
-  stopSound(true);
   const ctx = getCtx();
   const now = ctx.currentTime;
+
+  // Si ya hay osciladores del mismo tipo y cantidad: rampar frecuencia sin corte
+  if (activeOscs.length === freqs.length && envGain &&
+      activeOscs.every(o => o.type === currentWave)) {
+    freqs.forEach((freq, i) => {
+      activeOscs[i].frequency.cancelScheduledValues(now);
+      activeOscs[i].frequency.setTargetAtTime(freq, now, 0.006);
+    });
+    document.getElementById('playing-dot').style.display = 'block';
+    return;
+  }
+
+  // Distinto número u onda: crossfade — desvanecer los viejos sin corte brusco
+  const oldOscs = [...activeOscs];
+  const oldGain = envGain;
+  activeOscs = [];
+  if (oldGain && oldOscs.length) {
+    oldGain.gain.cancelScheduledValues(now);
+    oldGain.gain.setValueAtTime(oldGain.gain.value, now);
+    oldGain.gain.linearRampToValueAtTime(0, now + 0.025);
+    setTimeout(() => {
+      oldOscs.forEach(o => { try { o.stop(); o.disconnect(); } catch(e){} });
+      try { oldGain.disconnect(); } catch(e){}
+    }, 60);
+  }
+
   envGain = ctx.createGain();
   envGain.gain.setValueAtTime(0, now);
-  envGain.gain.linearRampToValueAtTime(1, now + 0.015);
+  envGain.gain.linearRampToValueAtTime(1, now + 0.010);
   envGain.connect(masterGain);
   activeOscs = freqs.map(freq => {
     const osc = ctx.createOscillator();
@@ -432,7 +457,7 @@ function stopSound(hard = false) {
   const oscs = [...activeOscs];
   activeOscs = [];
   if (hard || !envGain) {
-    oscs.forEach(o => { try { o.stop(); o.disconnect(); } catch(e){} });
+    oscs.forEach(o => { try { o.stop(now); o.disconnect(); } catch(e){} });
     return;
   }
   envGain.gain.cancelScheduledValues(now);
@@ -1389,6 +1414,7 @@ const TUNER = {
   strobePhase: 0, prevStrobePhase: 0, lastTs: 0, rafId: null,
   detectedFreq: null, detectedCents: null, clarity: 0, rms: 0,
   _lastFreq: 440, _lastNi: 9, _lastOct: 4,  // último pitch válido (A4 inicial)
+  _buf: null,  // buffer pre-reservado para evitar GC en cada frame
 
   getTargetFreq() {
     const off = (lastSelected ?? selected.find(Boolean))?.offsets ?? new Array(12).fill(0);
@@ -1524,9 +1550,13 @@ const TUNER = {
 
     let freqError = 0;
     if (this.analyser) {
-      const buf = new Float32Array(this.analyser.fftSize);
+      // Buffer pre-reservado: evita allocar Float32Array cada frame (reduce GC)
+      if (!this._buf || this._buf.length !== this.analyser.fftSize) {
+        this._buf = new Float32Array(this.analyser.fftSize);
+      }
+      const buf = this._buf;
       this.analyser.getFloatTimeDomainData(buf);
-      // Always compute RMS for signal bar (fast, first 1024 samples)
+      // RMS sobre los primeros 1024 muestras (rápido)
       let rmsSum = 0;
       const rmsN = Math.min(1024, buf.length);
       for (let i = 0; i < rmsN; i++) rmsSum += buf[i] * buf[i];
@@ -1547,15 +1577,18 @@ const TUNER = {
         this.detectedCents = 1200 * Math.log2(p.freq / tf);
         freqError = p.freq - tf;
         if (this.refOn && this.refOsc) {
+          const now = getCtx().currentTime;
           const noteChanged = (this.targetNi !== this._refNi || this.targetOct !== this._refOct);
           this._refNi = this.targetNi; this._refOct = this.targetOct;
           if (noteChanged) {
-            // Nota nueva: salto inmediato sin glide
-            this.refOsc.frequency.cancelScheduledValues(getCtx().currentTime);
-            this.refOsc.frequency.setValueAtTime(tf, getCtx().currentTime);
+            // Nota nueva: salto inmediato
+            this.refOsc.frequency.cancelScheduledValues(now);
+            this.refOsc.frequency.setValueAtTime(tf, now);
           } else {
-            // Misma nota: smooth lento para seguir el temperamento sin glide audible
-            this.refOsc.frequency.setTargetAtTime(tf, getCtx().currentTime, 0.08);
+            // Misma nota: cancelar automatizaciones acumuladas antes de fijar nueva
+            this.refOsc.frequency.cancelScheduledValues(now);
+            this.refOsc.frequency.setValueAtTime(this.refOsc.frequency.value, now);
+            this.refOsc.frequency.setTargetAtTime(tf, now, 0.08);
           }
         }
       } else {
