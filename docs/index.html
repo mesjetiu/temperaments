@@ -1329,6 +1329,7 @@ const TUNER = {
   micOn: false, micStream: null, analyser: null,
   strobePhase: 0, prevStrobePhase: 0, lastTs: 0, rafId: null,
   detectedFreq: null, detectedCents: null, clarity: 0, rms: 0,
+  _lastFreq: 440, _lastNi: 9, _lastOct: 4,  // último pitch válido (A4 inicial)
 
   getTargetFreq() {
     const off = (lastSelected ?? selected.find(Boolean))?.offsets ?? new Array(12).fill(0);
@@ -1474,6 +1475,8 @@ const TUNER = {
       const p = detectPitch(buf, getCtx().sampleRate);
       if (p) {
         this.detectedFreq = p.freq;
+        this._lastFreq = p.freq;
+        this._lastNi = this.targetNi; this._lastOct = this.targetOct;
         this.clarity = p.clarity;
         if (this.mode === 'auto') {
           const c = findClosestNote(p.freq);
@@ -1535,35 +1538,29 @@ const TUNER = {
     this.analyser.getFloatTimeDomainData(buf);
     const N          = buf.length;
     const sampleRate = getCtx().sampleRate;
-    const hasPitch   = this.detectedFreq !== null;
+    const hasPitch = this.detectedFreq !== null;
 
-    // Brillo: pleno con pitch, muy atenuado sin pitch (ruido visible pero no molesto)
-    const gain = hasPitch ? 1.0 : 0.18;
+    // Brillo: pleno con pitch activo, atenuado cuando usamos el último conocido
+    const gain = hasPitch ? 1.0 : 0.22;
 
-    let periodSamples, triggerIdx;
-    if (hasPitch) {
-      periodSamples = sampleRate / this.detectedFreq;
-      // Trigger: cruce por cero ascendente en zona central
-      const searchCenter = Math.floor(N / 2);
-      const searchRange  = Math.floor(periodSamples * 2);
-      const searchStart  = Math.max(1, searchCenter - searchRange);
-      const searchEnd    = Math.min(N - 1, searchCenter + searchRange);
-      triggerIdx = searchCenter;
-      for (let i = searchStart; i < searchEnd; i++) {
-        if (buf[i - 1] < 0 && buf[i] >= 0) { triggerIdx = i; break; }
-      }
-    } else {
-      // Sin pitch: ventana fija centrada, sin fase — muestra ruido sin repetición
-      periodSamples = W;   // mapear el ancho de pantalla a W muestras del buffer
-      triggerIdx    = Math.floor(N / 2) - Math.floor(W / 2);
+    // Usar último pitch válido (A4 si nunca se ha detectado nada)
+    const freq = hasPitch ? this.detectedFreq : this._lastFreq;
+    const periodSamples = sampleRate / freq;
+
+    // Trigger: cruce por cero ascendente en zona central
+    const searchCenter = Math.floor(N / 2);
+    const searchRange  = Math.floor(periodSamples * 2);
+    const searchStart  = Math.max(1, searchCenter - searchRange);
+    const searchEnd    = Math.min(N - 1, searchCenter + searchRange);
+    let triggerIdx = searchCenter;
+    for (let i = searchStart; i < searchEnd; i++) {
+      if (buf[i - 1] < 0 && buf[i] >= 0) { triggerIdx = i; break; }
     }
 
     for (let s = 0; s < SCROLL; s++) {
       const alpha   = s / SCROLL;
-      const phase_s = hasPitch
-        ? this.strobePhase * (1 - alpha) + this.prevStrobePhase * alpha
-        : 0;
-      const offset  = hasPitch ? (phase_s / (2 * Math.PI)) * periodSamples : s * 2;
+      const phase_s = this.strobePhase * (1 - alpha) + this.prevStrobePhase * alpha;
+      const offset  = (phase_s / (2 * Math.PI)) * periodSamples;
 
       for (let x = 0; x < W; x++) {
         const pos = triggerIdx + offset + (x / W) * periodSamples;
@@ -1603,13 +1600,17 @@ const TUNER = {
       this._lastTextTs = now;
       const ov = document.getElementById('strobe-overlay');
       if (ov) {
-        const noteStr  = has ? NOTES[this.targetNi] + this.targetOct : '—';
+        // Siempre mostrar última nota conocida; atenuada si no hay detección activa
+        const dispNi  = has ? this.targetNi  : this._lastNi;
+        const dispOct = has ? this.targetOct : this._lastOct;
+        const noteCol = has ? col : 'rgba(180,180,180,0.35)';
         const centsStr = has && c !== null ? (c >= 0 ? '+' : '') + c.toFixed(1) + '¢' : '';
-        const freqStr  = has ? this.detectedFreq.toFixed(2) + ' Hz' : '';
+        const freqStr  = has ? this.detectedFreq.toFixed(2) + ' Hz'
+                              : this._lastFreq.toFixed(2) + ' Hz';
         ov.innerHTML = `
-          <span style="font-size:clamp(80px,22vw,180px);font-weight:bold;color:${col};text-shadow:0 0 16px rgba(0,0,0,0.95),0 0 4px rgba(0,0,0,1);line-height:1">${noteStr}</span>
+          <span style="font-size:clamp(80px,22vw,180px);font-weight:bold;color:${noteCol};text-shadow:0 0 16px rgba(0,0,0,0.95),0 0 4px rgba(0,0,0,1);line-height:1">${NOTES[dispNi] + dispOct}</span>
           ${centsStr ? `<span style="font-size:clamp(32px,8vw,64px);color:${col};text-shadow:0 0 10px rgba(0,0,0,0.95);margin-top:6px">${centsStr}</span>` : ''}
-          ${freqStr  ? `<span style="font-size:clamp(20px,5vw,40px);color:rgba(200,200,200,0.85);text-shadow:0 0 8px rgba(0,0,0,0.95);margin-top:4px">${freqStr}</span>` : ''}`;
+          <span style="font-size:clamp(20px,5vw,40px);color:${has?'rgba(200,200,200,0.85)':'rgba(150,150,150,0.3)'};text-shadow:0 0 8px rgba(0,0,0,0.95);margin-top:4px">${freqStr}</span>`;
       }
     }
 
