@@ -299,7 +299,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'de04da9 · 2026-03-31';// ── Service Worker ──
+const APP_VERSION = '79b37e7 · 2026-03-31';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1560,7 +1560,7 @@ const TUNER = {
   micOn: false, micStream: null, analyser: null,
   vizMode: 'waterfall',
   strobePhase: 0, prevStrobePhase: 0, lastTs: 0, rafId: null,
-  _wavePhase: 0, _smoothedError: 0,
+  _wavePhase: 0, _smoothedError: 0, _needleCents: 0,
   detectedFreq: null, detectedCents: null, clarity: 0, rms: 0,
   _lastFreq: 440, _lastNi: 9, _lastOct: 4,  // último pitch válido (A4 inicial)
   _octCandidate: null, _octCandidateMs: 0,  // candidato de octava pendiente de confirmar
@@ -1779,6 +1779,10 @@ const TUNER = {
     const _wAlpha = Math.exp(-dt / 0.3);
     this._smoothedError = this._smoothedError * _wAlpha + freqError * (1 - _wAlpha);
     this._wavePhase += 2 * Math.PI * this._smoothedError * dt;
+    // Cents suavizados para la aguja (tau=0.08s: responsivo pero sin jitter)
+    const _nAlpha = Math.exp(-dt / 0.08);
+    const _nTarget = this.detectedCents !== null ? Math.max(-50, Math.min(50, this.detectedCents)) : 0;
+    this._needleCents = this._needleCents * _nAlpha + _nTarget * (1 - _nAlpha);
     this.renderStrobe();
     this.updateStatus();
   },
@@ -1787,13 +1791,14 @@ const TUNER = {
     this.vizMode = mode;
     savePrefs({ tunerVizMode: mode });
     this.strobePhase = 0; this.prevStrobePhase = 0;
-    this._wavePhase = 0; this._smoothedError = 0;
+    this._wavePhase = 0; this._smoothedError = 0; this._needleCents = 0;
     const cv = document.getElementById('strobe-canvas');
     if (cv) { const c = cv.getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, cv.width, cv.height); }
   },
 
   renderStrobe() {
     if (this.vizMode === 'waveform') { this.renderWaveformStrobe(); return; }
+    if (this.vizMode === 'needle')   { this.renderNeedle(); return; }
 
     const canvas = document.getElementById('strobe-canvas');
     if (!canvas) return;
@@ -1826,6 +1831,132 @@ const TUNER = {
       }
     }
     ctx.putImageData(strip, 0, 0);
+  },
+
+  renderNeedle() {
+    const canvas = document.getElementById('strobe-canvas');
+    if (!canvas) return;
+    const W = canvas.clientWidth || 400;
+    const H = canvas.clientHeight || 220;
+    if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#030712';
+    ctx.fillRect(0, 0, W, H);
+
+    // Limpiar overlay (el canvas lo muestra todo)
+    const ov = document.getElementById('strobe-overlay');
+    if (ov) ov.innerHTML = '';
+
+    const has  = this.detectedFreq !== null;
+    const nc   = this._needleCents;                         // suavizado para la aguja
+    const raw  = this.detectedCents ?? 0;
+    const absC = Math.abs(raw);
+
+    // Color según afinación
+    const colorFor = (a) => {
+      if (!has)       return '#475569';
+      if (a < 2)      return '#4ade80';
+      if (a < 8)      { const t=(a-2)/6; return `rgb(${Math.round(74+t*181)},${Math.round(222-t*62)},0)`; }
+      if (a < 25)     { const t=(a-8)/17; return `rgb(255,${Math.round(160-t*160)},0)`; }
+      return '#ef4444';
+    };
+    const col = colorFor(absC);
+
+    // Geometría del arco
+    const cx = W / 2;
+    const cy = H * 0.84;
+    const R  = Math.min(W * 0.42, cy * 0.94);
+
+    // c=-50 → ángulo π (izq), c=0 → 3π/2 (arriba), c=+50 → 2π (der)
+    const toAngle = (c) => Math.PI * (1 + (Math.max(-50, Math.min(50, c)) + 50) / 100);
+
+    // Arco de fondo segmentado con color degradado
+    const ARC_STEPS = 90;
+    ctx.lineWidth = Math.max(7, R * 0.14);
+    ctx.lineCap = 'butt';
+    for (let i = 0; i < ARC_STEPS; i++) {
+      const t1 = i / ARC_STEPS, t2 = (i + 1) / ARC_STEPS;
+      const a1 = Math.PI * (1 + t1), a2 = Math.PI * (1 + t2);
+      const cv = (t1 - 0.5) * 100;  // -50..+50
+      const av = Math.abs(cv);
+      // Tono apagado del degradado (rojo→verde→rojo)
+      let r, g, b;
+      if (av < 5)       { r=22;  g=101; b=52;  }
+      else if (av < 15) { r=120; g=80;  b=0;   }
+      else              { r=127; g=29;  b=29;  }
+      ctx.beginPath();
+      ctx.arc(cx, cy, R, a1, a2, false);
+      ctx.strokeStyle = `rgb(${r},${g},${b})`;
+      ctx.stroke();
+    }
+
+    // Ticks
+    const ticks = [
+      {c:-50,major:true},{c:-25,major:true},{c:-10,major:false},{c:-5,major:false},
+      {c:0,major:true},
+      {c:5,major:false},{c:10,major:false},{c:25,major:true},{c:50,major:true}
+    ];
+    ticks.forEach(({c: tc, major}) => {
+      const a   = toAngle(tc);
+      const cos = Math.cos(a), sin = Math.sin(a);
+      const len = major ? R * 0.22 : R * 0.13;
+      const r0  = R - len, r1 = R + R * 0.03;
+      ctx.beginPath();
+      ctx.moveTo(cx + r0*cos, cy + r0*sin);
+      ctx.lineTo(cx + r1*cos, cy + r1*sin);
+      ctx.lineWidth  = major ? 2 : 1;
+      ctx.strokeStyle = tc === 0 ? '#60a5fa' : '#475569';
+      ctx.stroke();
+      if (major) {
+        const lr = R - len - R * 0.10;
+        ctx.fillStyle = tc === 0 ? '#60a5fa' : '#64748b';
+        ctx.font = `${Math.round(R * 0.11)}px monospace`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(tc === 0 ? '0' : (tc > 0 ? '+' : '') + tc, cx + lr*cos, cy + lr*sin);
+      }
+    });
+
+    // Aguja
+    const needleA  = toAngle(nc);
+    const needleL  = R * 0.87;
+    const baseL    = R * 0.10;
+    ctx.beginPath();
+    ctx.moveTo(cx - baseL*Math.cos(needleA), cy - baseL*Math.sin(needleA));
+    ctx.lineTo(cx + needleL*Math.cos(needleA), cy + needleL*Math.sin(needleA));
+    ctx.lineWidth   = 2.5;
+    ctx.strokeStyle = has ? col : '#334155';
+    ctx.lineCap     = 'round';
+    if (has && absC < 4) { ctx.shadowBlur = 14; ctx.shadowColor = col; }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Pivote central
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 0.045, 0, 2 * Math.PI);
+    ctx.fillStyle = '#1e293b'; ctx.fill();
+    ctx.strokeStyle = '#64748b'; ctx.lineWidth = 1.5; ctx.stroke();
+
+    // Nota (grande, encima del arco)
+    const dispNi  = has ? this.targetNi  : this._lastNi;
+    const dispOct = has ? this.targetOct : this._lastOct;
+    ctx.fillStyle = has ? col : '#374151';
+    ctx.font = `bold ${Math.round(Math.min(H * 0.26, R * 0.55))}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText(NOTES[dispNi] + dispOct, cx, cy - R * 1.02);
+
+    // Cents
+    const cStr = has ? (raw >= 0 ? '+' : '') + raw.toFixed(1) + '¢' : '';
+    ctx.fillStyle = col;
+    ctx.font = `${Math.round(H * 0.075)}px monospace`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(cStr || '—', cx, cy + R * 0.08 + 4);
+
+    // Emoji
+    const emoji = !has ? '🎤' : absC < 2 ? '😄' : absC < 6 ? '😊' : absC < 15 ? '😐' : absC < 30 ? '😕' : '😬';
+    ctx.font = `${Math.round(Math.min(H * 0.13, R * 0.28))}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(emoji, cx, 6);
   },
 
   renderWaveformStrobe() {
@@ -1897,6 +2028,14 @@ const TUNER = {
     else if (absCents < 8)  { const t=(absCents-2)/6; col=`rgb(${Math.round(74+t*181)},${Math.round(222-t*62)},${Math.round(128*(1-t))})`; }
     else if (absCents < 25) { const t=(absCents-8)/17; col=`rgb(255,${Math.round(160-t*160)},0)`; }
     else { col = '#ef4444'; }
+
+    // En modo aguja el canvas gestiona todo el display; el overlay ya se limpia en renderNeedle
+    if (this.vizMode === 'needle') {
+      // Solo actualizar barra de señal y elementos de desktop (cents-needle, etc.)
+      const sigFil = document.getElementById('signal-fill');
+      if (sigFil) { const s=Math.min(1,this.rms*10); sigFil.style.width=(s*100)+'%'; sigFil.style.background=s>0.6?'#4ade80':s>0.2?'#fbbf24':'#ef4444'; }
+      return;
+    }
 
     // Overlay superpuesto — texto throttled a 4 fps
     if (textReady) {
@@ -2036,6 +2175,7 @@ function buildTunerScreen() {
           <select onchange="TUNER.setVizMode(this.value)" style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:5px 8px;font-size:12px;cursor:pointer">
             <option value="waterfall"${TUNER.vizMode==='waterfall'?' selected':''}>Estroboscopio waterfall</option>
             <option value="waveform"${TUNER.vizMode==='waveform'?' selected':''}>Forma de onda estroboscópica</option>
+            <option value="needle"${TUNER.vizMode==='needle'?' selected':''}>Aguja</option>
           </select>
         </div>
         <div id="tmenu-oct" style="display:${isManual?'flex':'none'};align-items:center;gap:8px;margin-top:2px">
