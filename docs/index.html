@@ -299,7 +299,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'e2b1144 · 2026-03-31';// ── Service Worker ──
+const APP_VERSION = '82618e9 · 2026-03-31';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1872,8 +1872,9 @@ const TUNER = {
 
     // Geometría: pivot en 88% de H, R acotado para que el arco quepa
     const cx = W / 2;
-    const cy = H * 0.88;
-    const R  = Math.min(W * 0.44, cy - 4);
+    // R acotado por ancho Y por alto: deja espacio arriba para nota y abajo para cents
+    const R  = Math.min(W * 0.44, H * 0.58);
+    const cy = Math.min(H * 0.88, R + H * 0.30);
 
     // c cents → ángulo. c=-50 → π (izq), c=0 → 1.5π (arriba), c=50 → 2π (der)
     // Corrección: el ángulo 0 en canvas es a la derecha, π/2 abajo, π izq, 3π/2 arriba
