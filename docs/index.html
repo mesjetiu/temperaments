@@ -503,12 +503,37 @@ function bindChartAudio(canvasId, type, slotMap) {
   function interact(clientX, clientY) {
     const chart = charts[canvasId];
     if (!chart) return;
-    const els = chart.getElementsAtEventForMode({ clientX, clientY }, 'nearest', { intersect: true }, false);
+    const meta = chartMeta[canvasId];
+
+    if (meta.type === 'radar') {
+      // Detectar por ángulo desde el centro — funciona aunque no se pulse la bolita
+      const rect = canvas.getBoundingClientRect();
+      const px = clientX - rect.left;
+      const py = clientY - rect.top;
+      const ca = chart.chartArea;
+      const cx = (ca.left + ca.right) / 2;
+      const cy = (ca.top + ca.bottom) / 2;
+      const n = chart.data.labels.length;
+      const angle = Math.atan2(py - cy, px - cx);
+      const norm = (angle + Math.PI / 2 + 2 * Math.PI) % (2 * Math.PI);
+      const index = Math.round(norm / (2 * Math.PI / n)) % n;
+      const temp = selected[meta.slotMap[0]];
+      if (!temp) return;
+      playForType(meta.type, index, temp.offsets);
+      return;
+    }
+
+    // Bar / line: primero intento exacto; si falla (barra en 0 o muy pequeña),
+    // detecto por posición X — activa toda la columna aunque la barra no sea visible
+    let els = chart.getElementsAtEventForMode({ clientX, clientY }, 'nearest', { intersect: true }, false);
+    if (!els.length) {
+      els = chart.getElementsAtEventForMode({ clientX, clientY }, 'index', { intersect: false }, false);
+    }
     if (!els.length) return;
     const { datasetIndex, index } = els[0];
-    const temp = selected[chartMeta[canvasId].slotMap[datasetIndex]];
+    const temp = selected[meta.slotMap[datasetIndex]];
     if (!temp) return;
-    playForType(chartMeta[canvasId].type, index, temp.offsets);
+    playForType(meta.type, index, temp.offsets);
   }
 
   let pressing = false;
