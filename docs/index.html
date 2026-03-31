@@ -299,7 +299,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'fea6cea · 2026-03-31';
+const APP_VERSION = '47b23ca · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
@@ -1717,11 +1717,19 @@ const TUNER = {
         this._lastFreq = p.freq;
         this._lastNi = this.targetNi; this._lastOct = this.targetOct;
         this.clarity = p.clarity;
+
+        // Snap detected freq to the octave closest to current target (prevents octave jumps
+        // from harmonics/noise from affecting note display and waterfall)
+        const tf_cur = this.getTargetFreq();
+        let snapFreq = p.freq;
+        while (snapFreq < tf_cur * Math.SQRT1_2) snapFreq *= 2;
+        while (snapFreq > tf_cur * Math.SQRT2)   snapFreq /= 2;
+
         if (this.mode === 'auto') {
-          const c = findClosestNote(p.freq);
+          const c = findClosestNote(snapFreq);
           const OCT_HOLD_MS = 900;
           if (c.ni !== this.targetNi) {
-            // Cambio de nota: aceptar inmediatamente, resetear candidato de octava
+            // Cambio de nota: aceptar inmediatamente con la octava más cercana a la actual
             this.targetNi = c.ni; this.targetOct = c.oct;
             this._octCandidate = null; this._octCandidateMs = 0;
           } else if (c.oct !== this.targetOct) {
@@ -1736,14 +1744,13 @@ const TUNER = {
               this._octCandidate = c.oct; this._octCandidateMs = dt * 1000;
             }
           } else {
-            // Misma nota y octava: resetear candidato
             this._octCandidate = null; this._octCandidateMs = 0;
           }
           this.updateTargetDisplay();
         }
         const tf = this.getTargetFreq();
-        this.detectedCents = 1200 * Math.log2(p.freq / tf);
-        freqError = p.freq - tf;
+        this.detectedCents = 1200 * Math.log2(snapFreq / tf);
+        freqError = snapFreq - tf;  // waterfall usa freq estabilizada, no la cruda
         if (this.refOn && this.refOsc) {
           const now = getCtx().currentTime;
           const noteChanged = (this.targetNi !== this._refNi || this.targetOct !== this._refOct);
