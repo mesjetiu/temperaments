@@ -299,7 +299,7 @@
 </div>
 
 <script>
-const APP_VERSION = '1092f2d · 2026-03-31';// ── Service Worker ──
+const APP_VERSION = 'e2b1144 · 2026-03-31';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1852,55 +1852,57 @@ const TUNER = {
     ctx.fillStyle = '#030712';
     ctx.fillRect(0, 0, W, H);
 
-    // Limpiar overlay (el canvas lo muestra todo)
     const ov = document.getElementById('strobe-overlay');
     if (ov) ov.innerHTML = '';
 
     const has  = this.detectedFreq !== null;
-    const nc   = this._needlePos;          // posición física de la aguja (muelle-masa)
+    const nc   = this._needlePos;
     const raw  = this.detectedCents ?? 0;
     const absC = Math.abs(raw);
-    const emojiA = this._emojiCents;       // promedio lento para el emoji
 
-    // Color según afinación
-    const colorFor = (a) => {
-      if (!has)       return '#475569';
-      if (a < 2)      return '#4ade80';
-      if (a < 8)      { const t=(a-2)/6; return `rgb(${Math.round(74+t*181)},${Math.round(222-t*62)},0)`; }
-      if (a < 25)     { const t=(a-8)/17; return `rgb(255,${Math.round(160-t*160)},0)`; }
-      return '#ef4444';
+    // Color de aguja según afinación
+    const arcCol = (a) => {
+      if (a < 2)  return [74, 222, 128];
+      if (a < 8)  { const t=(a-2)/6; return [Math.round(74+t*181), Math.round(222-t*62), 0]; }
+      if (a < 25) { const t=(a-8)/17; return [255, Math.round(160-t*160), 0]; }
+      return [239, 68, 68];
     };
-    const col = colorFor(absC);
+    const [nr,ng,nb] = has ? arcCol(absC) : [71,85,105];
+    const col = `rgb(${nr},${ng},${nb})`;
 
-    // Geometría del arco — cy bajo para que la nota quepa encima dentro del canvas
+    // Geometría: pivot en 88% de H, R acotado para que el arco quepa
     const cx = W / 2;
-    const cy = H * 0.90;
-    const R  = Math.min(W * 0.42, H * 0.52);
+    const cy = H * 0.88;
+    const R  = Math.min(W * 0.44, cy - 4);
 
-    // c=-50 → ángulo π (izq), c=0 → 3π/2 (arriba), c=+50 → 2π (der)
-    const toAngle = (c) => Math.PI * (1 + (Math.max(-50, Math.min(50, c)) + 50) / 100);
+    // c cents → ángulo. c=-50 → π (izq), c=0 → 1.5π (arriba), c=50 → 2π (der)
+    // Corrección: el ángulo 0 en canvas es a la derecha, π/2 abajo, π izq, 3π/2 arriba
+    const toAngle = (c) => Math.PI + (Math.max(-50, Math.min(50, c)) + 50) / 100 * Math.PI;
 
-    // Arco de fondo segmentado con color degradado
-    const ARC_STEPS = 90;
-    ctx.lineWidth = Math.max(7, R * 0.14);
+    // Arco de fondo — degradado suave rojo→naranja→verde→naranja→rojo
+    // Usando el punto MEDIO del segmento para que el verde esté exactamente en c=0
+    const ARC_STEPS = 120;
+    const arcLW = Math.max(7, Math.round(R * 0.13));
+    ctx.lineWidth = arcLW;
     ctx.lineCap = 'butt';
     for (let i = 0; i < ARC_STEPS; i++) {
-      const t1 = i / ARC_STEPS, t2 = (i + 1) / ARC_STEPS;
-      const a1 = Math.PI * (1 + t1), a2 = Math.PI * (1 + t2);
-      const cv = (t1 - 0.5) * 100;  // -50..+50
-      const av = Math.abs(cv);
-      // Tono apagado del degradado (rojo→verde→rojo)
-      let r, g, b;
-      if (av < 5)       { r=22;  g=101; b=52;  }
-      else if (av < 15) { r=120; g=80;  b=0;   }
-      else              { r=127; g=29;  b=29;  }
+      const tmid = (i + 0.5) / ARC_STEPS;        // punto MEDIO del segmento
+      const cents = (tmid - 0.5) * 100;           // -50..+50, simétrico
+      const av = Math.abs(cents);
+      // degradado continuo apagado: verde oscuro en centro, rojo oscuro en extremos
+      let rr, gg, bb;
+      if (av < 5)       { const t=av/5;      rr=Math.round(t*80);  gg=Math.round(80-t*20); bb=Math.round(t*5); }
+      else if (av < 15) { const t=(av-5)/10;  rr=Math.round(80+t*100); gg=Math.round(60-t*40); bb=0; }
+      else              { const t=(av-15)/35; rr=Math.round(180+t*60); gg=Math.round(20-t*10); bb=0; }
+      const a1 = toAngle(cents - 50/ARC_STEPS);
+      const a2 = toAngle(cents + 50/ARC_STEPS);
       ctx.beginPath();
       ctx.arc(cx, cy, R, a1, a2, false);
-      ctx.strokeStyle = `rgb(${r},${g},${b})`;
+      ctx.strokeStyle = `rgb(${rr},${gg},${bb})`;
       ctx.stroke();
     }
 
-    // Ticks
+    // Ticks y etiquetas
     const ticks = [
       {c:-50,major:true},{c:-25,major:true},{c:-10,major:false},{c:-5,major:false},
       {c:0,major:true},
@@ -1909,64 +1911,64 @@ const TUNER = {
     ticks.forEach(({c: tc, major}) => {
       const a   = toAngle(tc);
       const cos = Math.cos(a), sin = Math.sin(a);
-      const len = major ? R * 0.22 : R * 0.13;
-      const r0  = R - len, r1 = R + R * 0.03;
+      const len = major ? arcLW * 1.8 : arcLW * 1.1;
+      const r0  = R - arcLW * 0.5 - len;
+      const r1  = R + arcLW * 0.5 + 2;
       ctx.beginPath();
       ctx.moveTo(cx + r0*cos, cy + r0*sin);
       ctx.lineTo(cx + r1*cos, cy + r1*sin);
-      ctx.lineWidth  = major ? 2 : 1;
-      ctx.strokeStyle = tc === 0 ? '#60a5fa' : '#475569';
+      ctx.lineWidth   = major ? 2 : 1;
+      ctx.strokeStyle = tc === 0 ? '#93c5fd' : '#64748b';
+      ctx.lineCap = 'round';
       ctx.stroke();
       if (major) {
-        const lr = R - len - R * 0.10;
-        ctx.fillStyle = tc === 0 ? '#60a5fa' : '#64748b';
-        ctx.font = `${Math.round(R * 0.11)}px monospace`;
+        const lr = R - arcLW * 0.5 - len - R * 0.09;
+        ctx.fillStyle = tc === 0 ? '#93c5fd' : '#94a3b8';
+        ctx.font = `${Math.round(R * 0.10)}px monospace`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(tc === 0 ? '0' : (tc > 0 ? '+' : '') + tc, cx + lr*cos, cy + lr*sin);
       }
     });
 
     // Aguja
-    const needleA  = toAngle(nc);
-    const needleL  = R * 0.87;
-    const baseL    = R * 0.10;
+    const needleA = toAngle(nc);
     ctx.beginPath();
-    ctx.moveTo(cx - baseL*Math.cos(needleA), cy - baseL*Math.sin(needleA));
-    ctx.lineTo(cx + needleL*Math.cos(needleA), cy + needleL*Math.sin(needleA));
+    ctx.moveTo(cx - R*0.08*Math.cos(needleA), cy - R*0.08*Math.sin(needleA));
+    ctx.lineTo(cx + R*0.85*Math.cos(needleA), cy + R*0.85*Math.sin(needleA));
     ctx.lineWidth   = 2.5;
-    ctx.strokeStyle = has ? col : '#334155';
+    ctx.strokeStyle = has ? col : '#475569';
     ctx.lineCap     = 'round';
-    if (has && absC < 4) { ctx.shadowBlur = 14; ctx.shadowColor = col; }
+    if (has && absC < 5) { ctx.shadowBlur = 16; ctx.shadowColor = col; }
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // Pivote central
+    // Pivote
     ctx.beginPath();
-    ctx.arc(cx, cy, R * 0.045, 0, 2 * Math.PI);
+    ctx.arc(cx, cy, arcLW * 0.38, 0, 2*Math.PI);
     ctx.fillStyle = '#1e293b'; ctx.fill();
     ctx.strokeStyle = '#64748b'; ctx.lineWidth = 1.5; ctx.stroke();
 
-    // Nota (grande, dentro del arco, centrada entre emoji y arco)
+    // Nota — centrada en el espacio entre la cima del arco y el borde superior
     const dispNi  = has ? this.targetNi  : this._lastNi;
     const dispOct = has ? this.targetOct : this._lastOct;
-    const arcTop  = cy - R;          // y del vértice superior del arco
-    const noteFontPx = Math.round(Math.min((arcTop - 28) * 0.72, R * 0.48, H * 0.22));
+    const arcTop  = cy - R - arcLW * 0.5;  // borde exterior del arco
+    const noteY   = arcTop / 2;            // centro del espacio disponible arriba
+    const notePx  = Math.round(Math.min(arcTop * 0.65, R * 0.42));
     ctx.fillStyle = has ? col : '#374151';
-    ctx.font = `bold ${noteFontPx}px sans-serif`;
+    ctx.font = `bold ${notePx}px sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(NOTES[dispNi] + dispOct, cx, arcTop * 0.54 + 14);
+    ctx.fillText(NOTES[dispNi] + dispOct, cx, noteY);
 
-    // Cents (debajo del pivote) — throttled a 4fps para que se pueda leer
+    // Cents throttled a 4fps
     const nowMs = performance.now();
     if (!this._needleTextTs || nowMs - this._needleTextTs > 250) {
       this._needleTextTs = nowMs;
       this._needleTextStr = has ? (raw >= 0 ? '+' : '') + raw.toFixed(1) + '¢' : '—';
     }
     ctx.fillStyle = col;
-    ctx.font = `${Math.round(H * 0.065)}px monospace`;
+    ctx.font = `${Math.round(Math.min(H * 0.065, R * 0.13))}px monospace`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText(this._needleTextStr || '—', cx, cy + R * 0.06 + 2);
-
+    ctx.fillText(this._needleTextStr || '—', cx, cy + arcLW * 0.6 + 4);
   },
 
   renderWaveformStrobe() {
