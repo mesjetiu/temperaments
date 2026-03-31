@@ -882,7 +882,7 @@ function restoreSession() {
   // Restaurar temperamento seleccionado
   if (p.selectedName) {
     const t = all.find(x => x.name === p.selectedName);
-    if (t) { selected[0] = t; lastSelected = t; renderBadges(); }
+    if (t) { selected[0] = t; lastSelected = t; renderBadges(); renderContent(); }
   }
 }
 
