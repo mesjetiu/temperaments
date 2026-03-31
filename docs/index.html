@@ -299,7 +299,7 @@
 </div>
 
 <script>
-const APP_VERSION = '597c730 · 2026-03-31';
+const APP_VERSION = '11dab07 · 2026-03-31';
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
@@ -600,14 +600,25 @@ function bindChartAudio(canvasId, type, slotMap) {
   }
 
   let pressing = false;
+  // Mouse
   canvas.addEventListener('mousedown', e => { e.preventDefault(); pressing = true; interact(e.clientX, e.clientY); });
   canvas.addEventListener('mousemove', e => { if (pressing) interact(e.clientX, e.clientY); });
-  canvas.addEventListener('mouseup',    () => { pressing = false; });
+  canvas.addEventListener('mouseup',    () => { pressing = false; stopSound(); });
   canvas.addEventListener('mouseleave', () => { pressing = false; });
-  canvas.addEventListener('touchstart', e => { e.preventDefault(); pressing = true; const t=e.touches[0]; interact(t.clientX,t.clientY); }, { passive:false });
-  canvas.addEventListener('touchmove',  e => { e.preventDefault(); if (pressing) { const t=e.touches[0]; interact(t.clientX,t.clientY); } }, { passive:false });
-  canvas.addEventListener('touchend',   () => { pressing = false; });
-  canvas.addEventListener('touchcancel',() => { pressing = false; });
+  // Touch: pasivo para no bloquear scroll; cancelar si el dedo se mueve verticalmente
+  let _tx0 = 0, _ty0 = 0, _scrolling = false;
+  canvas.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    _tx0 = t.clientX; _ty0 = t.clientY; _scrolling = false; pressing = true;
+    interact(t.clientX, t.clientY);
+  }, { passive: true });
+  canvas.addEventListener('touchmove', e => {
+    const t = e.touches[0];
+    if (!_scrolling && Math.abs(t.clientY - _ty0) > 8) { _scrolling = true; pressing = false; stopSound(); }
+    if (pressing && !_scrolling) interact(t.clientX, t.clientY);
+  }, { passive: true });
+  canvas.addEventListener('touchend',    () => { pressing = false; });
+  canvas.addEventListener('touchcancel', () => { pressing = false; stopSound(); });
 }
 
 // ══════════════════════════════════════════════
@@ -628,10 +639,18 @@ function bindCircleAudio() {
   wrap.addEventListener('mousemove', e => { if(pressing) interact(e.clientX,e.clientY); });
   wrap.addEventListener('mouseup',    () => { pressing=false; });
   wrap.addEventListener('mouseleave', () => { pressing=false; });
-  wrap.addEventListener('touchstart', e => { e.preventDefault(); pressing=true; const t=e.touches[0]; interact(t.clientX,t.clientY); }, {passive:false});
-  wrap.addEventListener('touchmove',  e => { e.preventDefault(); const t=e.touches[0]; interact(t.clientX,t.clientY); }, {passive:false});
-  wrap.addEventListener('touchend',   () => { pressing=false; });
-  wrap.addEventListener('touchcancel',() => { pressing=false; });
+  let _cy0 = 0, _cscrolling = false;
+  wrap.addEventListener('touchstart', e => {
+    const t = e.touches[0]; _cy0 = t.clientY; _cscrolling = false; pressing = true;
+    interact(t.clientX, t.clientY);
+  }, { passive: true });
+  wrap.addEventListener('touchmove', e => {
+    const t = e.touches[0];
+    if (!_cscrolling && Math.abs(t.clientY - _cy0) > 8) { _cscrolling = true; pressing = false; }
+    if (pressing && !_cscrolling) interact(t.clientX, t.clientY);
+  }, { passive: true });
+  wrap.addEventListener('touchend',    () => { pressing = false; });
+  wrap.addEventListener('touchcancel', () => { pressing = false; });
 }
 
 // ══════════════════════════════════════════════
