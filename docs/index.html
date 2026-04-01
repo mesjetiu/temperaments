@@ -234,6 +234,7 @@
       <div class="tab" data-tab="intervals">Intervalos</div>
       <div class="tab" data-tab="beats">Batidos</div>
       <div class="tab" data-tab="tonnetz">Tonnetz</div>
+      <div class="tab" data-tab="scatter">Mapa</div>
       <div class="tab" data-tab="keyboard">Teclado</div>
       <div class="tab" data-tab="tuner" style="display:none">Afinador</div>
     </div>
@@ -307,7 +308,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'd619808 · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = '3323f74 · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -384,6 +385,7 @@ const COLORS_A= ['rgba(96,165,250,0.18)','rgba(248,113,113,0.18)','rgba(74,222,1
 // ══════════════════════════════════════════════
 let all       = [];
 let selected  = [null, null, null];
+let _scatterPts = null; // caché de métricas para el scatter
 let lastSelected = null;   // último temperamento elegido (teclado + afinador lo usan)
 let activeTab = 'overview';
 let charts    = {};
@@ -1151,7 +1153,7 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
 // SWIPE HORIZONTAL EN CONTENT PARA CAMBIAR PESTAÑA (móvil)
 // ══════════════════════════════════════════════
 (function() {
-  const TABS_ORDER = ['overview','fifths','thirds','compare','intervals','beats','tonnetz','keyboard'];
+  const TABS_ORDER = ['overview','fifths','thirds','compare','intervals','beats','tonnetz','scatter','keyboard'];
   let sx = 0, sy = 0, swiping = false;
   document.getElementById('content').addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
@@ -1373,10 +1375,10 @@ function renderContent() {
   if (activeTab !== 'keyboard') { /* KB keeps its chord */ }
   const act=selected.filter(Boolean);
   const el=document.getElementById('content');
-  if (activeTab !== 'keyboard' && activeTab !== 'tuner' && !act.length) {
+  if (activeTab !== 'keyboard' && activeTab !== 'tuner' && activeTab !== 'scatter' && !act.length) {
     el.innerHTML='<div class="empty-state">Selecciona un temperamento de la lista para empezar.</div>'; return;
   }
-  ({overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,intervals:viewIntervals,beats:viewBeats,tonnetz:viewTonnetz,keyboard:viewKeyboard,tuner:viewTuner}[activeTab])?.(act);
+  ({overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,intervals:viewIntervals,beats:viewBeats,tonnetz:viewTonnetz,scatter:viewScatter,keyboard:viewKeyboard,tuner:viewTuner}[activeTab])?.(act);
 }
 
 // ─── VISTA GENERAL ───
@@ -1711,6 +1713,168 @@ function _initTonnetz(canvas, nfoEl, temp, ti) {
       const s = v => (v >= 0 ? '+' : '') + v.toFixed(1) + '¢';
       if (nfoEl) nfoEl.textContent = `${rn} ${type}  ·  ${tr.isMaj ? '3ª M' : '3ª m'}: ${s(dt)}  ·  5ª: ${s(df)}`;
     }
+  });
+}
+
+// ─── MAPA / SCATTER ───
+function viewScatter() {
+  if (!_scatterPts) {
+    _scatterPts = all.map((temp, idx) => {
+      let sumM3 = 0;
+      for (let i = 0; i < 12; i++)
+        sumM3 += Math.abs(400 + temp.offsets[(i+4)%12] - temp.offsets[i] - 386.314);
+      let maxP5 = 0;
+      for (let i = 0; i < 12; i++) {
+        const d = Math.abs(700 + temp.offsets[(i+7)%12] - temp.offsets[i] - 701.955);
+        if (d > maxP5) maxP5 = d;
+      }
+      return { idx, x: sumM3 / 12, y: maxP5, src: temp.source, name: temp.name };
+    });
+  }
+  document.getElementById('content').innerHTML =
+    `<div class="panel" style="width:100%">
+       <h3>Cartografía de temperamentos (${all.length})</h3>
+       <canvas id="scat-cv" style="width:100%;cursor:crosshair;display:block"></canvas>
+       <div id="scat-nfo" style="margin-top:4px;min-height:1.4em;font-size:10px;color:var(--muted);text-align:center">pulsa un punto para seleccionarlo</div>
+       <div style="margin-top:4px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;font-size:10px;color:#6b7280">
+         <span><span style="color:#60a5fa">●</span> Scala</span>
+         <span><span style="color:#fb923c">●</span> GrandOrgue</span>
+         <span><span style="color:#a78bfa">●</span> Otros</span>
+         <span style="color:#4b5563">← 3ªM mejor &nbsp;↓ 5ª mejor</span>
+       </div>
+     </div>`;
+  requestAnimationFrame(() => {
+    const cv = document.getElementById('scat-cv');
+    if (cv) _initScatter(cv);
+  });
+}
+
+function _initScatter(canvas) {
+  const pts  = _scatterPts;
+  const nfoEl = document.getElementById('scat-nfo');
+  const dpr  = window.devicePixelRatio || 1;
+  const W    = canvas.clientWidth || 580;
+  const H    = Math.round(Math.min(W * 0.62, 370));
+  const MX   = 44, MY = 10, MR = 10, MB = 28;
+  canvas.width  = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const xs = pts.map(p=>p.x).sort((a,b)=>a-b);
+  const ys = pts.map(p=>p.y).sort((a,b)=>a-b);
+  const maxX = Math.ceil(xs[Math.floor(xs.length*0.96)] / 5) * 5;
+  const maxY = Math.ceil(ys[Math.floor(ys.length*0.96)] / 5) * 5;
+  const plotW = W - MX - MR, plotH = H - MY - MB;
+  const toX = v => MX + Math.min(v/maxX, 1.08) * plotW;
+  const toY = v => MY + plotH - Math.min(v/maxY, 1.08) * plotH;
+
+  const SRC_COL = { 'Scala':'#60a5fa', 'GrandOrgue':'#fb923c' };
+  let hovPt = null;
+
+  function draw() {
+    ctx.fillStyle = '#0d1117'; ctx.fillRect(0,0,W,H);
+
+    // Grid
+    ctx.lineWidth = 0.6;
+    for (let v = 0; v <= maxX; v += 5) {
+      const x = toX(v);
+      ctx.strokeStyle='#1e2a3a'; ctx.beginPath(); ctx.moveTo(x,MY); ctx.lineTo(x,MY+plotH); ctx.stroke();
+      ctx.fillStyle='#4b5563'; ctx.font='9px system-ui'; ctx.textAlign='center';
+      ctx.fillText(v+'¢', x, MY+plotH+14);
+    }
+    for (let v = 0; v <= maxY; v += 5) {
+      const y = toY(v);
+      ctx.strokeStyle='#1e2a3a'; ctx.beginPath(); ctx.moveTo(MX,y); ctx.lineTo(MX+plotW,y); ctx.stroke();
+      ctx.fillStyle='#4b5563'; ctx.font='9px system-ui'; ctx.textAlign='right';
+      ctx.fillText(v+'¢', MX-4, y+3);
+    }
+    ctx.strokeStyle='#374151'; ctx.lineWidth=1; ctx.strokeRect(MX,MY,plotW,plotH);
+
+    // Axis labels
+    ctx.fillStyle='#6b7280'; ctx.font='10px system-ui'; ctx.textAlign='center';
+    ctx.fillText('desv. media de 3ªM respecto a justa', MX+plotW/2, H-2);
+    ctx.save(); ctx.translate(11,MY+plotH/2); ctx.rotate(-Math.PI/2);
+    ctx.fillText('peor 5ª (desv. máx.)', 0, 0); ctx.restore();
+
+    // ET crosshairs
+    const etPt = pts.find(p => p.name==='Equal temperament' && p.src==='GrandOrgue') || pts.find(p => p.name.toLowerCase()==='equal temperament');
+    if (etPt) {
+      ctx.strokeStyle='#334155'; ctx.lineWidth=0.8; ctx.setLineDash([4,4]);
+      ctx.beginPath(); ctx.moveTo(toX(etPt.x),MY); ctx.lineTo(toX(etPt.x),MY+plotH); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(MX,toY(etPt.y)); ctx.lineTo(MX+plotW,toY(etPt.y)); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle='#475569'; ctx.font='9px system-ui'; ctx.textAlign='left';
+      ctx.fillText('ET', toX(etPt.x)+3, MY+11);
+    }
+
+    // Batch-draw all unselected points by color
+    const byCol = {};
+    pts.forEach(p => {
+      if (selected.some(s=>s&&s.name===p.name)) return;
+      const col = SRC_COL[p.src] || '#a78bfa';
+      (byCol[col] = byCol[col]||[]).push(p);
+    });
+    Object.entries(byCol).forEach(([col, ps]) => {
+      ctx.fillStyle = col + '55';
+      ctx.beginPath();
+      ps.forEach(p => { ctx.moveTo(toX(p.x)+2,toY(p.y)); ctx.arc(toX(p.x),toY(p.y),2,0,Math.PI*2); });
+      ctx.fill();
+    });
+
+    // Hovered (unselected)
+    if (hovPt && !selected.some(s=>s&&s.name===hovPt.name)) {
+      ctx.beginPath(); ctx.arc(toX(hovPt.x),toY(hovPt.y),5,0,Math.PI*2);
+      ctx.fillStyle='#e2e8f0'; ctx.fill();
+    }
+
+    // Selected
+    selected.filter(Boolean).forEach((t,si) => {
+      const p = pts.find(pt=>pt.name===t.name); if(!p) return;
+      ctx.beginPath(); ctx.arc(toX(p.x),toY(p.y),7,0,Math.PI*2);
+      ctx.fillStyle=COLORS[si]; ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+    });
+
+    // Tooltip
+    if (hovPt) {
+      const tx = Math.max(MX+2, Math.min(toX(hovPt.x)+8, W-160));
+      const ty = Math.max(MY+16, toY(hovPt.y)-20);
+      ctx.font='10px system-ui';
+      const tw = Math.min(ctx.measureText(hovPt.name).width+10, W-MX-8);
+      ctx.fillStyle='rgba(15,23,42,0.92)'; ctx.fillRect(tx,ty,tw,17);
+      ctx.fillStyle='#e2e8f0'; ctx.textAlign='left'; ctx.fillText(hovPt.name,tx+5,ty+12);
+    }
+  }
+
+  draw();
+
+  function nearPt(mx, my, thr) {
+    let best=null, bd=thr;
+    pts.forEach(p => { const d=Math.hypot(mx-toX(p.x),my-toY(p.y)); if(d<bd){bd=d;best=p;} });
+    return best;
+  }
+
+  canvas.addEventListener('mousemove', e => {
+    const rc=canvas.getBoundingClientRect();
+    const np=nearPt((e.clientX-rc.left)*(W/rc.width),(e.clientY-rc.top)*(H/rc.height),12);
+    if(np!==hovPt){hovPt=np;draw();}
+  });
+  canvas.addEventListener('mouseleave', ()=>{hovPt=null;draw();});
+
+  canvas.addEventListener('pointerdown', e => {
+    const rc=canvas.getBoundingClientRect();
+    const np=nearPt((e.clientX-rc.left)*(W/rc.width),(e.clientY-rc.top)*(H/rc.height),15);
+    if(!np) return;
+    hovPt = np;
+    const t=all[np.idx], already=selected.some(s=>s&&s.name===t.name);
+    selected = already ? [null,null,null] : [t,null,null];
+    lastSelected = already ? null : t;
+    if(!already) savePrefs({selectedName:t.name});
+    renderBadges(); refreshList(); draw();
+    if(nfoEl) nfoEl.textContent = already ? 'pulsa un punto para seleccionarlo'
+      : `${t.name} [${t.source}]  ·  3ªM: ${np.x.toFixed(1)}¢  ·  5ª: ${np.y.toFixed(1)}¢`;
   });
 }
 
