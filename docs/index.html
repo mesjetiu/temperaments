@@ -226,14 +226,14 @@
     </div>
 
     <div id="tabs">
-      <div class="tab" data-tab="overview">Vista general</div>
+      <div class="tab active" data-tab="overview">Vista general</div>
       <div class="tab" data-tab="fifths">Quintas</div>
       <div class="tab" data-tab="thirds">Terceras</div>
       <div class="tab" data-tab="compare">Comparar</div>
       <div class="tab" data-tab="intervals">Intervalos</div>
       <div class="tab" data-tab="beats">Batidos</div>
       <div class="tab" data-tab="keyboard">Teclado</div>
-      <div class="tab active" data-tab="tuner" style="display:none">Afinador</div>
+      <div class="tab" data-tab="tuner" style="display:none">Afinador</div>
     </div>
     <!-- FAB flotante del afinador -->
     <button id="tuner-fab" onclick="document.querySelector('.tab[data-tab=tuner]').click()" title="Abrir afinador"
@@ -301,7 +301,7 @@
 </div>
 
 <script>
-const APP_VERSION = '441927f · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = 'bacfd30 · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -379,7 +379,7 @@ const COLORS_A= ['rgba(96,165,250,0.18)','rgba(248,113,113,0.18)','rgba(74,222,1
 let all       = [];
 let selected  = [null, null, null];
 let lastSelected = null;   // último temperamento elegido (teclado + afinador lo usan)
-let activeTab = 'tuner';
+let activeTab = 'overview';
 let charts    = {};
 let chartMeta = {};
 
