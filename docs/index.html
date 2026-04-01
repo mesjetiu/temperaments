@@ -62,7 +62,7 @@
     #mob-header { display: flex !important; }
     #content { flex-direction: column !important; flex-wrap: nowrap !important; padding: 12px !important; gap: 12px !important; }
     .panel { width: 100% !important; max-width: 100% !important; min-width: unset !important; flex: none !important; box-sizing: border-box !important; }
-    .panel canvas { max-height: 220px; }
+    .panel:not(.panel-resized) canvas { max-height: 220px; }
     #circle-wrap svg { width: min(270px,90vw); height: auto; }
     #audio-hint { display: none; }
     #audio-bar { gap: 5px; padding: 6px 10px; }
@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = '9c538bb · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = 'bfc2c84 · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -609,6 +609,8 @@ function toggleContentFullscreen() {
 // ── ResizeObserver para canvas custom (scatter, tonnetz) y tablas ──
 const _panelRO = new ResizeObserver(entries => {
   entries.forEach(e => {
+    // Mark as resized when the panel has an explicit style.height (desktop CSS resize sets it)
+    if (e.target.style.height) e.target.classList.add('panel-resized');
     e.target.querySelectorAll('canvas[data-ro]').forEach(cv => {
       if (!cv._redraw) return;
       clearTimeout(cv._roTimer);
@@ -636,8 +638,25 @@ function togglePanelCollapse(panel) {
   }
   panel.classList.toggle('collapsed');
 }
+// Devuelve el alto disponible para un canvas dentro de su contenedor,
+// midiendo directamente los hermanos para ser independiente de la vista.
+function _availCanvasH(canvas) {
+  const body = canvas.closest('.panel-body') || canvas.closest('.panel');
+  if (!body) return 0;
+  const cs  = getComputedStyle(body);
+  const bodyH = body.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  const siblH = Array.from(body.children)
+    .filter(el => el !== canvas)
+    .reduce((sum, el) => {
+      const m = getComputedStyle(el);
+      return sum + el.offsetHeight + parseFloat(m.marginTop) + parseFloat(m.marginBottom);
+    }, 0);
+  return Math.max(0, bodyH - siblH);
+}
+
 function startPanelDragResize(e, panel) {
   e.preventDefault();
+  panel.classList.add('panel-resized');
   const startY = e.clientY;
   const minH = panel.clientHeight; // natural height = minimum
   panel.style.height = minH + 'px';
@@ -1474,7 +1493,7 @@ function _attachChartResize(id, c) {
   c._redraw = () => {
     const panel = c.closest('.panel');
     if (panel?.style.height) {
-      const availH = panel.clientHeight - 56;
+      const availH = _availCanvasH(c);
       if (availH > 50) c.style.height = Math.max(60, availH) + 'px';
     }
     charts[id]?.resize();
@@ -1779,7 +1798,7 @@ function _initTonnetz(canvas, nfoEl, temp, ti) {
   const panel = canvas.closest('.panel');
   let stepH = Infinity;
   if (panel?.style.height) {
-    const availH = panel.clientHeight - 80; // title + legend + nfo rows
+    const availH = _availCanvasH(canvas);
     if (availH > 40) stepH = (availH - MY * 2) / ((NR - 1) * Math.sqrt(3) / 2);
   }
   const step = Math.min(stepW, stepH);
@@ -1937,8 +1956,8 @@ function _initScatter(canvas) {
   const nfoEl = document.getElementById('scat-nfo');
   const dpr  = window.devicePixelRatio || 1;
   const W    = canvas.clientWidth || 580;
-  const panelH = canvas.closest('.panel')?.clientHeight || 0;
-  const availH = panelH > 120 ? panelH - 80 : 0; // subtract title + legend rows
+  const panel = canvas.closest('.panel');
+  const availH = panel?.style.height ? _availCanvasH(canvas) : 0;
   const H    = availH > 80 ? Math.round(availH) : Math.round(Math.min(W * 0.62, 370));
   const MX   = 44, MY = 10, MR = 10, MB = 28;
   canvas.width  = Math.round(W * dpr);
