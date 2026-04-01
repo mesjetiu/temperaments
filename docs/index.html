@@ -160,6 +160,13 @@
   .panel-hdr .panel-chevron { font-size:11px; color:#6b7280; transition:transform 0.2s; flex-shrink:0; }
   .panel.collapsed .panel-chevron { transform:rotate(-90deg); }
   .panel.collapsed .panel-body { display:none; }
+  .panel.collapsed .panel-drag-bar { display:none; }
+  /* Barra de resize táctil (móvil) */
+  .panel-drag-bar { display:none; }
+  @media (max-width: 767px) {
+    .panel-drag-bar { display:flex; align-items:center; justify-content:center; height:18px; margin:6px -16px -16px; border-top:1px solid var(--border); cursor:ns-resize; touch-action:none; -webkit-tap-highlight-color:transparent; }
+    .panel-drag-bar::after { content:''; display:block; width:32px; height:3px; border-radius:2px; background:#2d3f55; }
+  }
   .empty-state { color: #4b5563; font-style: italic; padding: 60px; text-align: center; width: 100%; }
   .playable { cursor: crosshair; }
   table td[onpointerdown] { user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
@@ -344,7 +351,7 @@
 </div>
 
 <script>
-const APP_VERSION = '72244f9 · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = 'a2222e8 · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -615,6 +622,22 @@ function attachPanelResize(canvas) {
   canvas.setAttribute('data-ro', '1');
   const panel = canvas.closest('.panel');
   if (panel) _panelRO.observe(panel);
+}
+function startPanelDragResize(e, panel) {
+  e.preventDefault();
+  const startY = e.clientY;
+  const startH = panel.clientHeight;
+  panel.style.height = startH + 'px'; // pin height before dragging
+  function onMove(ev) {
+    const h = Math.max(80, startH + ev.clientY - startY);
+    panel.style.height = h + 'px';
+  }
+  function onEnd() {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onEnd);
+  }
+  window.addEventListener('pointermove', onMove, { passive: true });
+  window.addEventListener('pointerup', onEnd);
 }
 function attachTablePanelResize(tableEl) {
   const panel = tableEl.closest('.panel');
@@ -1476,6 +1499,7 @@ function panel(title, bodyHtml, style = '') {
       <h3>${title}</h3><span style="display:flex;gap:6px;align-items:center">${zoomBtn}<span class="panel-chevron">▼</span></span>
     </div>
     <div class="panel-body">${bodyHtml}</div>
+    <div class="panel-drag-bar" onpointerdown="startPanelDragResize(event,this.closest('.panel'))"></div>
   </div>`;
 }
 
@@ -1874,7 +1898,9 @@ function _initScatter(canvas) {
   const nfoEl = document.getElementById('scat-nfo');
   const dpr  = window.devicePixelRatio || 1;
   const W    = canvas.clientWidth || 580;
-  const H    = Math.round(Math.min(W * 0.62, 370));
+  const panelH = canvas.closest('.panel')?.clientHeight || 0;
+  const availH = panelH > 120 ? panelH - 80 : 0; // subtract title + legend rows
+  const H    = availH > 80 ? Math.round(availH) : Math.round(Math.min(W * 0.62, 370));
   const MX   = 44, MY = 10, MR = 10, MB = 28;
   canvas.width  = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
