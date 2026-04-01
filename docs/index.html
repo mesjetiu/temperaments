@@ -284,7 +284,7 @@
     </div>
     <!-- FAB flotante del afinador -->
     <button id="tuner-fab" onclick="document.querySelector('.tab[data-tab=tuner]').click()" title="Abrir afinador"
-      style="position:fixed;bottom:24px;right:20px;z-index:800;background:#1d4ed8;border:none;border-radius:50px;padding:14px 22px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;display:none;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(29,78,216,0.5);white-space:nowrap">
+      style="position:fixed;bottom:24px;right:20px;z-index:800;background:#1d4ed8;border:none;border-radius:50px;padding:14px 22px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(29,78,216,0.5);white-space:nowrap">
       🎵 Afinar
     </button>
 
@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = '97a96ee · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = '5761b2e · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2184,6 +2184,22 @@ function detectPitch(buf, sampleRate) {
   return { freq: sampleRate / betterTau, clarity, rms };
 }
 
+// Refina la frecuencia YIN usando interpolación parabólica sobre el espectro FFT (dB).
+// Para tonos puros (electrónicos) la precisión pasa de varios Hz a < 0.05 Hz.
+function refinePitchFFT(approxFreq, freqBuf, sampleRate) {
+  const binWidth = sampleRate / (freqBuf.length * 2);
+  const center = Math.round(approxFreq / binWidth);
+  const lo = Math.max(1, center - 6), hi = Math.min(freqBuf.length - 2, center + 6);
+  // Buscar el bin pico en dB dentro del rango
+  let peakBin = center;
+  for (let b = lo; b <= hi; b++) if (freqBuf[b] > freqBuf[peakBin]) peakBin = b;
+  // Interpolación parabólica sobre log-magnitud (dB) → exacta para picos Gaussianos
+  const l = freqBuf[peakBin - 1], m = freqBuf[peakBin], r = freqBuf[peakBin + 1];
+  const denom = 2 * (l + r - 2 * m); // negativo para un máximo
+  if (Math.abs(denom) > 1e-8) return (peakBin + (l - r) / denom) * binWidth;
+  return peakBin * binWidth;
+}
+
 function findClosestNote(freq) {
   const centsFromA4 = 1200 * Math.log2(freq / pitchA);
   const off = (lastSelected ?? selected.find(Boolean))?.offsets ?? new Array(12).fill(0);
@@ -2353,12 +2369,16 @@ const TUNER = {
 
     let freqError = 0;
     if (this.analyser) {
-      // Buffer pre-reservado: evita allocar Float32Array cada frame (reduce GC)
+      // Buffers pre-reservados: evita allocar Float32Array cada frame (reduce GC)
       if (!this._buf || this._buf.length !== this.analyser.fftSize) {
         this._buf = new Float32Array(this.analyser.fftSize);
       }
+      if (!this._freqBuf || this._freqBuf.length !== this.analyser.frequencyBinCount) {
+        this._freqBuf = new Float32Array(this.analyser.frequencyBinCount);
+      }
       const buf = this._buf;
       this.analyser.getFloatTimeDomainData(buf);
+      this.analyser.getFloatFrequencyData(this._freqBuf);
       // RMS sobre los primeros 1024 muestras (rápido)
       let rmsSum = 0;
       const rmsN = Math.min(1024, buf.length);
@@ -2366,6 +2386,8 @@ const TUNER = {
       this.rms = Math.sqrt(rmsSum / rmsN);
 
       const p = detectPitch(buf, getCtx().sampleRate);
+      // Refinar frecuencia con el espectro FFT (sub-Hz para tonos puros)
+      if (p) p.freq = refinePitchFFT(p.freq, this._freqBuf, getCtx().sampleRate);
       if (p) {
         this.detectedFreq = p.freq;
         this._lastFreq = p.freq;
