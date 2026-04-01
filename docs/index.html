@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'c829d9a · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = 'a1d15cf · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2242,6 +2242,7 @@ const TUNER = {
   _lastFreq: 440, _lastNi: 9, _lastOct: 4,  // último pitch válido (A4 inicial)
   _octCandidate: null, _octCandidateMs: 0,  // candidato de octava pendiente de confirmar
   _buf: null,  // buffer pre-reservado para evitar GC en cada frame
+  _freqHistory: [],  // historial para filtro de mediana temporal
 
   getTargetFreq() {
     const off = (lastSelected ?? selected.find(Boolean))?.offsets ?? new Array(12).fill(0);
@@ -2253,7 +2254,7 @@ const TUNER = {
     if (this.mode === 'manual' && m !== 'manual' && !this.refOn) this.stopRef();
     this.mode = m;
     savePrefs({ tunerMode: m });
-    this.strobePhase = 0; this.prevStrobePhase = 0; this._octCandidate = null; this._octCandidateMs = 0;
+    this.strobePhase = 0; this.prevStrobePhase = 0; this._octCandidate = null; this._octCandidateMs = 0; this._freqHistory.length = 0;
     if (document.getElementById('tuner-screen')) {
       cancelAnimationFrame(this.rafId); this.rafId = null;
       closeTunerMenu();
@@ -2268,7 +2269,7 @@ const TUNER = {
 
   setTarget(ni, oct) {
     this.targetNi = ni; this.targetOct = oct;
-    this.strobePhase = 0; this.prevStrobePhase = 0; this._octCandidate = null; this._octCandidateMs = 0;
+    this.strobePhase = 0; this.prevStrobePhase = 0; this._octCandidate = null; this._octCandidateMs = 0; this._freqHistory.length = 0;
     this.updateTargetDisplay();
     document.querySelectorAll('[data-tni]').forEach(el =>
       el.classList.toggle('ka', +el.dataset.tni === ni && +el.dataset.toct === oct));
@@ -2393,7 +2394,17 @@ const TUNER = {
 
       const p = detectPitch(buf, getCtx().sampleRate);
       // Refinar frecuencia con cruces por cero (< 0.002 Hz para tonos puros)
-      if (p) p.freq = refinePitchZeroCross(buf, p.freq, getCtx().sampleRate);
+      if (p) {
+        p.freq = refinePitchZeroCross(buf, p.freq, getCtx().sampleRate);
+        // Filtro de mediana temporal (N=9): elimina fluctuaciones frame a frame.
+        // Resetea el historial si el pitch ha saltado > 80 cents (cambio real de nota).
+        const H = this._freqHistory;
+        if (H.length && Math.abs(1200 * Math.log2(p.freq / H[H.length - 1])) > 80) H.length = 0;
+        H.push(p.freq);
+        if (H.length > 9) H.shift();
+        const sorted = H.slice().sort((a, b) => a - b);
+        p.freq = sorted[sorted.length >> 1]; // mediana
+      }
       if (p) {
         this.detectedFreq = p.freq;
         this._lastFreq = p.freq;
