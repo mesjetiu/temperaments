@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'd287926 · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = '1545bdf · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2455,8 +2455,10 @@ const TUNER = {
         const tf = this.getTargetFreq();
         // Snap solo para waterfall: evitar pliegues por armónicos sin bloquear detección de octava
         let snapFreq = p.freq;
-        while (snapFreq < tf * Math.SQRT1_2) snapFreq *= 2;
-        while (snapFreq > tf * Math.SQRT2)   snapFreq /= 2;
+        if (snapFreq > 0) { // guarda: frecuencia negativa o cero causa bucle infinito
+          while (snapFreq < tf * Math.SQRT1_2) snapFreq *= 2;
+          while (snapFreq > tf * Math.SQRT2)   snapFreq /= 2;
+        } else { snapFreq = tf; }
         // Filtro de mediana temporal en cents (N=9): estabiliza la visualización
         // sin afectar a la identificación de nota/octava.
         // Resetea si el pitch ha saltado > 80 cents (cambio real de nota).
