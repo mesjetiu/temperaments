@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = '873698b · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = 'c54f634 · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2409,17 +2409,7 @@ const TUNER = {
 
       const p = detectPitch(buf, getCtx().sampleRate);
       // Refinar frecuencia con cruces por cero (< 0.002 Hz para tonos puros)
-      if (p) {
-        p.freq = refinePitchZeroCross(buf, p.freq, getCtx().sampleRate);
-        // Filtro de mediana temporal (N=9): elimina fluctuaciones frame a frame.
-        // Resetea el historial si el pitch ha saltado > 80 cents (cambio real de nota).
-        const H = this._freqHistory;
-        if (H.length && Math.abs(1200 * Math.log2(p.freq / H[H.length - 1])) > 80) H.length = 0;
-        H.push(p.freq);
-        if (H.length > 9) H.shift();
-        const sorted = H.slice().sort((a, b) => a - b);
-        p.freq = sorted[sorted.length >> 1]; // mediana
-      }
+      if (p) p.freq = refinePitchZeroCross(buf, p.freq, getCtx().sampleRate);
       if (p) {
         this.detectedFreq = p.freq;
         this._lastFreq = p.freq;
@@ -2456,7 +2446,16 @@ const TUNER = {
         let snapFreq = p.freq;
         while (snapFreq < tf * Math.SQRT1_2) snapFreq *= 2;
         while (snapFreq > tf * Math.SQRT2)   snapFreq /= 2;
-        this.detectedCents = 1200 * Math.log2(snapFreq / tf);
+        // Filtro de mediana temporal en cents (N=9): estabiliza la visualización
+        // sin afectar a la identificación de nota/octava.
+        // Resetea si el pitch ha saltado > 80 cents (cambio real de nota).
+        const rawCents = 1200 * Math.log2(snapFreq / tf);
+        const H = this._freqHistory;
+        if (H.length && Math.abs(rawCents - H[H.length - 1]) > 80) H.length = 0;
+        H.push(rawCents);
+        if (H.length > 9) H.shift();
+        const sc = H.slice().sort((a, b) => a - b);
+        this.detectedCents = sc[sc.length >> 1];
         freqError = snapFreq - tf;
         if (this.refOn && this.refOsc) {
           const now = getCtx().currentTime;
