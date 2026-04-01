@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = '64bac3b · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = '7311d3f · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -609,11 +609,11 @@ function toggleContentFullscreen() {
 // ── ResizeObserver para canvas custom (scatter, tonnetz) y tablas ──
 const _panelRO = new ResizeObserver(entries => {
   entries.forEach(e => {
-    const cv = e.target.querySelector('canvas[data-ro]');
-    if (cv && cv._redraw) {
+    e.target.querySelectorAll('canvas[data-ro]').forEach(cv => {
+      if (!cv._redraw) return;
       clearTimeout(cv._roTimer);
       cv._roTimer = setTimeout(() => cv._redraw(), 120);
-    }
+    });
     const tbl = e.target.querySelector('table[data-rt]');
     if (tbl) {
       clearTimeout(tbl._roTimer);
@@ -1454,11 +1454,23 @@ const shortName = (t,n=32) => t.name.length>n ? t.name.slice(0,n-1)+'…' : t.na
 function activeSlotMap() { return selected.map((t,i)=>({t,i})).filter(x=>x.t).map(x=>x.i); }
 
 const gridColor='#374151', tickColor='#9ca3af';
-const baseOpts = { responsive:true, animation:{duration:250},
+const baseOpts = { responsive:true, maintainAspectRatio:false, animation:{duration:250},
   plugins:{legend:{labels:{color:'#d1d5db',font:{size:11},boxWidth:14}}} };
 const ds = (t,i,data,extra={}) => ({ label:shortName(t), data, backgroundColor:COLORS_A[i], borderColor:COLORS[i], borderWidth:isMobile()?1.5:2, minBarLength:3, ...extra });
 const dsFifth = (t,i,devs) => ({ label:shortName(t), data:devs, backgroundColor:devs.map(fifthDevColor), borderColor:devs.map(fifthDevColor), borderWidth:1, minBarLength:3 });
 const dsMaj3  = (t,i,devs) => ({ label:shortName(t), data:devs, backgroundColor:devs.map(maj3DevColor),  borderColor:devs.map(maj3DevColor),  borderWidth:1, minBarLength:3 });
+
+function _attachChartResize(id, c) {
+  c._redraw = () => {
+    const panel = c.closest('.panel');
+    if (panel?.style.height) {
+      const availH = panel.clientHeight - 56;
+      if (availH > 50) c.style.height = Math.max(60, availH) + 'px';
+    }
+    charts[id]?.resize();
+  };
+  attachPanelResize(c);
+}
 
 function mkBar(id, labels, datasets, yLabel, tipFmt, audioType) {
   const c=document.getElementById(id); if(!c) return;
@@ -1468,6 +1480,7 @@ function mkBar(id, labels, datasets, yLabel, tipFmt, audioType) {
     scales:{x:{ticks:{color:tickColor,font:{size:9},maxRotation:40},grid:{color:gridColor}},
             y:{ticks:{color:tickColor,callback:v=>`${v>=0?'+':''}${v}¢`},grid:{color:gridColor},
                title:{display:true,text:yLabel,color:'#6b7280',font:{size:10}}}}}});
+  _attachChartResize(id, c);
   if(audioType) bindChartAudio(id,audioType,activeSlotMap());
 }
 
@@ -1478,6 +1491,7 @@ function mkLine(id, labels, datasets, yLabel, tipFmt, audioType) {
     scales:{x:{ticks:{color:tickColor,font:{size:10}},grid:{color:gridColor}},
             y:{ticks:{color:tickColor,callback:v=>`${v>0?'+':''}${v}¢`},grid:{color:gridColor},
                title:{display:true,text:yLabel,color:'#6b7280',font:{size:10}}}}}});
+  _attachChartResize(id, c);
   if(audioType) bindChartAudio(id,audioType,activeSlotMap());
 }
 
@@ -1487,6 +1501,7 @@ function mkRadar(id, datasets) {
     scales:{r:{ticks:{color:tickColor,backdropColor:'transparent',font:{size:9}},
               grid:{color:gridColor},angleLines:{color:gridColor},
               pointLabels:{color:'#d1d5db',font:{size:isMobile()?10:12}}}}}});
+  _attachChartResize(id, c);
   bindChartAudio(id,'radar',activeSlotMap());
 }
 
@@ -1749,7 +1764,15 @@ function _initTonnetz(canvas, nfoEl, temp, ti) {
   const dpr  = window.devicePixelRatio || 1;
   const W    = canvas.clientWidth || 560;
   const MX   = 14, MY = 16;
-  const step = (W - MX * 2) / (NC - 1 + (NR - 1) * 0.5);
+  const stepW = (W - MX * 2) / (NC - 1 + (NR - 1) * 0.5);
+  // If panel has explicit height, scale step to fill Y axis too
+  const panel = canvas.closest('.panel');
+  let stepH = Infinity;
+  if (panel?.style.height) {
+    const availH = panel.clientHeight - 80; // title + legend + nfo rows
+    if (availH > 40) stepH = (availH - MY * 2) / ((NR - 1) * Math.sqrt(3) / 2);
+  }
+  const step = Math.min(stepW, stepH);
   const HS   = step * Math.sqrt(3) / 2;
   const H    = (NR - 1) * HS + MY * 2;
   const R    = Math.min(step * 0.28, 13);
