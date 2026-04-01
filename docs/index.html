@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = '8e895af · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = 'fb9cc57 · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2342,7 +2342,7 @@ const TUNER = {
       const ctx = getCtx();
       const src = ctx.createMediaStreamSource(stream);
       this.analyser = ctx.createAnalyser();
-      this.analyser.fftSize = 8192;
+      this.analyser.fftSize = 4096;
       this.analyser.smoothingTimeConstant = 0;
       src.connect(this.analyser);
       this.micOn = true;
