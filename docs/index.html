@@ -152,7 +152,7 @@
   .panel-zoom-btn { background:none; border:none; color:#4b5563; cursor:pointer; font-size:14px; line-height:1; padding:0 2px; flex-shrink:0; -webkit-tap-highlight-color:transparent; transition:color 0.15s; }
   .panel-zoom-btn:hover { color:#94a3b8; }
   @media (min-width: 768px) {
-    .panel { resize:both; overflow:auto; min-height:80px; min-width:180px; }
+    .panel.panel-resizable { resize:both; overflow:auto; min-height:80px; min-width:180px; }
   }
   /* Paneles plegables en móvil */
   .panel-hdr { display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent; margin-bottom:12px; }
@@ -161,14 +161,14 @@
   .panel.collapsed .panel-chevron { transform:rotate(-90deg); }
   .panel.collapsed .panel-body { display:none; }
   .panel.collapsed .panel-drag-bar { display:none; }
-  /* Barra de resize táctil (móvil) */
+  /* Barra de resize táctil: solo paneles con contenido expandible */
   .panel-drag-bar { display:none; }
   @media (max-width: 767px) {
     .panel { display:flex !important; flex-direction:column !important; }
     .panel-hdr { flex-shrink:0; }
     .panel-body { flex:1; min-height:0; overflow-y:auto; }
-    .panel-drag-bar { display:flex; align-items:center; justify-content:center; height:18px; margin:6px -16px -16px; border-top:1px solid var(--border); cursor:ns-resize; touch-action:none; -webkit-tap-highlight-color:transparent; flex-shrink:0; }
-    .panel-drag-bar::after { content:''; display:block; width:32px; height:3px; border-radius:2px; background:#2d3f55; }
+    .panel.panel-resizable .panel-drag-bar { display:flex; align-items:center; justify-content:center; height:18px; margin:6px -16px -16px; border-top:1px solid var(--border); cursor:ns-resize; touch-action:none; -webkit-tap-highlight-color:transparent; flex-shrink:0; }
+    .panel.panel-resizable .panel-drag-bar::after { content:''; display:block; width:32px; height:3px; border-radius:2px; background:#2d3f55; }
   }
   .empty-state { color: #4b5563; font-style: italic; padding: 60px; text-align: center; width: 100%; }
   .playable { cursor: crosshair; }
@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = '773c3b3 · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = '4c257e6 · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -626,7 +626,7 @@ const _panelRO = new ResizeObserver(entries => {
 function attachPanelResize(canvas) {
   canvas.setAttribute('data-ro', '1');
   const panel = canvas.closest('.panel');
-  if (panel) _panelRO.observe(panel);
+  if (panel) { panel.classList.add('panel-resizable'); _panelRO.observe(panel); }
 }
 function togglePanelCollapse(panel) {
   const collapsing = !panel.classList.contains('collapsed');
@@ -674,8 +674,8 @@ function startPanelDragResize(e, panel) {
 function attachTablePanelResize(tableEl) {
   const panel = tableEl.closest('.panel');
   if (!panel) return;
+  panel.classList.add('panel-resizable');
   _panelRO.observe(panel);
-  // initial sizing based on current panel dimensions
   _resizeTableToPanel(tableEl, panel.getBoundingClientRect());
 }
 function _resizeTableToPanel(tbl, rect) {
@@ -1527,10 +1527,10 @@ function mkLine(id, labels, datasets, yLabel, tipFmt, audioType) {
 function mkRadar(id, datasets) {
   const c=document.getElementById(id); if(!c) return;
   charts[id]=new Chart(c,{type:'radar',data:{labels:NOTES,datasets},options:{...baseOpts,
+    maintainAspectRatio:true,
     scales:{r:{ticks:{color:tickColor,backdropColor:'transparent',font:{size:9}},
               grid:{color:gridColor},angleLines:{color:gridColor},
               pointLabels:{color:'#d1d5db',font:{size:isMobile()?10:12}}}}}});
-  _attachChartResize(id, c);
   bindChartAudio(id,'radar',activeSlotMap());
 }
 
