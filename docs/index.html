@@ -132,6 +132,7 @@
   .panel.collapsed .panel-body { display:none; }
   .empty-state { color: #4b5563; font-style: italic; padding: 60px; text-align: center; width: 100%; }
   .playable { cursor: crosshair; }
+  table td[onpointerdown] { user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
   table { border-collapse: collapse; width: 100%; font-size: 11px; }
   th { text-align: left; padding: 4px 8px; color: var(--accent); border-bottom: 1px solid var(--border); }
   td { padding: 3px 8px; }
@@ -306,7 +307,7 @@
 </div>
 
 <script>
-const APP_VERSION = '8c2481e · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = 'd619808 · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
