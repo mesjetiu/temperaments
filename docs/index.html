@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'bfc2c84 · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = '773c3b3 · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1332,7 +1332,7 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
     if (!swiping) return; swiping = false;
     const dx = e.changedTouches[0].clientX - sx;
     const dy = e.changedTouches[0].clientY - sy;
-    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.5) return; // ignorar si es más vertical
+    if (Math.abs(dx) < 90 || Math.abs(dx) < Math.abs(dy) * 2.5) return; // ignorar si es corto o más vertical
     if (activeTab === 'tuner') return; // el afinador tiene su propia pantalla
     const idx = TABS_ORDER.indexOf(activeTab);
     const next = dx < 0 ? TABS_ORDER[idx + 1] : TABS_ORDER[idx - 1];
