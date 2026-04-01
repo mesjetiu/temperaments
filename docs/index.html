@@ -164,7 +164,10 @@
   /* Barra de resize táctil (móvil) */
   .panel-drag-bar { display:none; }
   @media (max-width: 767px) {
-    .panel-drag-bar { display:flex; align-items:center; justify-content:center; height:18px; margin:6px -16px -16px; border-top:1px solid var(--border); cursor:ns-resize; touch-action:none; -webkit-tap-highlight-color:transparent; }
+    .panel { display:flex !important; flex-direction:column !important; }
+    .panel-hdr { flex-shrink:0; }
+    .panel-body { flex:1; min-height:0; overflow-y:auto; }
+    .panel-drag-bar { display:flex; align-items:center; justify-content:center; height:18px; margin:6px -16px -16px; border-top:1px solid var(--border); cursor:ns-resize; touch-action:none; -webkit-tap-highlight-color:transparent; flex-shrink:0; }
     .panel-drag-bar::after { content:''; display:block; width:32px; height:3px; border-radius:2px; background:#2d3f55; }
   }
   .empty-state { color: #4b5563; font-style: italic; padding: 60px; text-align: center; width: 100%; }
@@ -351,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'a2222e8 · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = '677dfe1 · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
