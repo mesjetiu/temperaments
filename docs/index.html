@@ -231,6 +231,7 @@
       <div class="tab" data-tab="thirds">Terceras</div>
       <div class="tab" data-tab="compare">Comparar</div>
       <div class="tab" data-tab="intervals">Intervalos</div>
+      <div class="tab" data-tab="beats">Batidos</div>
       <div class="tab" data-tab="keyboard">Teclado</div>
       <div class="tab active" data-tab="tuner" style="display:none">Afinador</div>
     </div>
@@ -300,7 +301,7 @@
 </div>
 
 <script>
-const APP_VERSION = '4e03afe · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = '441927f · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1131,7 +1132,7 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
 // SWIPE HORIZONTAL EN CONTENT PARA CAMBIAR PESTAÑA (móvil)
 // ══════════════════════════════════════════════
 (function() {
-  const TABS_ORDER = ['overview','fifths','thirds','compare','intervals','keyboard'];
+  const TABS_ORDER = ['overview','fifths','thirds','compare','intervals','beats','keyboard'];
   let sx = 0, sy = 0, swiping = false;
   document.getElementById('content').addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
@@ -1356,7 +1357,7 @@ function renderContent() {
   if (activeTab !== 'keyboard' && activeTab !== 'tuner' && !act.length) {
     el.innerHTML='<div class="empty-state">Selecciona un temperamento de la lista para empezar.</div>'; return;
   }
-  ({overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,intervals:viewIntervals,keyboard:viewKeyboard,tuner:viewTuner}[activeTab])?.(act);
+  ({overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,intervals:viewIntervals,beats:viewBeats,keyboard:viewKeyboard,tuner:viewTuner}[activeTab])?.(act);
 }
 
 // ─── VISTA GENERAL ───
@@ -1485,6 +1486,64 @@ function viewIntervals(act) {
       </div>
     </div>`;
     html += panel(`Matriz de intervalos — <span style="color:${COLORS[ti]}">${temp.name}</span>`, tableHtml, 'width:100%');
+  });
+  document.getElementById('content').innerHTML = html;
+}
+
+// ─── BATIDOS ───
+function viewBeats(act) {
+  // Intervalos con sus razones justas (p/q) para el cálculo de batidos
+  const IVLS = [
+    { semi:4, name:'M3', p:5, q:4 },
+    { semi:3, name:'m3', p:6, q:5 },
+    { semi:7, name:'P5', p:3, q:2 },
+    { semi:5, name:'P4', p:4, q:3 },
+    { semi:9, name:'M6', p:5, q:3 },
+    { semi:8, name:'m6', p:8, q:5 },
+    { semi:2, name:'M2', p:9, q:8 },
+    { semi:10, name:'m7', p:9, q:5 },
+  ];
+
+  function beatColor(hz) {
+    // 0 Hz = verde, ~4 Hz = amarillo, ≥12 Hz = rojo
+    const t = Math.min(1, hz / 12);
+    const hue = t < 0.5 ? 142 - t * 2 * 92 : 50 - (t - 0.5) * 2 * 50;
+    return `hsl(${hue.toFixed(0)},${(70 + t * 20).toFixed(0)}%,36%)`;
+  }
+
+  let html = '';
+  act.forEach((temp, ti) => {
+    const headerCols = IVLS.map(iv =>
+      `<th style="padding:3px 6px;font-size:9px;color:var(--accent);text-align:center">${iv.name}</th>`
+    ).join('');
+    let rows = '';
+    for (let start = 0; start < 12; start++) {
+      const f1 = noteFreq(start, temp.offsets);
+      let cells = `<td style="padding:2px 6px;font-size:9px;color:var(--muted);font-weight:600;white-space:nowrap">${NOTES[start]}</td>`;
+      IVLS.forEach(iv => {
+        const end = (start + iv.semi) % 12;
+        const actual = iv.semi * 100 + temp.offsets[end] - temp.offsets[start];
+        const f2 = f1 * Math.pow(2, actual / 1200);
+        const beat = Math.abs(iv.p * f1 - iv.q * f2);
+        const dispHz = beat < 0.05 ? '0' : beat < 10 ? beat.toFixed(1) : beat.toFixed(0);
+        const title = `${NOTES[start]}→${NOTES[end]} (${iv.name}): ${beat.toFixed(2)} Hz`;
+        cells += `<td title="${title}" style="background:${beatColor(beat)};text-align:center;padding:3px 5px;font-size:9px;cursor:pointer;border:1px solid rgba(0,0,0,0.25)" onclick="playHeatCell(${ti},${start},${iv.semi})">${dispHz}</td>`;
+      });
+      rows += `<tr>${cells}</tr>`;
+    }
+    const tableHtml = `<div style="overflow-x:auto">
+      <p style="font-size:10px;color:var(--muted);margin-bottom:8px">Hz de batido entre los armónicos que generan la consonancia. 0 = intervalo justo puro. Depende de la afinación de La (${pitchA} Hz).</p>
+      <table style="border-collapse:collapse">
+        <thead><tr><th style="padding:3px 6px;font-size:9px;color:var(--muted)"></th>${headerCols}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="grad-bar" style="margin-top:8px">
+        <span>0 Hz puro</span>
+        <div style="height:10px;border-radius:3px;flex:1;min-width:60px;background:linear-gradient(to right,hsl(142,72%,36%),hsl(96,76%,36%),hsl(50,80%,36%),hsl(25,84%,36%),hsl(0,88%,36%))"></div>
+        <span>≥12 Hz áspero</span>
+      </div>
+    </div>`;
+    html += panel(`Batidos — <span style="color:${COLORS[ti]}">${temp.name}</span>`, tableHtml, 'width:100%');
   });
   document.getElementById('content').innerHTML = html;
 }
