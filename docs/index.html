@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = '4c257e6 · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = '97a96ee · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2142,7 +2142,7 @@ function detectPitch(buf, sampleRate) {
   rms = Math.sqrt(rms / W);
   if (rms < 0.0003) return null;
 
-  const minTau = Math.max(2, Math.ceil(sampleRate / 1400)); // ~1400 Hz max
+  const minTau = Math.max(2, Math.ceil(sampleRate / 4096)); // ~4096 Hz max (cubre hasta C8)
   const maxTau = Math.min(W - 1, Math.floor(sampleRate / 50));  // ~50 Hz min
 
   // Step 1: difference function d[tau] = Σ (x[i] - x[i+tau])²
@@ -2376,7 +2376,7 @@ const TUNER = {
         if (this.mode === 'auto') {
           // Detección de nota: usar freq cruda para que los cambios reales de octava puedan acumularse
           const c = findClosestNote(p.freq);
-          const OCT_HOLD_MS = 900;
+          const OCT_HOLD_MS = 200;
           if (c.ni !== this.targetNi) {
             // Cambio de nota: aceptar inmediatamente
             this.targetNi = c.ni; this.targetOct = c.oct;
