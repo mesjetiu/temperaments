@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'c54f634 · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = 'd63c9c1 · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2208,7 +2208,7 @@ function refinePitchZeroCross(buf, approxFreq, sampleRate) {
   for (let i = 0; i < buf.length; i++) dc += buf[i];
   dc /= buf.length;
 
-  const minGap = 0.45 * sampleRate / approxFreq; // descarta cruces dobles por ruido
+  const minGap = 0.7 * sampleRate / approxFreq; // filtra 2º armónico (en 0.5·period) y ruido
   const crossings = [];
   for (let i = 1; i < buf.length; i++) {
     const prev = buf[i - 1] - dc, curr = buf[i] - dc;
