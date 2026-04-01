@@ -305,7 +305,7 @@
 </div>
 
 <script>
-const APP_VERSION = '4621ea0 · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = '4ced826 · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1486,7 +1486,7 @@ function viewIntervals(act) {
         const dev = actual - JUST_REF[semi];
         const sign = dev >= 0 ? '+' : '';
         const title = `${NOTES[start]}→${NOTES[end]} (${INT_NAMES[semi]}): ${actual.toFixed(1)}¢  desv. ${sign}${dev.toFixed(1)}¢ de la justa`;
-        cells += `<td title="${title}" style="background:${devColor(dev)};text-align:center;padding:3px 4px;font-size:9px;cursor:pointer;border:1px solid rgba(0,0,0,0.25)" onclick="playHeatCell(${ti},${start},${semi})">${sign}${dev.toFixed(1)}</td>`;
+        cells += `<td title="${title}" style="background:${devColor(dev)};text-align:center;padding:3px 4px;font-size:9px;cursor:pointer;border:1px solid rgba(0,0,0,0.25)" onpointerdown="playHeatCell(${ti},${start},${semi})">${sign}${dev.toFixed(1)}</td>`;
       }
       rows += `<tr>${cells}</tr>`;
     }
@@ -1544,7 +1544,7 @@ function viewBeats(act) {
         const beat = Math.abs(iv.p * f1 - iv.q * f2);
         const dispHz = beat < 0.05 ? '0' : beat < 10 ? beat.toFixed(1) : beat.toFixed(0);
         const title = `${NOTES[start]}→${NOTES[end]} (${iv.name}): ${beat.toFixed(2)} Hz`;
-        cells += `<td title="${title}" style="background:${beatColor(beat)};text-align:center;padding:3px 5px;font-size:9px;cursor:pointer;border:1px solid rgba(0,0,0,0.25)" onclick="playHeatCell(${ti},${start},${iv.semi})">${dispHz}</td>`;
+        cells += `<td title="${title}" style="background:${beatColor(beat)};text-align:center;padding:3px 5px;font-size:9px;cursor:pointer;border:1px solid rgba(0,0,0,0.25)" onpointerdown="playHeatCell(${ti},${start},${iv.semi})">${dispHz}</td>`;
       });
       rows += `<tr>${cells}</tr>`;
     }
