@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'fb9cc57 · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = '4146c7a · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2199,18 +2199,41 @@ function detectPitch(buf, sampleRate) {
   return { freq: sampleRate / betterTau, clarity, rms };
 }
 
-// Refina la frecuencia con interpolación parabólica sobre el espectro FFT en dB.
-// Con fftSize=8192 (bin=5.86 Hz) la precisión es ~0.05 Hz para tonos puros.
-function refinePitchFFT(approxFreq, freqBuf, sampleRate) {
-  const binWidth = sampleRate / (freqBuf.length * 2);
-  const center = Math.round(approxFreq / binWidth);
-  const lo = Math.max(1, center - 6), hi = Math.min(freqBuf.length - 2, center + 6);
-  let peakBin = center;
-  for (let b = lo; b <= hi; b++) if (freqBuf[b] > freqBuf[peakBin]) peakBin = b;
-  const l = freqBuf[peakBin - 1], m = freqBuf[peakBin], r = freqBuf[peakBin + 1];
-  const denom = 2 * (l + r - 2 * m);
-  if (Math.abs(denom) > 1e-8) return (peakBin + (l - r) / denom) * binWidth;
-  return peakBin * binWidth;
+// Ventana Blackman pre-calculada (misma que usa internamente el AnalyserNode).
+let _winBuf = null, _winN = 0;
+function getBlackmanWin(N) {
+  if (_winN !== N) {
+    _winBuf = new Float32Array(N);
+    const M = N - 1;
+    for (let i = 0; i < N; i++)
+      _winBuf[i] = 0.42 - 0.5 * Math.cos(2 * Math.PI * i / M)
+                       + 0.08 * Math.cos(4 * Math.PI * i / M);
+    _winN = N;
+  }
+  return _winBuf;
+}
+
+// Refina evaluando el DFT ventaneado directamente en frecuencias arbitrarias.
+// Sin cuantización de bins: precisión < 0.01 Hz para tonos puros.
+// Punto de partida: estimado FFT del AnalyserNode (dentro de ±6 Hz).
+function refinePitchDFT(approxFreq, buf, sampleRate) {
+  const win = getBlackmanWin(buf.length);
+  function magSq(f) {
+    const w = 2 * Math.PI * f / sampleRate;
+    const wr = Math.cos(w), wi = -Math.sin(w); // e^{-jw}
+    let cr = 1, ci = 0, re = 0, im = 0;
+    for (let n = 0; n < buf.length; n++) {
+      const s = buf[n] * win[n];
+      re += s * cr; im += s * ci;
+      const nr = cr * wr - ci * wi;
+      ci = cr * wi + ci * wr; cr = nr;
+    }
+    return re * re + im * im;
+  }
+  const d = 5; // Hz — bien dentro del lóbulo Blackman (~47 Hz de ancho)
+  const m0 = magSq(approxFreq - d), m1 = magSq(approxFreq), m2 = magSq(approxFreq + d);
+  const denom = 2 * (2 * m1 - m0 - m2);
+  return Math.abs(denom) > 1e-12 * m1 ? approxFreq + d * (m0 - m2) / denom : approxFreq;
 }
 
 function findClosestNote(freq) {
@@ -2387,12 +2410,8 @@ const TUNER = {
       if (!this._buf || this._buf.length !== this.analyser.fftSize) {
         this._buf = new Float32Array(this.analyser.fftSize);
       }
-      if (!this._freqBuf || this._freqBuf.length !== this.analyser.frequencyBinCount) {
-        this._freqBuf = new Float32Array(this.analyser.frequencyBinCount);
-      }
       const buf = this._buf;
       this.analyser.getFloatTimeDomainData(buf);
-      this.analyser.getFloatFrequencyData(this._freqBuf);
       // RMS sobre los primeros 1024 muestras (rápido)
       let rmsSum = 0;
       const rmsN = Math.min(1024, buf.length);
@@ -2400,8 +2419,8 @@ const TUNER = {
       this.rms = Math.sqrt(rmsSum / rmsN);
 
       const p = detectPitch(buf, getCtx().sampleRate);
-      // Refinar con interpolación FFT parabólica (~0.05 Hz con fftSize=8192)
-      if (p) p.freq = refinePitchFFT(p.freq, this._freqBuf, getCtx().sampleRate);
+      // Refinar con DFT evaluado en frecuencias arbitrarias (< 0.01 Hz de error)
+      if (p) p.freq = refinePitchDFT(p.freq, buf, getCtx().sampleRate);
       if (p) {
         this.detectedFreq = p.freq;
         this._lastFreq = p.freq;
