@@ -299,7 +299,7 @@
 </div>
 
 <script>
-const APP_VERSION = '82618e9 · 2026-03-31';// ── Service Worker ──
+const APP_VERSION = 'e37bf01 · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -997,11 +997,10 @@ function restoreSession() {
   if (p.tunerVizMode) TUNER.vizMode = p.tunerVizMode;
   // Restaurar octava del afinador
   if (p.tunerOct !== undefined) TUNER.tunerOct = p.tunerOct;
-  // Restaurar temperamento seleccionado
-  if (p.selectedName) {
-    const t = all.find(x => x.name === p.selectedName);
-    if (t) { selected[0] = t; lastSelected = t; renderBadges(); renderContent(); }
-  }
+  // Restaurar temperamento seleccionado; si nunca se eligió, usar Equal temperament de GrandOrgue
+  const nameToRestore = p.selectedName || 'Equal temperament';
+  const t = all.find(x => x.name === nameToRestore && (!p.selectedName ? x.source === 'GrandOrgue' : true));
+  if (t) { selected[0] = t; lastSelected = t; renderBadges(); renderContent(); }
 }
 
 // ══════════════════════════════════════════════
@@ -1558,7 +1557,7 @@ const TUNER = {
   _refNi: null, _refOct: null,
   refOn: false, refOsc: null, refGain: null,
   micOn: false, micStream: null, analyser: null,
-  vizMode: 'waterfall',
+  vizMode: 'needle',
   strobePhase: 0, prevStrobePhase: 0, lastTs: 0, rafId: null,
   _wavePhase: 0, _smoothedError: 0,
   _needlePos: 0, _needleVel: 0,  // simulación física muelle-masa para la aguja
@@ -2271,8 +2270,9 @@ function buildTunerScreen() {
 function viewTuner() {
   document.getElementById('content').innerHTML = '';
   buildTunerScreen();
-  // Auto-arrancar mic si el usuario ya lo autorizó antes
-  if (localStorage.getItem('micAutoStart') === '1') {
+  // Auto-arrancar mic si el usuario ya lo autorizó antes, o si nunca lo ha activado (primera vez)
+  const _micPref = localStorage.getItem('micAutoStart');
+  if (_micPref === null || _micPref === '1') {
     TUNER.startMic();
   }
 }
