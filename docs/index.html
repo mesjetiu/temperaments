@@ -147,6 +147,13 @@
   #content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   .panel { background: var(--surface); border-radius: 10px; padding: 16px; border: 1px solid var(--border); }
   .panel h3 { font-size: 12px; color: var(--accent); margin-bottom: 12px; font-weight: 600; }
+  .panel-h3-row { display:flex; align-items:flex-start; gap:6px; margin-bottom:12px; }
+  .panel-h3-row h3 { margin-bottom:0; flex:1; }
+  .panel-zoom-btn { background:none; border:none; color:#4b5563; cursor:pointer; font-size:14px; line-height:1; padding:0 2px; flex-shrink:0; -webkit-tap-highlight-color:transparent; transition:color 0.15s; }
+  .panel-zoom-btn:hover { color:#94a3b8; }
+  @media (min-width: 768px) {
+    .panel { resize:both; overflow:auto; min-height:80px; min-width:180px; }
+  }
   /* Paneles plegables en móvil */
   .panel-hdr { display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent; margin-bottom:12px; }
   .panel-hdr h3 { margin-bottom:0; }
@@ -248,7 +255,8 @@
 
     <div id="desk-header">
       <span id="desk-header-hint" style="font-size:12px;color:#6b7280;white-space:nowrap">Selecciona un temperamento:</span>
-      <div id="desk-badges" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      <div id="desk-badges" style="display:flex;gap:6px;flex-wrap:wrap;flex:1"></div>
+      <button onclick="toggleContentFullscreen()" title="Pantalla completa" style="background:none;border:none;color:#4b5563;cursor:pointer;font-size:17px;padding:2px 4px;flex-shrink:0;line-height:1" id="desk-fullscreen-btn">⤢</button>
     </div>
 
     <div id="top-collapsible">
@@ -336,7 +344,7 @@
 </div>
 
 <script>
-const APP_VERSION = '823e101 · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = '49646ee · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -580,11 +588,27 @@ document.getElementById('content').addEventListener('pointerdown', () => {
 function toggleContentFullscreen() {
   const content = document.getElementById('content');
   const closeBtn = document.getElementById('content-fullscreen-close');
-  const togBtn   = document.getElementById('mob-fullscreen-btn');
   const isFs = content.classList.toggle('content-fullscreen');
   if (closeBtn) closeBtn.style.display = isFs ? 'flex' : 'none';
-  if (togBtn)   togBtn.textContent = isFs ? '⤡' : '⤢';
+  ['mob-fullscreen-btn','desk-fullscreen-btn'].forEach(id => {
+    const b = document.getElementById(id); if (b) b.textContent = isFs ? '⤡' : '⤢';
+  });
   renderContent();
+}
+
+// ── ResizeObserver para canvas custom (scatter, tonnetz) ──
+const _panelRO = new ResizeObserver(entries => {
+  entries.forEach(e => {
+    const cv = e.target.querySelector('canvas[data-ro]');
+    if (!cv || !cv._redraw) return;
+    clearTimeout(cv._roTimer);
+    cv._roTimer = setTimeout(() => cv._redraw(), 120);
+  });
+});
+function attachPanelResize(canvas) {
+  canvas.setAttribute('data-ro', '1');
+  const panel = canvas.closest('.panel');
+  if (panel) _panelRO.observe(panel);
 }
 
 // ── Modo reproducción gráficas ──
@@ -1408,12 +1432,13 @@ function mkRadar(id, datasets) {
 // En móvil genera un panel con header clicable que colapsa el contenido.
 // En desktop devuelve el HTML tal cual (sin wrapper extra).
 function panel(title, bodyHtml, style = '') {
+  const zoomBtn = `<button class="panel-zoom-btn" onclick="toggleContentFullscreen()" title="Pantalla completa">⤢</button>`;
   if (!isMobile()) {
-    return `<div class="panel" style="${style}"><h3>${title}</h3>${bodyHtml}</div>`;
+    return `<div class="panel" style="${style}"><div class="panel-h3-row"><h3>${title}</h3>${zoomBtn}</div>${bodyHtml}</div>`;
   }
   return `<div class="panel" style="width:100%;box-sizing:border-box">
     <div class="panel-hdr" onclick="this.closest('.panel').classList.toggle('collapsed')">
-      <h3>${title}</h3><span class="panel-chevron">▼</span>
+      <h3>${title}</h3><span style="display:flex;gap:6px;align-items:center">${zoomBtn}<span class="panel-chevron">▼</span></span>
     </div>
     <div class="panel-body">${bodyHtml}</div>
   </div>`;
@@ -1642,7 +1667,12 @@ function viewTonnetz(act) {
   act.forEach((temp, ti) => {
     requestAnimationFrame(() => {
       const cv = document.getElementById(`tz-${ti}`);
-      if (cv) _initTonnetz(cv, document.getElementById(`tz-nfo-${ti}`), temp, ti);
+      if (cv) {
+        const nfo = document.getElementById(`tz-nfo-${ti}`);
+        _initTonnetz(cv, nfo, temp, ti);
+        cv._redraw = () => _initTonnetz(cv, nfo, temp, ti);
+        attachPanelResize(cv);
+      }
     });
   });
 }
@@ -1785,21 +1815,20 @@ function viewScatter() {
       return { idx, x: minM3, y: maxP5, src: temp.source, name: temp.name };
     });
   }
-  document.getElementById('content').innerHTML =
-    `<div class="panel" style="width:100%">
-       <h3>Cartografía de temperamentos (${all.length})</h3>
-       <canvas id="scat-cv" style="width:100%;cursor:crosshair;display:block"></canvas>
-       <div id="scat-nfo" style="margin-top:4px;min-height:1.4em;font-size:10px;color:var(--muted);text-align:center">pulsa un punto para seleccionarlo</div>
-       <div style="margin-top:4px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;font-size:10px;color:#6b7280">
-         <span><span style="color:#60a5fa">●</span> Scala</span>
-         <span><span style="color:#fb923c">●</span> GrandOrgue</span>
-         <span><span style="color:#a78bfa">●</span> Otros</span>
-         <span style="color:#4b5563">← 3ªM mejor &nbsp;↓ 5ª mejor</span>
-       </div>
-     </div>`;
+  document.getElementById('content').innerHTML = panel(
+    `Cartografía de temperamentos (${all.length})`,
+    `<canvas id="scat-cv" style="width:100%;cursor:crosshair;display:block"></canvas>
+     <div id="scat-nfo" style="margin-top:4px;min-height:1.4em;font-size:10px;color:var(--muted);text-align:center">pulsa un punto para seleccionarlo</div>
+     <div style="margin-top:4px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;font-size:10px;color:#6b7280">
+       <span><span style="color:#60a5fa">●</span> Scala</span>
+       <span><span style="color:#fb923c">●</span> GrandOrgue</span>
+       <span><span style="color:#a78bfa">●</span> Otros</span>
+       <span style="color:#4b5563">← 3ªM mejor &nbsp;↓ 5ª mejor</span>
+     </div>`,
+    'width:100%');
   requestAnimationFrame(() => {
     const cv = document.getElementById('scat-cv');
-    if (cv) _initScatter(cv);
+    if (cv) { _initScatter(cv); cv._redraw = () => _initScatter(cv); attachPanelResize(cv); }
   });
 }
 
