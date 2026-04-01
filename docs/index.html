@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = '7311d3f · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = '9c538bb · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -626,13 +626,23 @@ function attachPanelResize(canvas) {
   const panel = canvas.closest('.panel');
   if (panel) _panelRO.observe(panel);
 }
+function togglePanelCollapse(panel) {
+  const collapsing = !panel.classList.contains('collapsed');
+  if (collapsing) {
+    if (panel.style.height) panel.dataset.savedH = panel.style.height;
+    panel.style.height = '';
+  } else {
+    if (panel.dataset.savedH) panel.style.height = panel.dataset.savedH;
+  }
+  panel.classList.toggle('collapsed');
+}
 function startPanelDragResize(e, panel) {
   e.preventDefault();
   const startY = e.clientY;
-  const startH = panel.clientHeight;
-  panel.style.height = startH + 'px'; // pin height before dragging
+  const minH = panel.clientHeight; // natural height = minimum
+  panel.style.height = minH + 'px';
   function onMove(ev) {
-    const h = Math.max(80, startH + ev.clientY - startY);
+    const h = Math.max(minH, minH + ev.clientY - startY);
     panel.style.height = h + 'px';
   }
   function onEnd() {
@@ -1516,7 +1526,7 @@ function panel(title, bodyHtml, style = '') {
     return `<div class="panel" style="${style}"><div class="panel-h3-row"><h3>${title}</h3>${zoomBtn}</div>${bodyHtml}</div>`;
   }
   return `<div class="panel" style="width:100%;box-sizing:border-box">
-    <div class="panel-hdr" onclick="this.closest('.panel').classList.toggle('collapsed')">
+    <div class="panel-hdr" onclick="togglePanelCollapse(this.closest('.panel'))">
       <h3>${title}</h3><span style="display:flex;gap:6px;align-items:center">${zoomBtn}<span class="panel-chevron">▼</span></span>
     </div>
     <div class="panel-body">${bodyHtml}</div>
