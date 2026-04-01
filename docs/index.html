@@ -225,7 +225,7 @@
 </head>
 <body>
 <div id="app">
-  <div id="overlay" onclick="closeSidebar()"></div>
+  <div id="overlay" onclick="closeSidebar()" ontouchend="closeSidebar()"></div>
 
   <!-- ═══ SIDEBAR ═══ -->
   <div id="sidebar">
@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'a1d15cf · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = '873698b · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1127,6 +1127,21 @@ const KB = {
 const isMobile = () => window.innerWidth < 768;
 function openSidebar()  { document.getElementById('sidebar').classList.add('open'); document.getElementById('overlay').classList.add('open'); }
 function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('overlay').classList.remove('open'); }
+
+// Swipe izquierda en el sidebar para cerrarlo (móvil)
+(function() {
+  let sx = 0, sy = 0;
+  const sb = document.getElementById('sidebar');
+  sb.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+  }, { passive: true });
+  sb.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - sx;
+    const dy = e.changedTouches[0].clientY - sy;
+    if (dx < -50 && Math.abs(dy) < Math.abs(dx)) closeSidebar();
+  }, { passive: true });
+})();
 
 // ══════════════════════════════════════════════
 // CARGA Y PARSEO
