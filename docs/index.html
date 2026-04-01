@@ -230,6 +230,7 @@
       <div class="tab" data-tab="fifths">Quintas</div>
       <div class="tab" data-tab="thirds">Terceras</div>
       <div class="tab" data-tab="compare">Comparar</div>
+      <div class="tab" data-tab="intervals">Intervalos</div>
       <div class="tab" data-tab="keyboard">Teclado</div>
       <div class="tab active" data-tab="tuner" style="display:none">Afinador</div>
     </div>
@@ -299,7 +300,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'e37bf01 · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = '4e03afe · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1130,7 +1131,7 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
 // SWIPE HORIZONTAL EN CONTENT PARA CAMBIAR PESTAÑA (móvil)
 // ══════════════════════════════════════════════
 (function() {
-  const TABS_ORDER = ['overview','fifths','thirds','compare','keyboard'];
+  const TABS_ORDER = ['overview','fifths','thirds','compare','intervals','keyboard'];
   let sx = 0, sy = 0, swiping = false;
   document.getElementById('content').addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
@@ -1355,7 +1356,7 @@ function renderContent() {
   if (activeTab !== 'keyboard' && activeTab !== 'tuner' && !act.length) {
     el.innerHTML='<div class="empty-state">Selecciona un temperamento de la lista para empezar.</div>'; return;
   }
-  ({overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,keyboard:viewKeyboard,tuner:viewTuner}[activeTab])?.(act);
+  ({overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,intervals:viewIntervals,keyboard:viewKeyboard,tuner:viewTuner}[activeTab])?.(act);
 }
 
 // ─── VISTA GENERAL ───
@@ -1430,6 +1431,62 @@ function viewCompare(act) {
     'Desv. de quinta pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(3)}¢`,'fifths');
   mkBar('c-3rd',NOTES,selected.map((t,i)=>!t?null:dsMaj3(t,i,getMaj3(t.offsets).map(x=>x.dev))).filter(Boolean),
     'Desv. de 3ª mayor pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢`,'maj3');
+}
+
+// ─── INTERVALOS (heatmap 12×12) ───
+function playHeatCell(ti, start, semi) {
+  const off = selected.filter(Boolean)[ti]?.offsets;
+  if (!off || semi === 0) return;
+  const f1 = noteFreq(start, off);
+  const end = (start + semi) % 12;
+  const actual = semi * 100 + off[end] - off[start];
+  playFreqs([f1, f1 * Math.pow(2, actual / 1200)]);
+}
+
+function viewIntervals(act) {
+  const JUST_REF  = [0, 111.731, 203.910, 315.641, 386.314, 498.045, 600.0, 701.955, 813.686, 884.359, 1017.596, 1088.269];
+  const INT_NAMES = ['P1','m2','M2','m3','M3','P4','tt','P5','m6','M6','m7','M7'];
+
+  function devColor(dev) {
+    const t = Math.min(1, Math.abs(dev) / 22);
+    const hue = t < 0.5 ? 142 - t * 2 * 92 : 50 - (t - 0.5) * 2 * 50;
+    return `hsl(${hue.toFixed(0)},${(70 + t * 20).toFixed(0)}%,36%)`;
+  }
+
+  let html = '';
+  act.forEach((temp, ti) => {
+    let rows = '';
+    for (let start = 0; start < 12; start++) {
+      let cells = `<td style="padding:2px 6px;font-size:9px;color:var(--muted);white-space:nowrap;font-weight:600">${NOTES[start]}</td>`;
+      for (let semi = 0; semi < 12; semi++) {
+        if (semi === 0) {
+          cells += `<td style="background:#161e2e;text-align:center;padding:3px 4px;font-size:9px;color:#2d3f55;border:1px solid rgba(0,0,0,0.3)">—</td>`;
+          continue;
+        }
+        const end = (start + semi) % 12;
+        const actual = semi * 100 + temp.offsets[end] - temp.offsets[start];
+        const dev = actual - JUST_REF[semi];
+        const sign = dev >= 0 ? '+' : '';
+        const title = `${NOTES[start]}→${NOTES[end]} (${INT_NAMES[semi]}): ${actual.toFixed(1)}¢  desv. ${sign}${dev.toFixed(1)}¢ de la justa`;
+        cells += `<td title="${title}" style="background:${devColor(dev)};text-align:center;padding:3px 4px;font-size:9px;cursor:pointer;border:1px solid rgba(0,0,0,0.25)" onclick="playHeatCell(${ti},${start},${semi})">${sign}${dev.toFixed(1)}</td>`;
+      }
+      rows += `<tr>${cells}</tr>`;
+    }
+    const headerCols = INT_NAMES.map(n => `<th style="padding:3px 4px;font-size:9px;color:var(--accent);text-align:center;white-space:nowrap">${n}</th>`).join('');
+    const tableHtml = `<div style="overflow-x:auto">
+      <table style="border-collapse:collapse">
+        <thead><tr><th style="padding:3px 6px;font-size:9px;color:var(--muted)"></th>${headerCols}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="grad-bar" style="margin-top:8px">
+        <span>0¢ justo</span>
+        <div style="height:10px;border-radius:3px;flex:1;min-width:60px;background:linear-gradient(to right,hsl(142,72%,36%),hsl(96,76%,36%),hsl(50,80%,36%),hsl(25,84%,36%),hsl(0,88%,36%))"></div>
+        <span>≥22¢ impuro</span>
+      </div>
+    </div>`;
+    html += panel(`Matriz de intervalos — <span style="color:${COLORS[ti]}">${temp.name}</span>`, tableHtml, 'width:100%');
+  });
+  document.getElementById('content').innerHTML = html;
 }
 
 // ─── TECLADO ───
