@@ -273,6 +273,10 @@
       <span id="oct-disp">0</span>
       <button class="icon-btn" onclick="octShift(+1)">+</button>
 
+      <div class="ab-sep"></div>
+
+      <button id="play-mode-btn" class="icon-btn" onclick="toggleChartPlayMode()" title="Modo de reproducción en gráficas">Normal</button>
+
       <span id="audio-hint">mantén pulsado sobre las gráficas para escuchar</span>
     </div>
 
@@ -301,7 +305,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'bacfd30 · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = '4621ea0 · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -420,8 +424,9 @@ function savePrefs(patch) {
 }
 const _prefs = loadPrefs();
 
-let pitchA      = _prefs.pitchA ?? 440;
-let octaveShift = _prefs.octaveShift ?? 0;
+let pitchA        = _prefs.pitchA ?? 440;
+let octaveShift   = _prefs.octaveShift ?? 0;
+let chartPlayMode = 'normal'; // 'normal' | 'legato'
 
 // ══════════════════════════════════════════════
 // AUDIO ENGINE (gráficas)
@@ -489,6 +494,7 @@ function playFreqs(freqs) {
 }
 
 function stopSound(hard = false) {
+  if (!hard && chartPlayMode === 'legato') return;
   document.getElementById('playing-dot').style.display = 'none';
   if (!activeOscs.length) return;
   const ctx = audioCtx;
@@ -524,6 +530,17 @@ document.getElementById('pitch-input').addEventListener('input', function() {
   const tp = document.getElementById('tuner-pitch-input');
   if (tp) tp.value = this.value;
 });
+
+// ── Modo reproducción gráficas ──
+function toggleChartPlayMode() {
+  chartPlayMode = chartPlayMode === 'normal' ? 'legato' : 'normal';
+  const btn = document.getElementById('play-mode-btn');
+  if (btn) {
+    btn.textContent = chartPlayMode === 'legato' ? 'Legato' : 'Normal';
+    btn.classList.toggle('sel', chartPlayMode === 'legato');
+  }
+  if (chartPlayMode === 'normal') stopSound(true);
+}
 
 // ── Octava gráficas ──
 function octShift(d) {
