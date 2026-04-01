@@ -36,6 +36,23 @@
   #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 
   /* ═══ MOBILE ═══ */
+  canvas { -webkit-tap-highlight-color: transparent; }
+
+  /* ═══ PERSIANA MÓVIL ═══ */
+  #top-collapsible { flex-shrink: 0; }
+  #top-toggle { display: none; }
+  @media (max-width: 767px) {
+    #top-collapsible { overflow: hidden; max-height: 200px; transition: max-height 0.22s ease; }
+    #top-collapsible.top-hidden { max-height: 0; }
+    #top-toggle {
+      display: flex !important; align-items: center; justify-content: center;
+      height: 16px; background: #161e2e; border-bottom: 1px solid var(--border);
+      cursor: pointer; flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+    }
+    #top-toggle-arrow { font-size: 9px; color: #4b5563; line-height: 1; }
+  }
+
   @media (max-width: 767px) {
     #app { flex-direction: column; height: 100dvh; }
     #sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: min(85vw,320px); transform: translateX(-105%); box-shadow: 4px 0 24px rgba(0,0,0,.5); }
@@ -226,6 +243,7 @@
       <div id="desk-badges" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
     </div>
 
+    <div id="top-collapsible">
     <div id="tabs">
       <div class="tab active" data-tab="overview">Vista general</div>
       <div class="tab" data-tab="fifths">Quintas</div>
@@ -282,6 +300,8 @@
 
       <span id="audio-hint">mantén pulsado sobre las gráficas para escuchar</span>
     </div>
+    </div><!-- /top-collapsible -->
+    <div id="top-toggle" onclick="toggleTopBar()"><span id="top-toggle-arrow">▴</span></div>
 
     <div id="content">
       <div class="empty-state">Selecciona un temperamento de la lista para empezar.</div>
@@ -308,7 +328,7 @@
 </div>
 
 <script>
-const APP_VERSION = '3323f74 · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = 'e0105e8 · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -534,6 +554,19 @@ document.getElementById('pitch-input').addEventListener('input', function() {
   const tp = document.getElementById('tuner-pitch-input');
   if (tp) tp.value = this.value;
 });
+
+// ── Persiana móvil ──
+function toggleTopBar(forceHide) {
+  const coll  = document.getElementById('top-collapsible');
+  const arrow = document.getElementById('top-toggle-arrow');
+  if (!coll) return;
+  const hide = forceHide !== undefined ? forceHide : !coll.classList.contains('top-hidden');
+  coll.classList.toggle('top-hidden', hide);
+  if (arrow) arrow.textContent = hide ? '▾' : '▴';
+}
+document.getElementById('content').addEventListener('pointerdown', () => {
+  if (isMobile()) toggleTopBar(true);
+}, { passive: true });
 
 // ── Modo reproducción gráficas ──
 function toggleChartPlayMode() {
@@ -1577,7 +1610,7 @@ function viewTonnetz(act) {
       `Tonnetz — <span style="color:${COLORS[ti]}">${temp.name}</span>`,
       `<canvas id="tz-${ti}" style="width:100%;cursor:pointer;display:block"></canvas>
        <div style="margin-top:4px;font-size:9px;color:#4b5563;text-align:center">→ quinta &nbsp;↗ 3ª Mayor &nbsp;↘ 3ª menor &nbsp;·&nbsp; ▲ tríada mayor &nbsp;▽ tríada menor</div>
-       <div id="tz-nfo-${ti}" style="margin-top:4px;min-height:1.4em;font-size:10px;color:var(--muted);text-align:center">pulsa una nota o región para oír</div>
+       <div id="tz-nfo-${ti}" style="margin-top:8px;min-height:1.8em;font-size:clamp(14px,4vw,18px);color:var(--text);text-align:center;font-weight:500;letter-spacing:0.2px">pulsa una nota o región para oír</div>
        <div class="grad-bar" style="margin-top:6px">
          <span>tríada pura</span>
          <div style="height:10px;border-radius:3px;flex:1;min-width:60px;background:linear-gradient(to right,hsl(142,65%,30%),hsl(50,80%,30%),hsl(0,85%,30%))"></div>
