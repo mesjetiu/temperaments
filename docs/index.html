@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = '4146c7a · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = 'd287926 · 2026-04-01';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2773,8 +2773,8 @@ const TUNER = {
         const dispOct = has ? this.targetOct : this._lastOct;
         const noteCol = has ? col : 'rgba(180,180,180,0.35)';
         const centsStr = has && c !== null ? (c >= 0 ? '+' : '') + c.toFixed(1) + '¢' : '';
-        const freqStr  = has ? this.detectedFreq.toFixed(2) + ' Hz'
-                              : this._lastFreq.toFixed(2) + ' Hz';
+        const freqStr  = has ? this.detectedFreq.toFixed(1) + ' Hz'
+                              : this._lastFreq.toFixed(1) + ' Hz';
         ov.innerHTML = `
           <span style="font-size:clamp(80px,22vw,180px);font-weight:bold;color:${noteCol};text-shadow:0 0 16px rgba(0,0,0,0.95),0 0 4px rgba(0,0,0,1);line-height:1">${NOTES[dispNi] + dispOct}</span>
           ${centsStr ? `<span style="font-size:clamp(32px,8vw,64px);color:${col};margin-top:6px;background:rgba(0,0,0,0.45);border-radius:6px;padding:2px 10px;backdrop-filter:blur(2px)">${centsStr}</span>` : ''}
@@ -2800,7 +2800,7 @@ const TUNER = {
     const cEl = document.getElementById('det-cents');
     if (cEl) { cEl.textContent = has && c !== null ? (c >= 0 ? '+' : '') + c.toFixed(1) + '¢' : '—'; cEl.style.color = col; }
     const fEl = document.getElementById('det-freq');
-    if (fEl) fEl.textContent = has ? this.detectedFreq.toFixed(2) + ' Hz' : '—';
+    if (fEl) fEl.textContent = has ? this.detectedFreq.toFixed(1) + ' Hz' : '—';
     const nEl = document.getElementById('det-note-auto');
     if (nEl) nEl.textContent = has ? NOTES[this.targetNi] + this.targetOct : '—';
   },
