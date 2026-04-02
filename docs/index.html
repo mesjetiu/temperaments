@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'be96fdc · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = '4aaa642 · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2227,6 +2227,24 @@ function detectPitch(buf, sampleRate) {
   return { freq: sampleRate / refinedTau, clarity, rms };
 }
 
+// Refina frecuencia con interpolación parabólica sobre el espectro FFT (dB)
+// del AnalyserNode. La FFT la calcula el browser en su hilo nativo → coste JS ≈ 0.
+function _refineFFT(approxFreq, freqBuf, sampleRate) {
+  const N = freqBuf.length;
+  const binW = sampleRate / (N * 2);
+  const center = Math.round(approxFreq / binW);
+  const lo = Math.max(1, center - 3), hi = Math.min(N - 2, center + 3);
+  let pk = lo;
+  for (let b = lo; b <= hi; b++) if (freqBuf[b] > freqBuf[pk]) pk = b;
+  if (pk < 1 || pk >= N - 1) return approxFreq;
+  const l = freqBuf[pk - 1], m = freqBuf[pk], r = freqBuf[pk + 1];
+  const d = 2 * (l + r - 2 * m);
+  if (Math.abs(d) < 1e-8) return approxFreq;
+  const refined = (pk + (l - r) / d) * binW;
+  // Sanity: si el refinamiento se aleja > 1 semitono de MPM, ignorarlo
+  return Math.abs(1200 * Math.log2(refined / approxFreq)) < 100 ? refined : approxFreq;
+}
+
 function findClosestNote(freq) {
   const centsFromA4 = 1200 * Math.log2(freq / pitchA);
   const off = (lastSelected ?? selected.find(Boolean))?.offsets ?? new Array(12).fill(0);
@@ -2258,7 +2276,7 @@ const TUNER = {
   detectedFreq: null, detectedCents: null, clarity: 0, rms: 0,
   _lastFreq: 440, _lastNi: 9, _lastOct: 4,  // último pitch válido (A4 inicial)
   _octCandidate: null, _octCandidateMs: 0,  // candidato de octava pendiente de confirmar
-  _buf: null,  // buffer pre-reservado para evitar GC en cada frame
+  _buf: null, _freqBuf: null,  // buffers pre-reservados
   _freqHistory: [],  // historial para filtro de mediana temporal
 
   getTargetFreq() {
@@ -2400,9 +2418,11 @@ const TUNER = {
       // Buffers pre-reservados: evita allocar Float32Array cada frame (reduce GC)
       if (!this._buf || this._buf.length !== this.analyser.fftSize) {
         this._buf = new Float32Array(this.analyser.fftSize);
+        this._freqBuf = new Float32Array(this.analyser.frequencyBinCount);
       }
       const buf = this._buf;
       this.analyser.getFloatTimeDomainData(buf);
+      this.analyser.getFloatFrequencyData(this._freqBuf);
       // RMS sobre los primeros 1024 muestras (rápido)
       let rmsSum = 0;
       const rmsN = Math.min(1024, buf.length);
@@ -2410,7 +2430,9 @@ const TUNER = {
       this.rms = Math.sqrt(rmsSum / rmsN);
 
       const p = detectPitch(buf, getCtx().sampleRate);
-      if (p) {
+      // Refinar frecuencia con interpolación parabólica sobre FFT nativa (coste JS ≈ 0)
+      if (p && p.clarity >= 0.5) p.freq = _refineFFT(p.freq, this._freqBuf, getCtx().sampleRate);
+      if (p && p.clarity >= 0.5) {
         this.detectedFreq = p.freq;
         this._lastFreq = p.freq;
         this._lastNi = this.targetNi; this._lastOct = this.targetOct;
