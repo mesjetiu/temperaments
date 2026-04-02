@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'f8dacd5 · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = 'be96fdc · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2157,7 +2157,7 @@ function detectPitch(buf, sampleRate) {
   let rms = 0;
   for (let i = 0; i < W; i++) rms += buf[i] * buf[i];
   rms = Math.sqrt(rms / W);
-  if (rms < 0.0003) return null;
+  if (rms < 0.0001) return null;
 
   const maxTau = Math.min(W - 1, Math.floor(sampleRate / 50));
 
@@ -2179,7 +2179,7 @@ function detectPitch(buf, sampleRate) {
   }
 
   // Peak picking: key maximums entre cruces por cero (exacto al paper)
-  const MPM_K = 0.93;
+  const MPM_K = 0.85;
   const minTau = Math.max(2, Math.ceil(sampleRate / 4096)); // hasta C8
   let lookingForMax = false, maxIdx = -1, maxVal = -Infinity;
   let globalBestVal = -Infinity;
