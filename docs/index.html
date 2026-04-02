@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = '1545bdf · 2026-04-01';// ── Service Worker ──
+const APP_VERSION = '61a46da · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2145,11 +2145,13 @@ function viewKeyboard() {
 }
 
 // ══════════════════════════════════════════════
-// AFINADOR — DETECCIÓN DE PITCH (autocorrelación)
+// AFINADOR — DETECCIÓN DE PITCH (MPM — McLeod Pitch Method)
 // ══════════════════════════════════════════════
+// Ref: McLeod & Wyvill 2005 "A Smarter Way to Find Pitch"
+// Ventajas sobre YIN: normalización por-tau (NSDF) → sin sesgo hacia graves,
+// detecta agudos con solo 2 periodos, y el peak-picking es más robusto.
 function detectPitch(buf, sampleRate) {
-  // YIN algorithm (de Cheveigne & Kawahara 2002)
-  const W = Math.min(2048, buf.length >> 1); // analysis window = half buffer
+  const W = Math.min(2048, buf.length >> 1);
 
   // RMS
   let rms = 0;
@@ -2157,83 +2159,69 @@ function detectPitch(buf, sampleRate) {
   rms = Math.sqrt(rms / W);
   if (rms < 0.0003) return null;
 
-  const minTau = Math.max(2, Math.ceil(sampleRate / 4096)); // ~4096 Hz max (cubre hasta C8)
-  const maxTau = Math.min(W - 1, Math.floor(sampleRate / 50));  // ~50 Hz min
+  const minTau = Math.max(2, Math.ceil(sampleRate / 4096)); // hasta C8
+  const maxTau = Math.min(W - 1, Math.floor(sampleRate / 50));
 
-  // Step 1: difference function d[tau] = Σ (x[i] - x[i+tau])²
-  // Step 2: cumulative mean normalized difference function d'[tau]
-  const yin = new Float32Array(W);
-  yin[0] = 1;
-  let runSum = 0;
-  for (let tau = 1; tau < W; tau++) {
-    let d = 0;
-    for (let i = 0; i < W; i++) {
-      const diff = buf[i] - buf[i + tau];
-      d += diff * diff;
+  // NSDF: n'(tau) = 2·r'(tau) / m'(tau)
+  // r'(tau) = autocorrelación tipo II = Σ x[j]·x[j+tau]
+  // m'(tau) = Σ (x²[j] + x²[j+tau])  — normalización por-tau
+  const nsdf = new Float32Array(maxTau + 1);
+  // Pre-calcular sumas acumuladas de x² para m'(tau) incremental
+  // m'(tau) = Σ_{j=0}^{N-tau-1} x²[j] + Σ_{j=tau}^{N-1} x²[j]
+  //         = (cumSq[N-tau] - cumSq[0]) + (cumSq[N] - cumSq[tau])
+  //         = cumSq[N-tau] + cumSq[N] - cumSq[tau]
+  const N2 = 2 * W; // buf tiene al menos N2 muestras (fftSize = 2*W)
+  let cumEnd = 0, cumStart = 0; // energía decreciente desde ambos extremos
+  for (let i = 0; i < W; i++) { cumEnd += buf[i] * buf[i]; cumStart += buf[i] * buf[i]; }
+  // m'(0) = 2·Σx²[0..W-1]
+  let mTau = cumEnd + cumStart;
+
+  for (let tau = 0; tau <= maxTau; tau++) {
+    let r = 0;
+    for (let j = 0; j < W - tau; j++) r += buf[j] * buf[j + tau];
+    nsdf[tau] = mTau > 0 ? 2 * r / mTau : 0;
+    // Actualizar m'(tau+1): quitar buf[W-tau-1]² del primer bloque y buf[tau]² del segundo
+    if (tau < maxTau) {
+      mTau -= buf[W - tau - 1] * buf[W - tau - 1] + buf[tau] * buf[tau];
     }
-    runSum += d;
-    yin[tau] = (tau * d) / runSum; // CMNDF
   }
 
-  // Step 3: absolute threshold — first tau where yin < threshold
-  const YIN_THRESH = 0.30;
-  let tau = minTau;
-  while (tau <= maxTau) {
-    if (yin[tau] < YIN_THRESH) {
-      while (tau + 1 <= maxTau && yin[tau + 1] < yin[tau]) tau++;
-      break;
+  // Peak picking: encontrar "key maximums" (máximos entre cruces por cero positivos)
+  const MPM_K = 0.93; // umbral = K × máximo global de key maximums
+  const keys = []; // {tau, val}
+  let isNeg = true, bestInSegment = -1, bestVal = -Infinity;
+  for (let tau = minTau; tau <= maxTau; tau++) {
+    if (isNeg) {
+      if (nsdf[tau] >= 0) { isNeg = false; bestInSegment = tau; bestVal = nsdf[tau]; }
+    } else {
+      if (nsdf[tau] > bestVal) { bestVal = nsdf[tau]; bestInSegment = tau; }
+      if (nsdf[tau] < 0) {
+        keys.push({ tau: bestInSegment, val: bestVal });
+        isNeg = true;
+      }
     }
-    tau++;
   }
-  if (tau > maxTau) return null;
+  // Último segmento (puede no cruzar cero)
+  if (!isNeg && bestInSegment > 0) keys.push({ tau: bestInSegment, val: bestVal });
 
-  // Step 4: parabolic interpolation for sub-sample accuracy
-  let betterTau = tau;
-  if (tau > 0 && tau < W - 1) {
-    const s0 = yin[tau - 1], s1 = yin[tau], s2 = yin[tau + 1];
-    const denom = 2 * (2 * s1 - s2 - s0);
-    if (Math.abs(denom) > 1e-8) betterTau = tau + (s2 - s0) / denom;
+  if (!keys.length) return null;
+
+  // Primer key maximum que supera K × máximo global
+  const globalMax = Math.max(...keys.map(k => k.val));
+  const thresh = MPM_K * globalMax;
+  let best = keys.find(k => k.val >= thresh);
+  if (!best) best = keys[keys.length - 1];
+
+  let tau = best.tau;
+
+  // Interpolación parabólica para precisión sub-muestra
+  if (tau > 0 && tau < maxTau) {
+    const s0 = nsdf[tau - 1], s1 = nsdf[tau], s2 = nsdf[tau + 1];
+    const d = 2 * s1 - s0 - s2;
+    if (Math.abs(d) > 1e-8) tau += (s0 - s2) / (2 * d);
   }
 
-  const clarity = 1 - yin[tau];
-  return { freq: sampleRate / betterTau, clarity, rms };
-}
-
-// Ventana Blackman pre-calculada (misma que usa internamente el AnalyserNode).
-let _winBuf = null, _winN = 0;
-function getBlackmanWin(N) {
-  if (_winN !== N) {
-    _winBuf = new Float32Array(N);
-    const M = N - 1;
-    for (let i = 0; i < N; i++)
-      _winBuf[i] = 0.42 - 0.5 * Math.cos(2 * Math.PI * i / M)
-                       + 0.08 * Math.cos(4 * Math.PI * i / M);
-    _winN = N;
-  }
-  return _winBuf;
-}
-
-// Refina evaluando el DFT ventaneado directamente en frecuencias arbitrarias.
-// Sin cuantización de bins: precisión < 0.01 Hz para tonos puros.
-// Punto de partida: estimado FFT del AnalyserNode (dentro de ±6 Hz).
-function refinePitchDFT(approxFreq, buf, sampleRate) {
-  const win = getBlackmanWin(buf.length);
-  function magSq(f) {
-    const w = 2 * Math.PI * f / sampleRate;
-    const wr = Math.cos(w), wi = -Math.sin(w); // e^{-jw}
-    let cr = 1, ci = 0, re = 0, im = 0;
-    for (let n = 0; n < buf.length; n++) {
-      const s = buf[n] * win[n];
-      re += s * cr; im += s * ci;
-      const nr = cr * wr - ci * wi;
-      ci = cr * wi + ci * wr; cr = nr;
-    }
-    return re * re + im * im;
-  }
-  const d = 5; // Hz — bien dentro del lóbulo Blackman (~47 Hz de ancho)
-  const m0 = magSq(approxFreq - d), m1 = magSq(approxFreq), m2 = magSq(approxFreq + d);
-  const denom = 2 * (2 * m1 - m0 - m2);
-  return Math.abs(denom) > 1e-12 * m1 ? approxFreq + d * (m0 - m2) / denom : approxFreq;
+  return { freq: sampleRate / tau, clarity: best.val, rms };
 }
 
 function findClosestNote(freq) {
@@ -2419,8 +2407,6 @@ const TUNER = {
       this.rms = Math.sqrt(rmsSum / rmsN);
 
       const p = detectPitch(buf, getCtx().sampleRate);
-      // Refinar con DFT evaluado en frecuencias arbitrarias (< 0.01 Hz de error)
-      if (p) p.freq = refinePitchDFT(p.freq, buf, getCtx().sampleRate);
       if (p) {
         this.detectedFreq = p.freq;
         this._lastFreq = p.freq;
