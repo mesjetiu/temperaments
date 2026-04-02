@@ -354,7 +354,7 @@
 </div>
 
 <script>
-const APP_VERSION = '61a46da · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = 'f8dacd5 · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2147,9 +2147,9 @@ function viewKeyboard() {
 // ══════════════════════════════════════════════
 // AFINADOR — DETECCIÓN DE PITCH (MPM — McLeod Pitch Method)
 // ══════════════════════════════════════════════
-// Ref: McLeod & Wyvill 2005 "A Smarter Way to Find Pitch"
-// Ventajas sobre YIN: normalización por-tau (NSDF) → sin sesgo hacia graves,
-// detecta agudos con solo 2 periodos, y el peak-picking es más robusto.
+// Implementación fiel a pitchy (ianprime0509) y al paper original
+// McLeod & Wyvill 2005 "A Smarter Way to Find Pitch".
+// NSDF con normalización incremental m'(tau) — O(W·maxTau), sin FFT externa.
 function detectPitch(buf, sampleRate) {
   const W = Math.min(2048, buf.length >> 1);
 
@@ -2159,69 +2159,72 @@ function detectPitch(buf, sampleRate) {
   rms = Math.sqrt(rms / W);
   if (rms < 0.0003) return null;
 
-  const minTau = Math.max(2, Math.ceil(sampleRate / 4096)); // hasta C8
   const maxTau = Math.min(W - 1, Math.floor(sampleRate / 50));
 
-  // NSDF: n'(tau) = 2·r'(tau) / m'(tau)
-  // r'(tau) = autocorrelación tipo II = Σ x[j]·x[j+tau]
-  // m'(tau) = Σ (x²[j] + x²[j+tau])  — normalización por-tau
+  // Paso 1: autocorrelación directa r'(tau) para tau = 0..maxTau
+  // Paso 2: NSDF = 2·r'(tau) / m'(tau) con m' incremental (ec. 6 y 9 del paper)
+  // m'(0) = 2·r'(0); m'(tau) = m'(tau-1) - x[tau-1]² - x[W-tau]²
   const nsdf = new Float32Array(maxTau + 1);
-  // Pre-calcular sumas acumuladas de x² para m'(tau) incremental
-  // m'(tau) = Σ_{j=0}^{N-tau-1} x²[j] + Σ_{j=tau}^{N-1} x²[j]
-  //         = (cumSq[N-tau] - cumSq[0]) + (cumSq[N] - cumSq[tau])
-  //         = cumSq[N-tau] + cumSq[N] - cumSq[tau]
-  const N2 = 2 * W; // buf tiene al menos N2 muestras (fftSize = 2*W)
-  let cumEnd = 0, cumStart = 0; // energía decreciente desde ambos extremos
-  for (let i = 0; i < W; i++) { cumEnd += buf[i] * buf[i]; cumStart += buf[i] * buf[i]; }
-  // m'(0) = 2·Σx²[0..W-1]
-  let mTau = cumEnd + cumStart;
+  // Calcular r'(0) = Σ x[j]² para j=0..W-1
+  let r0 = 0;
+  for (let j = 0; j < W; j++) r0 += buf[j] * buf[j];
+  let m = 2 * r0;
 
   for (let tau = 0; tau <= maxTau; tau++) {
+    if (tau > 0) m -= buf[tau - 1] * buf[tau - 1] + buf[W - tau] * buf[W - tau];
+    if (m <= 0) { nsdf[tau] = 0; continue; }
     let r = 0;
     for (let j = 0; j < W - tau; j++) r += buf[j] * buf[j + tau];
-    nsdf[tau] = mTau > 0 ? 2 * r / mTau : 0;
-    // Actualizar m'(tau+1): quitar buf[W-tau-1]² del primer bloque y buf[tau]² del segundo
-    if (tau < maxTau) {
-      mTau -= buf[W - tau - 1] * buf[W - tau - 1] + buf[tau] * buf[tau];
-    }
+    nsdf[tau] = 2 * r / m;
   }
 
-  // Peak picking: encontrar "key maximums" (máximos entre cruces por cero positivos)
-  const MPM_K = 0.93; // umbral = K × máximo global de key maximums
-  const keys = []; // {tau, val}
-  let isNeg = true, bestInSegment = -1, bestVal = -Infinity;
-  for (let tau = minTau; tau <= maxTau; tau++) {
-    if (isNeg) {
-      if (nsdf[tau] >= 0) { isNeg = false; bestInSegment = tau; bestVal = nsdf[tau]; }
-    } else {
-      if (nsdf[tau] > bestVal) { bestVal = nsdf[tau]; bestInSegment = tau; }
-      if (nsdf[tau] < 0) {
-        keys.push({ tau: bestInSegment, val: bestVal });
-        isNeg = true;
+  // Peak picking: key maximums entre cruces por cero (exacto al paper)
+  const MPM_K = 0.93;
+  const minTau = Math.max(2, Math.ceil(sampleRate / 4096)); // hasta C8
+  let lookingForMax = false, maxIdx = -1, maxVal = -Infinity;
+  let globalBestVal = -Infinity;
+  const keys = [];
+  for (let i = minTau; i <= maxTau; i++) {
+    if (nsdf[i - 1] <= 0 && nsdf[i] > 0) {
+      lookingForMax = true; maxIdx = i; maxVal = nsdf[i];
+    } else if (nsdf[i - 1] > 0 && nsdf[i] <= 0) {
+      if (lookingForMax && maxIdx >= 0) {
+        keys.push(maxIdx);
+        if (maxVal > globalBestVal) globalBestVal = maxVal;
       }
+      lookingForMax = false;
+    } else if (lookingForMax && nsdf[i] > maxVal) {
+      maxVal = nsdf[i]; maxIdx = i;
     }
   }
-  // Último segmento (puede no cruzar cero)
-  if (!isNeg && bestInSegment > 0) keys.push({ tau: bestInSegment, val: bestVal });
+  if (lookingForMax && maxIdx >= 0) {
+    keys.push(maxIdx);
+    if (maxVal > globalBestVal) globalBestVal = maxVal;
+  }
 
   if (!keys.length) return null;
 
-  // Primer key maximum que supera K × máximo global
-  const globalMax = Math.max(...keys.map(k => k.val));
-  const thresh = MPM_K * globalMax;
-  let best = keys.find(k => k.val >= thresh);
-  if (!best) best = keys[keys.length - 1];
-
-  let tau = best.tau;
-
-  // Interpolación parabólica para precisión sub-muestra
-  if (tau > 0 && tau < maxTau) {
-    const s0 = nsdf[tau - 1], s1 = nsdf[tau], s2 = nsdf[tau + 1];
-    const d = 2 * s1 - s0 - s2;
-    if (Math.abs(d) > 1e-8) tau += (s0 - s2) / (2 * d);
+  // Primer key maximum ≥ K × máximo global
+  const thresh = MPM_K * globalBestVal;
+  let bestIdx = keys[keys.length - 1];
+  for (let i = 0; i < keys.length; i++) {
+    if (nsdf[keys[i]] >= thresh) { bestIdx = keys[i]; break; }
   }
 
-  return { freq: sampleRate / tau, clarity: best.val, rms };
+  // Interpolación parabólica (sección 5 del paper)
+  let clarity = nsdf[bestIdx];
+  let refinedTau = bestIdx;
+  if (bestIdx > 0 && bestIdx < maxTau) {
+    const y0 = nsdf[bestIdx - 1], y1 = nsdf[bestIdx], y2 = nsdf[bestIdx + 1];
+    const a = y0 / 2 - y1 + y2 / 2;
+    if (Math.abs(a) > 1e-12) {
+      const shift = (y0 - y2) / (4 * a);
+      refinedTau = bestIdx + shift;
+      clarity = Math.min(y1 - a * shift * shift, 1);
+    }
+  }
+
+  return { freq: sampleRate / refinedTau, clarity, rms };
 }
 
 function findClosestNote(freq) {
