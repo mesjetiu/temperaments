@@ -352,7 +352,7 @@
 </div>
 
 <script>
-const APP_VERSION = '4418075 · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = '1844773 · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1333,7 +1333,7 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
     if (!swiping) return; swiping = false;
     const dx = e.changedTouches[0].clientX - sx;
     const dy = e.changedTouches[0].clientY - sy;
-    if (Math.abs(dx) < 160 || Math.abs(dx) < Math.abs(dy) * 4) return; // solo gestos amplios y muy horizontales
+    if (Math.abs(dx) < window.innerWidth * 0.6 || Math.abs(dx) < Math.abs(dy) * 4) return; // gesto de al menos 60% del ancho de pantalla
     if (activeTab === 'tuner' || activeTab === 'keyboard') return; // estas pestañas manejan su propio scroll/touch
     const idx = TABS_ORDER.indexOf(activeTab);
     const next = dx < 0 ? TABS_ORDER[idx + 1] : TABS_ORDER[idx - 1];
