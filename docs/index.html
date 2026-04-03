@@ -384,7 +384,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'd52c817 · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = 'c19d0cd · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1693,26 +1693,39 @@ function zoomBarHtml(id) {
     `</div>`;
 }
 
+// Envuelve el canvas en un div de altura fija antes de crear el chart.
+// Chart.js responsive:true observa el padre del canvas; si el padre tiene
+// height:auto el chart crece → el padre crece → el chart vuelve a crecer (bucle).
+// Con un div de altura fija explícita ese bucle no puede ocurrir.
+function _wrapCanvas(c) {
+  const h = parseInt(c.getAttribute('height') || '160', 10);
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `position:relative;height:${h}px;width:100%`;
+  c.removeAttribute('height');
+  c.parentNode.insertBefore(wrap, c);
+  wrap.appendChild(c);
+}
+
 function mkBar(id, labels, datasets, yLabel, tipFmt, audioType) {
   const c=document.getElementById(id); if(!c) return;
+  _wrapCanvas(c);
   charts[id]=new Chart(c,{type:'bar',data:{labels,datasets},options:{...baseOpts,
     plugins:{...baseOpts.plugins,tooltip:{callbacks:{label:tipFmt}},zoom:_zoomOpts},
     datasets:{bar:{minBarLength:4}},
     scales:{x:{ticks:{color:tickColor,font:{size:9},maxRotation:40},grid:{color:gridColor}},
             y:{ticks:{color:tickColor,callback:v=>`${v>=0?'+':''}${v}¢`},grid:{color:gridColor},
                title:{display:true,text:yLabel,color:'#6b7280',font:{size:10}}}}}});
-  _attachChartResize(id, c);
   if(audioType) bindChartAudio(id,audioType,activeSlotMap());
 }
 
 function mkLine(id, labels, datasets, yLabel, tipFmt, audioType) {
   const c=document.getElementById(id); if(!c) return;
+  _wrapCanvas(c);
   charts[id]=new Chart(c,{type:'line',data:{labels,datasets},options:{...baseOpts,
     plugins:{...baseOpts.plugins,tooltip:{callbacks:{label:tipFmt}},zoom:_zoomOpts},
     scales:{x:{ticks:{color:tickColor,font:{size:10}},grid:{color:gridColor}},
             y:{ticks:{color:tickColor,callback:v=>`${v>0?'+':''}${v}¢`},grid:{color:gridColor},
                title:{display:true,text:yLabel,color:'#6b7280',font:{size:10}}}}}});
-  _attachChartResize(id, c);
   if(audioType) bindChartAudio(id,audioType,activeSlotMap());
 }
 
