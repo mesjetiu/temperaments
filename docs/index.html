@@ -352,7 +352,7 @@
 </div>
 
 <script>
-const APP_VERSION = '326133b · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = 'df4863c · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3017,6 +3017,28 @@ function buildTunerScreen() {
       <div id="tuner-mini-kb" style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px"></div>
     </div>`;
   document.body.appendChild(sc);
+
+  // Swipe horizontal en el afinador → cicla modo de visualización
+  const VIZ_MODES = ['waterfall', 'waveform', 'needle'];
+  let _tsx = 0, _tsy = 0;
+  sc.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    _tsx = e.touches[0].clientX; _tsy = e.touches[0].clientY;
+  }, { passive: true });
+  sc.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - _tsx;
+    const dy = e.changedTouches[0].clientY - _tsy;
+    if (Math.abs(dx) < window.innerWidth * 0.6 || Math.abs(dx) < Math.abs(dy) * 4) return;
+    const cur = VIZ_MODES.indexOf(TUNER.vizMode);
+    const next = dx < 0
+      ? VIZ_MODES[(cur + 1) % VIZ_MODES.length]
+      : VIZ_MODES[(cur + VIZ_MODES.length - 1) % VIZ_MODES.length];
+    TUNER.setVizMode(next);
+    // Actualizar el select del menú si está visible
+    const sel = document.querySelector('#tuner-menu select');
+    if (sel) sel.value = next;
+  }, { passive: true });
+
   if (isManual) TUNER.renderMiniKb();
   requestAnimationFrame(() => {
     const cv = document.getElementById('strobe-canvas');

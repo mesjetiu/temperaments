@@ -1,4 +1,4 @@
-const CACHE = 'temp-326133b';const STATIC = [
+const CACHE = 'temp-df4863c';const STATIC = [
   './icon-192.png',
   './icon-512.png',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
