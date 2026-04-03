@@ -384,7 +384,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'f9bb333 · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = 'bb57d81 · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1680,13 +1680,12 @@ const _zoomOpts = {
   zoom: { wheel:{enabled:true}, pinch:{enabled:true}, mode:'xy' }
 };
 
-function _addZoomControls(id) {
-  if (isMobile()) return;
-  const c = document.getElementById(id);
-  if (!c) return;
-  const bar = document.createElement('div');
-  bar.className = 'chart-zoom-bar';
-  bar.innerHTML =
+// Genera la barra de botones de zoom para desktop; vacío en móvil.
+// Se incluye ANTES del canvas en el HTML de la vista para que el ResizeObserver
+// la vea como hermano estable desde el principio (evita el bucle infinito).
+function zoomBarHtml(id) {
+  if (isMobile()) return '';
+  return `<div class="chart-zoom-bar">` +
     `<span class="czb-label">Y</span>` +
     `<button class="icon-btn czb-btn" onclick="charts['${id}']?.zoom({y:1.3})" title="Acercar eje Y">+</button>` +
     `<button class="icon-btn czb-btn" onclick="charts['${id}']?.zoom({y:0.77})" title="Alejar eje Y">−</button>` +
@@ -1695,8 +1694,8 @@ function _addZoomControls(id) {
     `<button class="icon-btn czb-btn" onclick="charts['${id}']?.zoom({x:1.3})" title="Acercar eje X">+</button>` +
     `<button class="icon-btn czb-btn" onclick="charts['${id}']?.zoom({x:0.77})" title="Alejar eje X">−</button>` +
     `<span class="czb-sep"></span>` +
-    `<button class="icon-btn czb-btn" onclick="charts['${id}']?.resetZoom()" title="Restablecer zoom">↺</button>`;
-  c.parentNode.insertBefore(bar, c);
+    `<button class="icon-btn czb-btn" onclick="charts['${id}']?.resetZoom()" title="Restablecer zoom">↺</button>` +
+    `</div>`;
 }
 
 function mkBar(id, labels, datasets, yLabel, tipFmt, audioType) {
@@ -1708,7 +1707,6 @@ function mkBar(id, labels, datasets, yLabel, tipFmt, audioType) {
             y:{ticks:{color:tickColor,callback:v=>`${v>=0?'+':''}${v}¢`},grid:{color:gridColor},
                title:{display:true,text:yLabel,color:'#6b7280',font:{size:10}}}}}});
   _attachChartResize(id, c);
-  _addZoomControls(id);
   if(audioType) bindChartAudio(id,audioType,activeSlotMap());
 }
 
@@ -1720,7 +1718,6 @@ function mkLine(id, labels, datasets, yLabel, tipFmt, audioType) {
             y:{ticks:{color:tickColor,callback:v=>`${v>0?'+':''}${v}¢`},grid:{color:gridColor},
                title:{display:true,text:yLabel,color:'#6b7280',font:{size:10}}}}}});
   _attachChartResize(id, c);
-  _addZoomControls(id);
   if(audioType) bindChartAudio(id,audioType,activeSlotMap());
 }
 
@@ -1793,7 +1790,7 @@ function viewFifths(act) {
   const mob=isMobile(), fl=FIFTH_LBL.map((n,i)=>`${n}→${FIFTH_LBL[(i+1)%12]}`);
   document.getElementById('content').innerHTML=
     panel('Desviación de las 12 quintas respecto a la quinta pura (701.955 ¢) <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
-      `<canvas id="c-fifths" ${mob?'height="160"':'height="110"'}></canvas>`, 'width:100%')
+      zoomBarHtml('c-fifths')+`<canvas id="c-fifths" ${mob?'height="160"':'height="110"'}></canvas>`, 'width:100%')
     + panel('Círculo de quintas',
       `<div class="grad-bar"><span>−8¢</span><div class="grad-strip"></div><span>+4¢</span></div>
        <div id="circle-wrap">${drawCircle(selected)}</div>`,
@@ -1811,9 +1808,9 @@ function viewThirds(act) {
   const mob=isMobile();
   document.getElementById('content').innerHTML=
     panel('Terceras mayores — desv. de la 3ª mayor pura (386.314 ¢) <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
-      `<canvas id="c-maj3" ${mob?'height="160"':'height="110"'}></canvas>`, 'width:100%')
+      zoomBarHtml('c-maj3')+`<canvas id="c-maj3" ${mob?'height="160"':'height="110"'}></canvas>`, 'width:100%')
     + panel('Terceras menores — desv. de la 3ª menor pura (315.641 ¢) <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
-      `<canvas id="c-min3" ${mob?'height="160"':'height="110"'}></canvas>`, 'width:100%')
+      zoomBarHtml('c-min3')+`<canvas id="c-min3" ${mob?'height="160"':'height="110"'}></canvas>`, 'width:100%')
     + act.map(t=>{const ci=selected.indexOf(t);
       return panel(`<span style="color:${COLORS[ci]}">${shortName(t,40)}</span>`, thirdsTableFn(t),
         mob?'':'flex:1;min-width:190px');}).join('');
@@ -1828,11 +1825,11 @@ function viewCompare(act) {
   const mob=isMobile(), fl=FIFTH_LBL.map((n,i)=>`${n}→${FIFTH_LBL[(i+1)%12]}`);
   document.getElementById('content').innerHTML=
     panel('Offsets de las 12 notas <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un punto</small>',
-      `<canvas id="c-off" ${mob?'height="180"':'height="100"'}></canvas>`, 'width:100%')
+      zoomBarHtml('c-off')+`<canvas id="c-off" ${mob?'height="180"':'height="100"'}></canvas>`, 'width:100%')
     + panel('Quintas — desviación de pura <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
-      `<canvas id="c-fif" ${mob?'height="180"':'height="100"'}></canvas>`, 'width:100%')
+      zoomBarHtml('c-fif')+`<canvas id="c-fif" ${mob?'height="180"':'height="100"'}></canvas>`, 'width:100%')
     + panel('Terceras mayores — desviación de pura <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
-      `<canvas id="c-3rd" ${mob?'height="180"':'height="100"'}></canvas>`, 'width:100%');
+      zoomBarHtml('c-3rd')+`<canvas id="c-3rd" ${mob?'height="180"':'height="100"'}></canvas>`, 'width:100%');
   mkLine('c-off',NOTES,selected.map((t,i)=>!t?null:({...ds(t,i,t.offsets,{pointRadius:5,tension:0.3,fill:i===0})})).filter(Boolean),
     'Desviación del ET (¢)',ctx=>`${ctx.dataset.label}: ${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(3)}¢`,'offsets');
   mkBar('c-fif',fl,selected.map((t,i)=>!t?null:dsFifth(t,i,getFifths(t.offsets).map(f=>f.dev))).filter(Boolean),
