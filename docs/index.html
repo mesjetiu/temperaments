@@ -384,7 +384,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'bb57d81 · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = '1b89aaa · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2133,8 +2133,8 @@ function viewScatter() {
   }
   document.getElementById('content').innerHTML = panel(
     `Cartografía de temperamentos (${all.length})`,
-    `<canvas id="scat-cv" style="width:100%;cursor:crosshair;display:block"></canvas>
-     <div id="scat-nfo" style="margin-top:4px;min-height:1.4em;font-size:10px;color:var(--muted);text-align:center">pulsa un punto para seleccionarlo</div>
+    `<canvas id="scat-cv" style="width:100%;cursor:grab;display:block;touch-action:none"></canvas>
+     <div id="scat-nfo" style="margin-top:4px;min-height:1.4em;font-size:10px;color:var(--muted);text-align:center">pulsa un punto para seleccionarlo · rueda/pinch para zoom · arrastra para mover</div>
      <div style="margin-top:4px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;font-size:10px;color:#6b7280">
        <span><span style="color:#60a5fa">●</span> Scala</span>
        <span><span style="color:#fb923c">●</span> GrandOrgue</span>
@@ -2149,27 +2149,52 @@ function viewScatter() {
 }
 
 function _initScatter(canvas) {
-  const pts  = _scatterPts;
+  const pts   = _scatterPts;
   const nfoEl = document.getElementById('scat-nfo');
-  const dpr  = window.devicePixelRatio || 1;
-  const W    = canvas.clientWidth || 580;
+  const dpr   = window.devicePixelRatio || 1;
+  const W     = canvas.clientWidth || 580;
   const panel = canvas.closest('.panel');
   const availH = panel?.style.height ? _availCanvasH(canvas) : 0;
-  const H    = availH > 80 ? Math.round(availH) : Math.round(Math.min(W * 0.62, 370));
-  const MX   = 44, MY = 10, MR = 10, MB = 28;
+  const H     = availH > 80 ? Math.round(availH) : Math.round(Math.min(W * 0.62, 370));
+  const MX = 44, MY = 10, MR = 10, MB = 28;
   canvas.width  = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
   canvas.style.height = H + 'px';
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
+  const plotW = W - MX - MR, plotH = H - MY - MB;
 
   const xs = pts.map(p=>p.x).sort((a,b)=>a-b);
   const ys = pts.map(p=>p.y).sort((a,b)=>a-b);
-  const maxX = Math.ceil(xs[Math.floor(xs.length*0.96)] / 5) * 5;
-  const maxY = Math.ceil(ys[Math.floor(ys.length*0.96)] / 5) * 5;
-  const plotW = W - MX - MR, plotH = H - MY - MB;
-  const toX = v => MX + Math.min(v/maxX, 1.08) * plotW;
-  const toY = v => MY + plotH - Math.min(v/maxY, 1.08) * plotH;
+  const fullMaxX = Math.ceil(xs[Math.floor(xs.length*0.96)] / 5) * 5;
+  const fullMaxY = Math.ceil(ys[Math.floor(ys.length*0.96)] / 5) * 5;
+
+  // ── Viewport state (data units) ──
+  let vMinX = 0, vMaxX = fullMaxX, vMinY = 0, vMaxY = fullMaxY;
+
+  const toX   = v  => MX + (v - vMinX) / (vMaxX - vMinX) * plotW;
+  const toY   = v  => MY + plotH - (v - vMinY) / (vMaxY - vMinY) * plotH;
+  const fromX = cx => vMinX + (cx - MX) / plotW * (vMaxX - vMinX);
+  const fromY = cy => vMinY + (1 - (cy - MY) / plotH) * (vMaxY - vMinY);
+  const isZoomed = () => vMinX > 0.01 || vMaxX < fullMaxX * 0.99 || vMinY > 0.01 || vMaxY < fullMaxY * 0.99;
+
+  function niceStep(range) {
+    const raw = range / 5, mag = Math.pow(10, Math.floor(Math.log10(raw))), n = raw / mag;
+    return n < 1.5 ? mag : n < 3.5 ? 2*mag : n < 7.5 ? 5*mag : 10*mag;
+  }
+
+  function zoomAround(cxPx, cyPx, factor) {
+    const dx = fromX(cxPx), dy = fromY(cyPx);
+    vMinX = dx + (vMinX-dx)*factor; vMaxX = dx + (vMaxX-dx)*factor;
+    vMinY = dy + (vMinY-dy)*factor; vMaxY = dy + (vMaxY-dy)*factor;
+    draw();
+  }
+  function pan(dxPx, dyPx) {
+    const dxD = dxPx/plotW*(vMaxX-vMinX), dyD = dyPx/plotH*(vMaxY-vMinY);
+    vMinX -= dxD; vMaxX -= dxD; vMinY += dyD; vMaxY += dyD;
+    draw();
+  }
+  function resetZoom() { vMinX=0; vMaxX=fullMaxX; vMinY=0; vMaxY=fullMaxY; draw(); }
 
   const SRC_COL = { 'Scala':'#60a5fa', 'GrandOrgue':'#fb923c' };
   let hovPt = null;
@@ -2177,19 +2202,22 @@ function _initScatter(canvas) {
   function draw() {
     ctx.fillStyle = '#0d1117'; ctx.fillRect(0,0,W,H);
 
-    // Grid
+    // Grid with adaptive tick step
+    const xStep = niceStep(vMaxX - vMinX), yStep = niceStep(vMaxY - vMinY);
     ctx.lineWidth = 0.6;
-    for (let v = 0; v <= maxX; v += 5) {
-      const x = toX(v);
+    const xStart = Math.ceil(vMinX/xStep)*xStep;
+    for (let v = xStart; v <= vMaxX+xStep*0.01; v += xStep) {
+      const x = toX(v); if (x < MX-1 || x > MX+plotW+1) continue;
       ctx.strokeStyle='#1e2a3a'; ctx.beginPath(); ctx.moveTo(x,MY); ctx.lineTo(x,MY+plotH); ctx.stroke();
       ctx.fillStyle='#4b5563'; ctx.font='9px system-ui'; ctx.textAlign='center';
-      ctx.fillText(v+'¢', x, MY+plotH+14);
+      ctx.fillText((Math.round(v*10)/10)+'¢', x, MY+plotH+14);
     }
-    for (let v = 0; v <= maxY; v += 5) {
-      const y = toY(v);
+    const yStart = Math.ceil(vMinY/yStep)*yStep;
+    for (let v = yStart; v <= vMaxY+yStep*0.01; v += yStep) {
+      const y = toY(v); if (y < MY-1 || y > MY+plotH+1) continue;
       ctx.strokeStyle='#1e2a3a'; ctx.beginPath(); ctx.moveTo(MX,y); ctx.lineTo(MX+plotW,y); ctx.stroke();
       ctx.fillStyle='#4b5563'; ctx.font='9px system-ui'; ctx.textAlign='right';
-      ctx.fillText(v+'¢', MX-4, y+3);
+      ctx.fillText((Math.round(v*10)/10)+'¢', MX-4, y+3);
     }
     ctx.strokeStyle='#374151'; ctx.lineWidth=1; ctx.strokeRect(MX,MY,plotW,plotH);
 
@@ -2199,8 +2227,12 @@ function _initScatter(canvas) {
     ctx.save(); ctx.translate(11,MY+plotH/2); ctx.rotate(-Math.PI/2);
     ctx.fillText('peor 5ª (desv. máx.)', 0, 0); ctx.restore();
 
+    // Clip to plot area
+    ctx.save();
+    ctx.beginPath(); ctx.rect(MX, MY, plotW, plotH); ctx.clip();
+
     // ET crosshairs
-    const etPt = pts.find(p => p.name==='Equal temperament' && p.src==='GrandOrgue') || pts.find(p => p.name.toLowerCase()==='equal temperament');
+    const etPt = pts.find(p=>p.name==='Equal temperament'&&p.src==='GrandOrgue')||pts.find(p=>p.name.toLowerCase()==='equal temperament');
     if (etPt) {
       ctx.strokeStyle='#334155'; ctx.lineWidth=0.8; ctx.setLineDash([4,4]);
       ctx.beginPath(); ctx.moveTo(toX(etPt.x),MY); ctx.lineTo(toX(etPt.x),MY+plotH); ctx.stroke();
@@ -2210,65 +2242,65 @@ function _initScatter(canvas) {
       ctx.fillText('ET', toX(etPt.x)+3, MY+11);
     }
 
-    // Batch-draw all unselected points by color
+    // Points by color (batch)
     const byCol = {};
     pts.forEach(p => {
       if (selected.some(s=>s&&s.name===p.name)) return;
-      const col = SRC_COL[p.src] || '#a78bfa';
-      (byCol[col] = byCol[col]||[]).push(p);
+      const col = SRC_COL[p.src]||'#a78bfa';
+      (byCol[col]=byCol[col]||[]).push(p);
     });
-    Object.entries(byCol).forEach(([col, ps]) => {
-      ctx.fillStyle = col + '55';
-      ctx.beginPath();
+    Object.entries(byCol).forEach(([col,ps]) => {
+      ctx.fillStyle = col+'55'; ctx.beginPath();
       ps.forEach(p => { ctx.moveTo(toX(p.x)+2,toY(p.y)); ctx.arc(toX(p.x),toY(p.y),2,0,Math.PI*2); });
       ctx.fill();
     });
 
-    // Hovered (unselected)
     if (hovPt && !selected.some(s=>s&&s.name===hovPt.name)) {
       ctx.beginPath(); ctx.arc(toX(hovPt.x),toY(hovPt.y),5,0,Math.PI*2);
       ctx.fillStyle='#e2e8f0'; ctx.fill();
     }
-
-    // Selected
     selected.filter(Boolean).forEach((t,si) => {
-      const p = pts.find(pt=>pt.name===t.name); if(!p) return;
+      const p=pts.find(pt=>pt.name===t.name); if(!p) return;
       ctx.beginPath(); ctx.arc(toX(p.x),toY(p.y),7,0,Math.PI*2);
       ctx.fillStyle=COLORS[si]; ctx.fill();
       ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
     });
 
-    // Tooltip
+    ctx.restore(); // end clip
+
+    // Tooltip (fuera del clip para que no se corte)
     if (hovPt) {
-      const tx = Math.max(MX+2, Math.min(toX(hovPt.x)+8, W-160));
-      const ty = Math.max(MY+16, toY(hovPt.y)-20);
+      const tx=Math.max(MX+2,Math.min(toX(hovPt.x)+8,W-160));
+      const ty=Math.max(MY+16,toY(hovPt.y)-20);
       ctx.font='10px system-ui';
-      const tw = Math.min(ctx.measureText(hovPt.name).width+10, W-MX-8);
+      const tw=Math.min(ctx.measureText(hovPt.name).width+10,W-MX-8);
       ctx.fillStyle='rgba(15,23,42,0.92)'; ctx.fillRect(tx,ty,tw,17);
       ctx.fillStyle='#e2e8f0'; ctx.textAlign='left'; ctx.fillText(hovPt.name,tx+5,ty+12);
     }
-  }
 
-  draw();
+    // Botón reset zoom (esquina superior derecha del plot)
+    if (isZoomed()) {
+      const bx=MX+plotW-44, by=MY+3, bw=42, bh=14;
+      ctx.fillStyle='rgba(30,41,59,0.9)'; ctx.fillRect(bx,by,bw,bh);
+      ctx.strokeStyle='#334155'; ctx.lineWidth=0.5; ctx.strokeRect(bx,by,bw,bh);
+      ctx.fillStyle='#60a5fa'; ctx.font='9px system-ui'; ctx.textAlign='center';
+      ctx.fillText('↺ reset', bx+bw/2, by+10);
+    }
+  }
 
   function nearPt(mx, my, thr) {
     let best=null, bd=thr;
-    pts.forEach(p => { const d=Math.hypot(mx-toX(p.x),my-toY(p.y)); if(d<bd){bd=d;best=p;} });
+    pts.forEach(p => {
+      const px=toX(p.x), py=toY(p.y);
+      if (px<MX||px>MX+plotW||py<MY||py>MY+plotH) return;
+      const d=Math.hypot(mx-px,my-py); if(d<bd){bd=d;best=p;}
+    });
     return best;
   }
 
-  canvas.addEventListener('mousemove', e => {
-    const rc=canvas.getBoundingClientRect();
-    const np=nearPt((e.clientX-rc.left)*(W/rc.width),(e.clientY-rc.top)*(H/rc.height),12);
-    if(np!==hovPt){hovPt=np;draw();}
-  });
-  canvas.addEventListener('mouseleave', ()=>{hovPt=null;draw();});
-
-  canvas.addEventListener('pointerdown', e => {
-    const rc=canvas.getBoundingClientRect();
-    const np=nearPt((e.clientX-rc.left)*(W/rc.width),(e.clientY-rc.top)*(H/rc.height),15);
-    if(!np) return;
-    hovPt = np;
+  function selectPt(np) {
+    if (!np) return;
+    hovPt=np;
     const t=all[np.idx], already=selected.some(s=>s&&s.name===t.name);
     selected = already ? [null,null,null] : [t,null,null];
     lastSelected = already ? null : t;
@@ -2276,7 +2308,115 @@ function _initScatter(canvas) {
     renderBadges(); refreshList(); draw();
     if(nfoEl) nfoEl.textContent = already ? 'pulsa un punto para seleccionarlo'
       : `${t.name} [${t.source}]  ·  3ªM: ${np.x.toFixed(1)}¢  ·  5ª: ${np.y.toFixed(1)}¢`;
+  }
+
+  draw();
+
+  // ── Mouse wheel zoom ──
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const rc=canvas.getBoundingClientRect(), scX=W/rc.width, scY=H/rc.height;
+    const cx=(e.clientX-rc.left)*scX, cy=(e.clientY-rc.top)*scY;
+    if (cx<MX||cx>MX+plotW||cy<MY||cy>MY+plotH) return;
+    zoomAround(cx, cy, e.deltaY>0 ? 1.2 : 1/1.2);
+  }, {passive:false});
+
+  // ── Mouse drag (pan) + click (select) ──
+  let _mDown=false, _mX=0, _mY=0, _mMoved=false;
+  canvas.addEventListener('mousedown', e => {
+    _mDown=true; _mX=e.clientX; _mY=e.clientY; _mMoved=false;
+    canvas.style.cursor='grabbing';
   });
+  const _onMouseMove = e => {
+    if (!canvas.isConnected) return;
+    if (_mDown) {
+      const dx=e.clientX-_mX, dy=e.clientY-_mY;
+      if (!_mMoved && Math.hypot(dx,dy)<4) return;
+      _mMoved=true; _mX=e.clientX; _mY=e.clientY;
+      pan(dx, dy);
+    } else {
+      const rc=canvas.getBoundingClientRect();
+      const np=nearPt((e.clientX-rc.left)*(W/rc.width),(e.clientY-rc.top)*(H/rc.height),12);
+      canvas.style.cursor = np ? 'crosshair' : 'grab';
+      if(np!==hovPt){hovPt=np;draw();}
+    }
+  };
+  const _onMouseUp = () => { if (!canvas.isConnected) return; _mDown=false; canvas.style.cursor='grab'; };
+  window.addEventListener('mousemove', _onMouseMove);
+  window.addEventListener('mouseup', _onMouseUp);
+
+  canvas.addEventListener('mouseleave', () => { if(!_mDown){hovPt=null;draw();} });
+
+  canvas.addEventListener('click', e => {
+    if (_mMoved) return;
+    const rc=canvas.getBoundingClientRect(), scX=W/rc.width, scY=H/rc.height;
+    const cx=(e.clientX-rc.left)*scX, cy=(e.clientY-rc.top)*scY;
+    // Reset zoom button
+    if (isZoomed() && cx>MX+plotW-44&&cx<MX+plotW-2&&cy>MY+3&&cy<MY+17) { resetZoom(); return; }
+    selectPt(nearPt(cx, cy, 15));
+  });
+
+  canvas.addEventListener('dblclick', resetZoom);
+
+  // ── Touch: pinch zoom + pan + tap ──
+  let _tc={}, _pinchDist=null, _pinchMid=null, _tStart=null, _tMoved=false;
+
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    Array.from(e.changedTouches).forEach(t=>{_tc[t.identifier]={x:t.clientX,y:t.clientY};});
+    const ids=Object.keys(_tc);
+    if (ids.length===1) { _tStart={x:_tc[ids[0]].x,y:_tc[ids[0]].y}; _tMoved=false; }
+    if (ids.length===2) {
+      const [a,b]=ids.map(id=>_tc[id]);
+      _pinchDist=Math.hypot(a.x-b.x,a.y-b.y);
+      _pinchMid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+    }
+  },{passive:false});
+
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    Array.from(e.changedTouches).forEach(t=>{_tc[t.identifier]={x:t.clientX,y:t.clientY};});
+    const ids=Object.keys(_tc);
+    const rc=canvas.getBoundingClientRect(), scX=W/rc.width, scY=H/rc.height;
+    if (ids.length>=2) {
+      const [a,b]=ids.slice(0,2).map(id=>_tc[id]);
+      const dist=Math.hypot(a.x-b.x,a.y-b.y);
+      const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+      if (_pinchDist) {
+        const cx=(mid.x-rc.left)*scX, cy=(mid.y-rc.top)*scY;
+        zoomAround(cx,cy,_pinchDist/dist);
+        if (_pinchMid) pan((mid.x-_pinchMid.x)*scX,(mid.y-_pinchMid.y)*scY);
+      }
+      _pinchDist=dist; _pinchMid=mid;
+    } else if (ids.length===1&&_tStart) {
+      const t=_tc[ids[0]];
+      const dx=t.x-_tStart.x, dy=t.y-_tStart.y;
+      if (!_tMoved&&Math.hypot(dx,dy)<5) return;
+      _tMoved=true; pan(dx*scX,dy*scY); _tStart={x:t.x,y:t.y};
+    }
+  },{passive:false});
+
+  canvas.addEventListener('touchend', e => {
+    Array.from(e.changedTouches).forEach(t=>{delete _tc[t.identifier];});
+    const ids=Object.keys(_tc);
+    if (ids.length<2){_pinchDist=null;_pinchMid=null;}
+    if (ids.length===0&&!_tMoved&&_tStart) {
+      const rc=canvas.getBoundingClientRect(), scX=W/rc.width, scY=H/rc.height;
+      const touch=e.changedTouches[0];
+      const cx=(touch.clientX-rc.left)*scX, cy=(touch.clientY-rc.top)*scY;
+      if (isZoomed()&&cx>MX+plotW-44&&cx<MX+plotW-2&&cy>MY+3&&cy<MY+17){resetZoom();}
+      else selectPt(nearPt(cx,cy,15));
+    }
+    if (ids.length===0){_tStart=null;_tMoved=false;}
+  },{passive:false});
+
+  // Doble tap para reset
+  let _lastTap=0;
+  canvas.addEventListener('touchend', e=>{
+    if(e.changedTouches.length===1&&Object.keys(_tc).length===0){
+      const now=Date.now(); if(now-_lastTap<300){resetZoom();} _lastTap=now;
+    }
+  },{passive:false});
 }
 
 // ─── TECLADO ───
