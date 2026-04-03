@@ -371,7 +371,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'f424ca3 · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = '2a0fb0a · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -546,7 +546,7 @@ let masterGain = null;
 let envGain    = null;
 let activeOscs = [];
 let currentWave = _prefs.wave ?? 'sawtooth';
-const currentVol = 0.20; // volumen fijo conservador; el usuario usa el volumen del dispositivo
+const currentVol = 0.14; // volumen fijo conservador; el usuario usa el volumen del dispositivo
 
 function getCtx() {
   if (!audioCtx || audioCtx.state === 'closed') {
@@ -577,7 +577,7 @@ function _makePeriodicWave(ctx, type, freq) {
   const real = new Float32Array(N + 1);
   const imag = new Float32Array(N + 1);
   if (type === 'sawtooth') {
-    for (let n = 1; n <= N; n++) imag[n] = (n % 2 === 0 ? -1 : 1) / Math.pow(n, 1.35);
+    for (let n = 1; n <= N; n++) imag[n] = (n % 2 === 0 ? -1 : 1) / Math.pow(n, 1.6);
   } else if (type === 'square') {
     for (let n = 1; n <= N; n += 2) imag[n] = 1 / n;
   } else if (type === 'triangle') {
@@ -625,7 +625,7 @@ function playFreqs(freqs) {
 
   envGain = ctx.createGain();
   envGain.gain.setValueAtTime(0, now);
-  envGain.gain.linearRampToValueAtTime(1, now + 0.010);
+  envGain.gain.linearRampToValueAtTime(1 / Math.sqrt(freqs.length), now + 0.010);
   envGain.connect(masterGain);
   activeOscs = freqs.map(freq => {
     const osc = ctx.createOscillator();
@@ -1122,7 +1122,7 @@ const KB = {
     const WL = ['C','D','E','F','G','A','B'];
     const BK = [{ni:1,cx:1},{ni:3,cx:2},{ni:6,cx:4},{ni:8,cx:5},{ni:10,cx:6}];
 
-    let html = `<div id="kb" style="position:relative;height:${H+2}px;width:${totalW}px;user-select:none;-webkit-user-select:none;touch-action:pan-x">`;
+    let html = `<div id="kb" style="position:relative;height:${H+2}px;width:${totalW}px;user-select:none;-webkit-user-select:none;touch-action:manipulation">`;
 
     for (let o = 0; o < nO; o++) {
       const oct = this.octave + o;
@@ -1159,7 +1159,12 @@ const KB = {
 
     const getKey = (cx, cy) => document.elementFromPoint(cx, cy)?.closest('[data-ni]');
 
+    // El browser sintetiza mousedown ~300 ms después de un touchend si no hay preventDefault.
+    // Ese mousedown haría toggle de la nota en legato → la apagaría. Ignorarlo.
+    let _lastTouchTs = 0;
+
     kb.addEventListener('mousedown', e => {
+      if (Date.now() - _lastTouchTs < 700) return; // ignorar mousedown sintético post-touch
       this.mouseDown = true;
       const k = getKey(e.clientX, e.clientY);
       if (k) this.press(+k.dataset.ni, +k.dataset.oct);
@@ -1182,9 +1187,10 @@ const KB = {
     window.addEventListener('mousemove', this._moveL);
     window.addEventListener('mouseup',   this._upL);
 
-    // Touch: tap plays note; scroll horizontal (touch-action:pan-x) lo maneja el browser
-    let _tpKey = null; // key que se pulsó en touchstart
+    // Touch: tap plays note; scroll horizontal gestionado por touch-action:manipulation
+    let _tpKey = null;
     kb.addEventListener('touchstart', e => {
+      _lastTouchTs = Date.now();
       this.touchId = e.changedTouches[0].identifier;
       _tpKey = null;
       const t = e.changedTouches[0];
