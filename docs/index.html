@@ -384,7 +384,7 @@
 </div>
 
 <script>
-const APP_VERSION = '1b89aaa · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = 'd52c817 · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1665,15 +1665,10 @@ const dsFifth = (t,i,devs) => ({ label:shortName(t), data:devs, backgroundColor:
 const dsMaj3  = (t,i,devs) => ({ label:shortName(t), data:devs, backgroundColor:devs.map(maj3DevColor),  borderColor:devs.map(maj3DevColor),  borderWidth:1, minBarLength:3 });
 
 function _attachChartResize(id, c) {
-  c._redraw = () => {
-    const panel = c.closest('.panel');
-    if (panel?.style.height) {
-      const availH = _availCanvasH(c);
-      if (availH > 50) c.style.height = Math.max(60, availH) + 'px';
-    }
-    charts[id]?.resize();
-  };
-  attachPanelResize(c);
+  // Chart.js (responsive:true) gestiona su propio ResizeObserver interno.
+  // NO llamar attachPanelResize aquí: eso añadiría un segundo observer que
+  // dispara _redraw → chart.resize → el panel cambia → observer dispara → bucle infinito.
+  // _attachChartResize existe solo para compatibilidad futura (p.ej. drag-resize manual).
 }
 
 const _zoomOpts = {
