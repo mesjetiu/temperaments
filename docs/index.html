@@ -378,7 +378,7 @@
 </div>
 
 <script>
-const APP_VERSION = '89882fb · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = '4106ff9 · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3347,6 +3347,7 @@ const DT = {
       const sp = document.getElementById('dt-save-row');
       if (sp) sp.style.display = this.measuredCount() > 0 ? 'flex' : 'none';
       this._renderKeyboard();
+      this._renderSuggestions();
     }
   },
 
@@ -3370,6 +3371,7 @@ const DT = {
         const sp = document.getElementById('dt-save-row');
         if (sp) sp.style.display = this.measuredCount() > 0 ? 'flex' : 'none';
         this._clearExport();
+        this._renderSuggestions();
       } else {
         this._targetNi = (this._targetNi === ni ? -1 : ni);
         this._stableNi = -1; this._stableCount = 0;
@@ -3387,6 +3389,7 @@ const DT = {
         const sp = document.getElementById('dt-save-row');
         if (sp) sp.style.display = this.measuredCount() > 0 ? 'flex' : 'none';
         this._clearExport();
+        this._renderSuggestions();
       }
     }
   },
@@ -3515,6 +3518,84 @@ const DT = {
   _copyToClipboard(txt) {
     navigator.clipboard?.writeText(txt).then(() => alert('Enlace copiado al portapapeles'))
       .catch(() => prompt('Copia este enlace:', txt));
+  },
+
+  // ── Similitud de temperamentos ────────────────
+  // Métrica: RMSE centrada en la media sobre las notas medidas.
+  // Centrar elimina el nivel absoluto de afinación; lo que cuenta es el
+  // *patrón* de desigualdades — exactamente lo que define un temperamento.
+  getSuggestions(n = 8) {
+    const measured = this.notes;
+    const idxs = measured.map((_,i) => i).filter(i => measured[i] !== null);
+    if (idxs.length < 3) return [];
+    const mMean = idxs.reduce((s,i) => s + measured[i], 0) / idxs.length;
+    return all
+      .map(t => {
+        const rMean = idxs.reduce((s,i) => s + t.offsets[i], 0) / idxs.length;
+        const rms = Math.sqrt(
+          idxs.reduce((s,i) => s + (measured[i] - mMean - (t.offsets[i] - rMean)) ** 2, 0) / idxs.length
+        );
+        return { t, dist: Math.round(rms * 10) / 10 };
+      })
+      .sort((a, b) => a.dist - b.dist)
+      .slice(0, n);
+  },
+
+  _renderSuggestions() {
+    const el = document.getElementById('dt-suggestions');
+    if (!el) return;
+    const n = this.measuredCount();
+    if (n < 3) {
+      el.innerHTML = `<div style="font-size:11px;color:#4b5563;text-align:center;padding:10px 0">
+        Mide al menos 3 notas para ver sugerencias (${n}/3)
+      </div>`;
+      return;
+    }
+    const sugs = this.getSuggestions(8);
+    const maxDist = Math.max(...sugs.map(s => s.dist), 1);
+    const hdr = `<div style="font-size:10px;color:#6b7280;margin-bottom:8px;font-weight:600;letter-spacing:.6px;display:flex;justify-content:space-between">
+      <span>TEMPERAMENTOS MÁS CERCANOS</span>
+      <span style="font-weight:400">${n} nota${n>1?'s':''} medida${n>1?'s':''}</span>
+    </div>`;
+    const rows = sugs.map(({t, dist}) => {
+      const tidx = all.indexOf(t);
+      const isSel = selected.some(s => s && s.name === t.name);
+      const barW  = Math.max(3, Math.round((1 - dist / (maxDist * 1.15)) * 100));
+      const col   = dist < 2 ? '#4ade80' : dist < 5 ? '#60a5fa' : dist < 10 ? '#f59e0b' : '#6b7280';
+      return `<div onclick="DT.selectSuggested(${tidx})"
+        style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;cursor:pointer;
+               border:1px solid ${isSel?'#3b82f6':'transparent'};
+               background:${isSel?'rgba(59,130,246,0.1)':'rgba(255,255,255,0.02)'};
+               margin-bottom:4px;-webkit-tap-highlight-color:transparent">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
+          <div style="height:3px;background:#1e293b;border-radius:2px;margin-top:4px;overflow:hidden">
+            <div style="width:${barW}%;height:100%;background:${col};border-radius:2px;transition:width 0.3s"></div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:${col};flex-shrink:0;min-width:38px;text-align:right;font-variant-numeric:tabular-nums">~${dist.toFixed(1)}¢</div>
+        <div style="font-size:9px;color:#4b5563;flex-shrink:0;max-width:54px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.source}</div>
+      </div>`;
+    }).join('');
+    el.innerHTML = hdr + rows;
+  },
+
+  selectSuggested(idx) {
+    const t = all[idx];
+    if (!t) return;
+    const ei = selected.findIndex(s => s && s.name === t.name);
+    if (ei >= 0) {
+      selected[ei] = null;  // deseleccionar si ya estaba
+    } else {
+      // añadir al primer hueco libre (sin tocar selected[0] si hay mediciones guardadas)
+      const free = selected.findIndex(s => !s);
+      if (free >= 0) selected[free] = t;
+      else selected = [t, null, null];
+      lastSelected = t;
+      savePrefs({ selectedName: t.name });
+    }
+    renderBadges(); refreshList();
+    this._renderSuggestions();  // actualizar resaltado sin re-renderizar el medidor
   }
 };
 
@@ -3564,10 +3645,16 @@ function viewMedidor() {
         <button class="icon-btn" onclick="DT.downloadJson()">⬇ Descargar .json</button>
       </div>
 
+      <!-- Sugerencias de temperamentos cercanos -->
+      <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px">
+        <div id="dt-suggestions"></div>
+      </div>
+
     </div>`;
 
   DT._updateCalibrationUI();
   DT._renderKeyboard();
+  DT._renderSuggestions();
   if (DT.micOn && !DT.rafId) DT._scheduleLoop();
 }
 
