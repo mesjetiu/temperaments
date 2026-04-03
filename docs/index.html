@@ -42,16 +42,23 @@
   #top-collapsible { flex-shrink: 0; }
   #top-toggle { display: none; }
   @media (max-width: 767px) {
-    #top-collapsible { overflow: hidden; max-height: 200px; transition: max-height 0.22s ease; }
+    #top-collapsible { overflow: hidden; max-height: 80px; transition: max-height 0.22s ease; }
     #top-collapsible.top-hidden { max-height: 0; }
     #top-toggle {
       display: flex !important; align-items: center; justify-content: center;
-      height: 16px; background: #161e2e; border-bottom: 1px solid var(--border);
+      height: 22px; background: #161e2e; border-bottom: 1px solid var(--border);
       cursor: pointer; flex-shrink: 0;
       -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
     }
-    #top-toggle-arrow { font-size: 9px; color: #4b5563; line-height: 1; }
+    #top-toggle-arrow { font-size: 13px; color: #6b7280; line-height: 1; }
   }
+
+  /* ═══ CONTEXT MENU TEMPERAMENTO ═══ */
+  .temp-ctx-menu { position: fixed; background: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); z-index: 9000; min-width: 190px; padding: 4px 0; }
+  .temp-ctx-item { padding: 9px 16px; font-size: 13px; color: #e2e8f0; cursor: pointer; white-space: nowrap; }
+  .temp-ctx-item:hover { background: #334155; }
+  .temp-ctx-disabled { color: #4b5563 !important; cursor: default !important; }
+  .temp-ctx-disabled:hover { background: none !important; }
 
   @media (max-width: 767px) {
     #app { flex-direction: column; height: 100dvh; }
@@ -107,7 +114,7 @@
   .temp-item.sel2 { border-left-color: var(--c2); background: #1f3f2a; color: #bbf7d0; }
 
   /* ═══ BADGES ═══ */
-  .badge { padding: 3px 10px; border-radius: 10px; font-size: 11px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; flex-shrink: 0; -webkit-tap-highlight-color: transparent; }
+  .badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default; flex-shrink: 0; -webkit-tap-highlight-color: transparent; display:inline-flex; align-items:center; gap:4px; }
   .badge0 { background: #1d4ed8; } .badge1 { background: #991b1b; } .badge2 { background: #166534; }
 
   /* ═══ TABS ═══ */
@@ -291,7 +298,6 @@
       <button onclick="toggleContentFullscreen()" title="Pantalla completa" style="background:none;border:none;color:#4b5563;cursor:pointer;font-size:17px;padding:2px 4px;flex-shrink:0;line-height:1" id="desk-fullscreen-btn">⤢</button>
     </div>
 
-    <div id="top-collapsible">
     <div id="tabs">
       <div class="tab active" data-tab="overview">Vista general</div>
       <div class="tab" data-tab="fifths">Quintas</div>
@@ -311,6 +317,7 @@
       🎵 Afinar
     </button>
 
+    <div id="top-collapsible">
     <!-- AUDIO BAR -->
     <div id="audio-bar">
       <div id="playing-dot"></div>
@@ -344,7 +351,7 @@
       <span id="audio-hint">mantén pulsado sobre las gráficas para escuchar</span>
     </div>
     </div><!-- /top-collapsible -->
-    <div id="top-toggle" onclick="toggleTopBar()"><span id="top-toggle-arrow">▴</span></div>
+    <div id="top-toggle" onclick="toggleTopBar()"><span id="top-toggle-arrow">∧</span></div>
 
     <div id="content">
       <div class="empty-state">Selecciona un temperamento de la lista para empezar.</div>
@@ -371,7 +378,7 @@
 </div>
 
 <script>
-const APP_VERSION = '2a0fb0a · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = '89882fb · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -501,6 +508,38 @@ function deleteUserTemp(name) {
   selected = selected.map(s => s?.name === name ? null : s);
   if (lastSelected?.name === name) lastSelected = selected.find(Boolean) ?? null;
   injectUserTemps(); renderBadges(); refreshList(); renderContent();
+}
+
+// ── Menú contextual de temperamento ──
+function openTempMenu(idx, event) {
+  event.stopPropagation();
+  document.querySelectorAll('.temp-ctx-menu').forEach(m => m.remove());
+  const t = all[idx];
+  if (!t) return;
+  const menu = document.createElement('div');
+  menu.className = 'temp-ctx-menu';
+  menu.innerHTML = `
+    <div class="temp-ctx-item" onclick="doShareTemp(${idx});document.querySelectorAll('.temp-ctx-menu').forEach(m=>m.remove())">📤 Compartir enlace</div>
+    <div class="temp-ctx-item temp-ctx-disabled" title="Próximamente">⚙ Modificar</div>
+  `;
+  document.body.appendChild(menu);
+  const r = event.target.getBoundingClientRect();
+  menu.style.left = Math.min(r.left, window.innerWidth - 210) + 'px';
+  menu.style.top  = (r.bottom + 4) + 'px';
+  setTimeout(() => document.addEventListener('click', () => document.querySelectorAll('.temp-ctx-menu').forEach(m => m.remove()), { once: true }), 0);
+}
+function doShareTemp(idx) {
+  const t = all[idx];
+  if (!t) return;
+  const offs = t.offsets.map(o => Math.round(o * 100) / 100).join(',');
+  const url = location.origin + location.pathname + '?t=' + encodeURIComponent(t.name) + '&o=' + encodeURIComponent(offs);
+  if (navigator.share) {
+    navigator.share({ title: t.name, text: 'Temperamento: ' + t.name, url }).catch(() => {});
+  } else {
+    navigator.clipboard?.writeText(url)
+      .then(() => alert('Enlace copiado al portapapeles'))
+      .catch(() => { prompt('Copia este enlace:', url); });
+  }
 }
 
 // ── Importación por URL (?t=Nombre&o=0,-3.9,3.9,...) ──
@@ -678,11 +717,9 @@ function toggleTopBar(forceHide) {
   if (!coll) return;
   const hide = forceHide !== undefined ? forceHide : !coll.classList.contains('top-hidden');
   coll.classList.toggle('top-hidden', hide);
-  if (arrow) arrow.textContent = hide ? '▾' : '▴';
+  if (arrow) arrow.textContent = hide ? '∨' : '∧';
+  savePrefs({ audioBarHidden: hide });
 }
-document.getElementById('content').addEventListener('pointerdown', () => {
-  if (isMobile()) toggleTopBar(true);
-}, { passive: true });
 
 // ── Pantalla completa de gráfica ──
 function toggleContentFullscreen() {
@@ -1296,6 +1333,22 @@ function restoreSession() {
   if (p.tunerVizMode) TUNER.vizMode = p.tunerVizMode;
   // Restaurar octava del afinador
   if (p.tunerOct !== undefined) TUNER.tunerOct = p.tunerOct;
+  // Restaurar pestaña activa (no restaurar 'tuner' al inicio)
+  if (p.activeTab && p.activeTab !== 'tuner') {
+    activeTab = p.activeTab;
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    const tabEl = document.querySelector(`.tab[data-tab="${p.activeTab}"]`);
+    if (tabEl) tabEl.classList.add('active');
+    const hint = document.getElementById('desk-header-hint');
+    if (hint) hint.textContent = activeTab === 'compare' ? 'Selecciona 1–3 para comparar:' : 'Selecciona un temperamento:';
+  }
+  // Restaurar estado de la barra de audio
+  if (p.audioBarHidden) {
+    const coll = document.getElementById('top-collapsible');
+    const arrow = document.getElementById('top-toggle-arrow');
+    if (coll) coll.classList.add('top-hidden');
+    if (arrow) arrow.textContent = '∨';
+  }
   // Restaurar temperamento seleccionado; si nunca se eligió, usar Equal temperament de GrandOrgue
   const nameToRestore = p.selectedName || 'Equal temperament';
   const t = all.find(x => x.name === nameToRestore && (!p.selectedName ? x.source === 'GrandOrgue' : true));
@@ -1328,8 +1381,9 @@ function itemHtml(t) {
   const safeName = t.name.replace(/'/g,"\\'");
   return `<div class="temp-item ${selClass(t)}" onclick="toggleSelect(${i})" title="${t.name} [${t.source}]">
     <span class="fav-btn${isFav?' fav-on':''}" onclick="toggleFav('${safeName}',event)" title="${isFav?'Quitar de favoritos':'Añadir a favoritos'}">${isFav?'★':'☆'}</span>
-    ${t.name}
-    ${isUser ? `<span onclick="deleteUserTemp('${safeName}');event.stopPropagation()" style="margin-left:auto;padding:0 4px;color:#6b7280;font-size:11px;cursor:pointer;flex-shrink:0" title="Eliminar">✕</span>` : ''}
+    <span style="flex:1;overflow:hidden;text-overflow:ellipsis">${t.name}</span>
+    ${isUser ? `<span onclick="deleteUserTemp('${safeName}');event.stopPropagation()" style="padding:0 3px;color:#6b7280;font-size:11px;cursor:pointer;flex-shrink:0" title="Eliminar">✕</span>` : ''}
+    <span onclick="openTempMenu(${i},event)" style="padding:0 3px;color:#6b7280;font-size:14px;cursor:pointer;flex-shrink:0;line-height:1" title="Opciones">⋯</span>
   </div>`;
 }
 
@@ -1399,9 +1453,11 @@ function updateTunerTempName() {
   if (el) el.textContent = tunerTempName();
 }
 function renderBadges() {
-  const html = selected.map((t,i) =>
-    t ? `<span class="badge badge${i}" onclick="clearSel(${i})" title="Quitar">${shortName(t,28)} ×</span>` : ''
-  ).join('');
+  const html = selected.map((t,i) => {
+    if (!t) return '';
+    const tidx = all.indexOf(t);
+    return `<span class="badge badge${i}"><span onclick="openTempMenu(${tidx},event)" style="cursor:pointer;opacity:0.75;font-size:12px;line-height:1" title="Opciones">⋯</span>${shortName(t,22)}<span onclick="clearSel(${i})" style="cursor:pointer;opacity:0.85" title="Quitar">×</span></span>`;
+  }).join('');
   document.getElementById('desk-badges').innerHTML = html;
   document.getElementById('mob-badges').innerHTML  = html;
 }
@@ -1421,6 +1477,7 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
   if (activeTab === 'medidor' && this.dataset.tab !== 'medidor') DT.stopMic();
   document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
   this.classList.add('active'); activeTab = this.dataset.tab;
+  savePrefs({ activeTab: this.dataset.tab });
   // Hint de selección según pestaña
   const hint = document.getElementById('desk-header-hint');
   if (hint) hint.textContent = activeTab === 'compare' ? 'Selecciona 1–3 para comparar:' : 'Selecciona un temperamento:';
