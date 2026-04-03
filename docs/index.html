@@ -67,7 +67,6 @@
     #audio-hint { display: none; }
     #audio-bar { gap: 5px; padding: 6px 10px; }
     #audio-bar .ab-sep { display: none; }
-    #vol-sl { width: 70px; }
     #pitch-input { width: 58px; }
   }
 
@@ -135,7 +134,6 @@
   .icon-btn { padding: 3px 10px; }
   #pitch-input { width: 72px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 4px; padding: 3px 5px; font-size: 11px; text-align: center; outline: none; }
   #pitch-input:focus { border-color: var(--accent); }
-  #vol-sl { width: 68px; accent-color: var(--accent); cursor: pointer; }
   #oct-disp { font-size: 11px; color: var(--muted); min-width: 22px; text-align: center; }
   #audio-hint { font-size: 10px; color: #374151; font-style: italic; margin-left: auto; }
   #playing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--c2); display: none; flex-shrink: 0; box-shadow: 0 0 6px var(--c2); animation: pulse 0.8s ease-in-out infinite alternate; }
@@ -307,12 +305,6 @@
         <option value="square">Cuadrada</option>
       </select>
 
-      <!-- Volumen -->
-      <label style="margin-left:4px">🔊</label>
-      <input type="range" id="vol-sl" min="0" max="1" step="0.05" value="0.4">
-
-      <div class="ab-sep"></div>
-
       <!-- La / Pitch A -->
       <label>La =</label>
       <input type="number" id="pitch-input" value="440" min="1" max="9999" step="0.1">
@@ -360,7 +352,7 @@
 </div>
 
 <script>
-const APP_VERSION = '7abcfe1 · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = '4418075 · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -492,7 +484,7 @@ let masterGain = null;
 let envGain    = null;
 let activeOscs = [];
 let currentWave = _prefs.wave ?? 'sawtooth';
-let currentVol  = _prefs.vol  ?? 0.4;
+const currentVol = 0.20; // volumen fijo conservador; el usuario usa el volumen del dispositivo
 
 function getCtx() {
   if (!audioCtx || audioCtx.state === 'closed') {
@@ -573,11 +565,6 @@ document.getElementById('wave-sel').addEventListener('change', function() {
   savePrefs({ wave: currentWave });
 });
 
-document.getElementById('vol-sl').addEventListener('input', function() {
-  currentVol = parseFloat(this.value);
-  if (masterGain) masterGain.gain.value = currentVol;
-  savePrefs({ vol: currentVol });
-});
 
 // ── Pitch A ──
 document.getElementById('pitch-input').addEventListener('input', function() {
@@ -878,7 +865,7 @@ const KB = {
     const now = ctx.currentTime;
     const g = ctx.createGain();
     g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(0.75, now + 0.012);
+    g.gain.linearRampToValueAtTime(0.55, now + 0.012);
     g.connect(masterGain);
     const osc = ctx.createOscillator();
     osc.type = currentWave;
@@ -1037,7 +1024,7 @@ const KB = {
     const WL = ['C','D','E','F','G','A','B'];
     const BK = [{ni:1,cx:.67},{ni:3,cx:1.67},{ni:6,cx:3.67},{ni:8,cx:4.67},{ni:10,cx:5.67}];
 
-    let html = `<div id="kb" style="position:relative;height:${H+2}px;width:${totalW}px;user-select:none;-webkit-user-select:none;touch-action:none">`;
+    let html = `<div id="kb" style="position:relative;height:${H+2}px;width:${totalW}px;user-select:none;-webkit-user-select:none;touch-action:pan-x">`;
 
     for (let o = 0; o < nO; o++) {
       const oct = this.octave + o;
@@ -1097,36 +1084,31 @@ const KB = {
     window.addEventListener('mousemove', this._moveL);
     window.addEventListener('mouseup',   this._upL);
 
+    // Touch: tap plays note; scroll horizontal (touch-action:pan-x) lo maneja el browser
+    let _tpKey = null; // key que se pulsó en touchstart
     kb.addEventListener('touchstart', e => {
-      e.preventDefault();
-      this.mouseDown = true;
-      const t = e.changedTouches[0]; this.touchId = t.identifier;
+      this.touchId = e.changedTouches[0].identifier;
+      _tpKey = null;
+      const t = e.changedTouches[0];
       const k = getKey(t.clientX, t.clientY);
-      if (k) this.press(+k.dataset.ni, +k.dataset.oct);
-    }, { passive: false });
+      if (k) { _tpKey = { ni: +k.dataset.ni, oct: +k.dataset.oct }; this.press(_tpKey.ni, _tpKey.oct); }
+    }, { passive: true });
 
-    kb.addEventListener('touchmove', e => {
-      e.preventDefault();
-      const t = Array.from(e.changedTouches).find(x => x.identifier === this.touchId);
-      if (!t) return;
-      const k = getKey(t.clientX, t.clientY);
-      if (k) this.enter(+k.dataset.ni, +k.dataset.oct);
-    }, { passive: false });
+    // No touchmove — scroll horizontal gestionado por touch-action:pan-x
 
     kb.addEventListener('touchend', e => {
-      e.preventDefault();
-      const t = Array.from(e.changedTouches).find(x => x.identifier === this.touchId);
-      this.mouseDown = false; this.touchId = null;
-      if (t) { const k=getKey(t.clientX,t.clientY); if(k) this.release(+k.dataset.ni,+k.dataset.oct); }
+      const pressed = _tpKey;
+      this.touchId = null; _tpKey = null;
+      if (pressed) this.release(pressed.ni, pressed.oct);
       else if (this.mode === 'normal') {
         this.stopNode(this.singleNode); this.singleNode=null; this.singleKey=null; this.updateKeys();
       }
-    }, { passive: false });
+    }, { passive: true });
 
     kb.addEventListener('touchcancel', () => {
-      this.mouseDown = false; this.touchId = null;
+      this.touchId = null; _tpKey = null;
       if (this.mode === 'normal') { this.stopNode(this.singleNode); this.singleNode=null; this.singleKey=null; this.updateKeys(); }
-    });
+    }, { passive: true });
   }
 };
 
@@ -1191,11 +1173,6 @@ function restoreSession() {
   if (p.pitchA) {
     pitchA = p.pitchA;
     document.getElementById('pitch-input').value = p.pitchA;
-  }
-  // Restaurar volumen
-  if (p.vol !== undefined) {
-    currentVol = p.vol;
-    document.getElementById('vol-sl').value = p.vol;
   }
   // Restaurar onda
   if (p.wave) {
@@ -1356,8 +1333,8 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
     if (!swiping) return; swiping = false;
     const dx = e.changedTouches[0].clientX - sx;
     const dy = e.changedTouches[0].clientY - sy;
-    if (Math.abs(dx) < 90 || Math.abs(dx) < Math.abs(dy) * 2.5) return; // ignorar si es corto o más vertical
-    if (activeTab === 'tuner') return; // el afinador tiene su propia pantalla
+    if (Math.abs(dx) < 160 || Math.abs(dx) < Math.abs(dy) * 4) return; // solo gestos amplios y muy horizontales
+    if (activeTab === 'tuner' || activeTab === 'keyboard') return; // estas pestañas manejan su propio scroll/touch
     const idx = TABS_ORDER.indexOf(activeTab);
     const next = dx < 0 ? TABS_ORDER[idx + 1] : TABS_ORDER[idx - 1];
     if (!next) return;
@@ -2356,7 +2333,7 @@ const TUNER = {
     const ctx = getCtx(), now = ctx.currentTime;
     this.refGain = ctx.createGain();
     this.refGain.gain.setValueAtTime(0, now);
-    this.refGain.gain.linearRampToValueAtTime(0.45, now + 0.025);
+    this.refGain.gain.linearRampToValueAtTime(0.60, now + 0.025);
     this.refGain.connect(masterGain);
     this.refOsc = ctx.createOscillator();
     this.refOsc.type = currentWave;
