@@ -185,24 +185,30 @@
   #kb-wrap::-webkit-scrollbar { height: 4px; }
   #kb-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
   .kw {
-    position: absolute; background: #e8e8e8; border: 1px solid #555;
-    border-radius: 0 0 5px 5px; z-index: 0;
-    display: flex; align-items: flex-end; justify-content: center; padding-bottom: 5px;
+    position: absolute;
+    background: linear-gradient(175deg, #fdfaf4 0%, #ece7db 90%);
+    border: 1px solid #999; border-top: 2px solid #bbb;
+    border-radius: 0 0 6px 6px; z-index: 0;
+    display: flex; align-items: flex-end; justify-content: center; padding-bottom: 4px;
     cursor: pointer; -webkit-tap-highlight-color: transparent;
-    transition: background 0.05s;
+    transition: background 0.06s;
+    box-shadow: inset -1px 0 0 rgba(0,0,0,.08), 0 4px 6px rgba(0,0,0,.25);
   }
-  .kw:hover { background: #d0d8f8; }
-  .kw.ka  { background: var(--c0); }
+  .kw:hover { background: linear-gradient(175deg, #e8f0ff 0%, #d0daff 90%); }
+  .kw.ka  { background: var(--c0); box-shadow: inset 0 2px 5px rgba(0,0,0,.3); }
   .kw.ka .klbl { color: #fff; }
   .kb2 {
-    position: absolute; background: #1a1a1a; border: 1px solid #000;
+    position: absolute;
+    background: linear-gradient(180deg, #333 0%, #111 70%);
+    border: 1px solid #000; border-top: none;
     border-radius: 0 0 4px 4px; z-index: 1;
     cursor: pointer; -webkit-tap-highlight-color: transparent;
-    transition: background 0.05s;
+    transition: background 0.06s;
+    box-shadow: 0 5px 8px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.12);
   }
-  .kb2:hover { background: #2a3050; }
-  .kb2.ka  { background: #1d4ed8; }
-  .klbl { font-size: 9px; color: #666; pointer-events: none; user-select: none; }
+  .kb2:hover { background: linear-gradient(180deg, #445 0%, #223 70%); }
+  .kb2.ka  { background: #1d4ed8; box-shadow: 0 2px 4px rgba(0,0,0,.4); }
+  .klbl { font-size: 9px; color: #888; pointer-events: none; user-select: none; }
   #kb-lbl { margin-top: 14px; font-size: 13px; color: var(--muted); text-align: center; letter-spacing: 0.3px; min-height: 1.4em; }
   #kb-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 
@@ -354,7 +360,7 @@
 </div>
 
 <script>
-const APP_VERSION = '4aaa642 · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = '7abcfe1 · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -934,7 +940,7 @@ const KB = {
     }
 
     const lbl = document.getElementById('kb-oct-lbl');
-    if (lbl) lbl.textContent = `Oct. ${this.octave}–${this.octave+1}`;
+    if (lbl) lbl.textContent = `Oct. ${this.octave}–${this.octave+2}`;
     this.render();
     this.updateKeys();
   },
@@ -1017,11 +1023,14 @@ const KB = {
     const wrap = document.getElementById('kb-wrap');
     if (!wrap) return;
     const mob = isMobile();
-    const W  = mob ? 26 : 34;
-    const H  = mob ? 86 : 116;
-    const BW = Math.round(W * 0.62);
+    // 3 octavas siempre; en móvil se ajusta para que 2 octavas sean cómodas (3ª scrollable)
+    const nO = 3;
+    const availW = mob ? (window.innerWidth - 16) : Math.max(480, (document.getElementById('kb-wrap')?.clientWidth || 700) - 8);
+    const visOct = mob ? 2 : 3;
+    const W  = Math.max(mob ? 22 : 28, Math.floor(availW / (visOct * 7)));
+    const H  = Math.round(W * 3.6);
+    const BW = Math.round(W * 0.58);
     const BH = Math.round(H * 0.62);
-    const nO = 2;
     const totalW = W * 7 * nO + 1;
 
     const WN = [0,2,4,5,7,9,11];   // note idx for white keys
@@ -2112,7 +2121,7 @@ function viewKeyboard() {
         <!-- Octava teclado -->
         <div style="display:flex;align-items:center;gap:5px">
           <button class="icon-btn" onclick="KB.shiftOct(-1)">◀</button>
-          <span id="kb-oct-lbl" style="font-size:11px;color:var(--muted);white-space:nowrap">Oct. ${KB.octave}–${KB.octave+1}</span>
+          <span id="kb-oct-lbl" style="font-size:11px;color:var(--muted);white-space:nowrap">Oct. ${KB.octave}–${KB.octave+2}</span>
           <button class="icon-btn" onclick="KB.shiftOct(+1)">▶</button>
         </div>
         <!-- Limpiar acorde -->
@@ -2303,6 +2312,10 @@ const TUNER = {
   },
 
   setTarget(ni, oct) {
+    // Toggle: volver a pulsar la nota que suena la apaga
+    if (ni === this.targetNi && oct === this.targetOct && this.refOn) {
+      this.stopRef(); return;
+    }
     this.targetNi = ni; this.targetOct = oct;
     this.strobePhase = 0; this.prevStrobePhase = 0; this._octCandidate = null; this._octCandidateMs = 0; this._freqHistory.length = 0;
     this.updateTargetDisplay();
@@ -2822,19 +2835,26 @@ const TUNER = {
     const wrap = document.getElementById('tuner-mini-kb');
     if (!wrap) return;
     const mob = isMobile();
-    const W = mob ? 24 : 32, H = mob ? 64 : 88, BW = Math.round(W * 0.62), BH = Math.round(H * 0.62);
-    const oct = this.tunerOct;
+    const nO = 2;
+    const availW = mob ? (window.innerWidth - 16) : Math.max(320, (document.getElementById('tuner-kb-wrap')?.clientWidth || 400) - 16);
+    const W = Math.max(mob ? 20 : 26, Math.floor(availW / (nO * 7)));
+    const H = Math.min(mob ? 72 : 96, Math.round(W * 2.8));
+    const BW = Math.round(W * 0.58), BH = Math.round(H * 0.62);
     const WN  = [0,2,4,5,7,9,11], BK = [{ni:1,cx:.67},{ni:3,cx:1.67},{ni:6,cx:3.67},{ni:8,cx:4.67},{ni:10,cx:5.67}];
     const WL  = ['C','D','E','F','G','A','B'];
-    let html = `<div style="position:relative;height:${H+2}px;width:${W*7+1}px;user-select:none">`;
-    WN.forEach((ni, wi) => {
-      const act = ni === this.targetNi && oct === this.targetOct;
-      html += `<div class="kw${act?' ka':''}" style="left:${wi*W}px;width:${W-1}px;height:${H}px" data-tni="${ni}" data-toct="${oct}" onclick="TUNER.setTarget(${ni},${oct})"><span class="klbl" style="font-size:8px">${ni===0?'C'+oct:WL[wi]}</span></div>`;
-    });
-    BK.forEach(({ni, cx}) => {
-      const act = ni === this.targetNi && oct === this.targetOct;
-      html += `<div class="kb2${act?' ka':''}" style="left:${cx*W-BW/2}px;width:${BW}px;height:${BH}px" data-tni="${ni}" data-toct="${oct}" onclick="TUNER.setTarget(${ni},${oct})"></div>`;
-    });
+    let html = `<div style="position:relative;height:${H+2}px;width:${W*7*nO+1}px;user-select:none">`;
+    for (let o = 0; o < nO; o++) {
+      const oct = this.tunerOct + o;
+      const ox  = o * W * 7;
+      WN.forEach((ni, wi) => {
+        const act = ni === this.targetNi && oct === this.targetOct;
+        html += `<div class="kw${act?' ka':''}" style="left:${ox+wi*W}px;width:${W-1}px;height:${H}px" data-tni="${ni}" data-toct="${oct}" onclick="TUNER.setTarget(${ni},${oct})"><span class="klbl" style="font-size:8px">${ni===0?'C'+oct:WL[wi]}</span></div>`;
+      });
+      BK.forEach(({ni, cx}) => {
+        const act = ni === this.targetNi && oct === this.targetOct;
+        html += `<div class="kb2${act?' ka':''}" style="left:${ox+cx*W-BW/2}px;width:${BW}px;height:${BH}px" data-tni="${ni}" data-toct="${oct}" onclick="TUNER.setTarget(${ni},${oct})"></div>`;
+      });
+    }
     html += '</div>';
     wrap.innerHTML = html;
   }
@@ -2980,7 +3000,7 @@ function buildTunerScreen() {
         <span id="tuner-oct-lbl2" style="font-size:12px;color:#cbd5e1;min-width:44px;text-align:center">Oct ${TUNER.tunerOct}</span>
         <button class="icon-btn" onclick="TUNER.shiftOct(+1)" style="padding:2px 14px;font-size:14px">▶</button>
       </div>
-      <div id="tuner-mini-kb"></div>
+      <div id="tuner-mini-kb" style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px"></div>
     </div>`;
   document.body.appendChild(sc);
   if (isManual) TUNER.renderMiniKb();
