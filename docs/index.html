@@ -352,7 +352,7 @@
 </div>
 
 <script>
-const APP_VERSION = '1844773 · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = 'fb86de0 · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -497,13 +497,48 @@ function getCtx() {
   return audioCtx;
 }
 
+// ── Síntesis band-limited (anti-aliasing) ──
+// Genera PeriodicWave con exactamente los armónicos que caben antes de Nyquist.
+// Sawtooth usa roll-off 1/n^1.35 para un timbre más suavizado.
+const _waveCache = new WeakMap(); // ctx → Map<key, PeriodicWave>
+
+function _makePeriodicWave(ctx, type, freq) {
+  if (type === 'sine') return null;
+  const sr = ctx.sampleRate;
+  const maxH = Math.min(256, Math.floor(sr / (2.2 * Math.max(freq, 20))));
+  if (maxH < 2) return null;
+  const N = Math.pow(2, Math.ceil(Math.log2(maxH))); // potencia de 2 para cachear
+  const key = `${type}_${N}`;
+  let cm = _waveCache.get(ctx);
+  if (!cm) { cm = new Map(); _waveCache.set(ctx, cm); }
+  if (cm.has(key)) return cm.get(key);
+  const real = new Float32Array(N + 1);
+  const imag = new Float32Array(N + 1);
+  if (type === 'sawtooth') {
+    for (let n = 1; n <= N; n++) imag[n] = (n % 2 === 0 ? -1 : 1) / Math.pow(n, 1.35);
+  } else if (type === 'square') {
+    for (let n = 1; n <= N; n += 2) imag[n] = 1 / n;
+  } else if (type === 'triangle') {
+    for (let n = 1; n <= N; n += 2) imag[n] = (((n-1)/2) % 2 === 0 ? 1 : -1) / (n * n);
+  }
+  const wave = ctx.createPeriodicWave(real, imag, { disableNormalization: false });
+  cm.set(key, wave);
+  return wave;
+}
+
+function _applyWave(osc, ctx, type, freq) {
+  const w = _makePeriodicWave(ctx, type, freq);
+  if (w) { osc.setPeriodicWave(w); } else { osc.type = type; }
+  osc._wt = type; // guardar tipo para comparaciones posteriores
+}
+
 function playFreqs(freqs) {
   const ctx = getCtx();
   const now = ctx.currentTime;
 
   // Si ya hay osciladores del mismo tipo y cantidad: rampar frecuencia sin corte
   if (activeOscs.length === freqs.length && envGain &&
-      activeOscs.every(o => o.type === currentWave)) {
+      activeOscs.every(o => o._wt === currentWave)) {
     freqs.forEach((freq, i) => {
       activeOscs[i].frequency.cancelScheduledValues(now);
       activeOscs[i].frequency.setTargetAtTime(freq, now, 0.006);
@@ -532,7 +567,7 @@ function playFreqs(freqs) {
   envGain.connect(masterGain);
   activeOscs = freqs.map(freq => {
     const osc = ctx.createOscillator();
-    osc.type = currentWave;
+    _applyWave(osc, ctx, currentWave, freq);
     osc.frequency.value = freq;
     osc.connect(envGain);
     osc.start(now);
@@ -868,8 +903,9 @@ const KB = {
     g.gain.linearRampToValueAtTime(0.55, now + 0.012);
     g.connect(masterGain);
     const osc = ctx.createOscillator();
-    osc.type = currentWave;
-    osc.frequency.value = this.freq(ni, oct);
+    const f = this.freq(ni, oct);
+    _applyWave(osc, ctx, currentWave, f);
+    osc.frequency.value = f;
     osc.connect(g);
     osc.start(now);
     return { osc, g, ni, oct };
@@ -2336,8 +2372,9 @@ const TUNER = {
     this.refGain.gain.linearRampToValueAtTime(0.60, now + 0.025);
     this.refGain.connect(masterGain);
     this.refOsc = ctx.createOscillator();
-    this.refOsc.type = currentWave;
-    this.refOsc.frequency.value = this.getTargetFreq();
+    const rf = this.getTargetFreq();
+    _applyWave(this.refOsc, ctx, currentWave, rf);
+    this.refOsc.frequency.value = rf;
     this.refOsc.connect(this.refGain);
     this.refOsc.start(now);
   },
