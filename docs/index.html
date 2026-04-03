@@ -390,7 +390,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'b1acf7c · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = 'e103efb · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -540,17 +540,28 @@ function openTempMenu(idx, event) {
   menu.style.top  = (r.bottom + 4) + 'px';
   setTimeout(() => document.addEventListener('click', () => document.querySelectorAll('.temp-ctx-menu').forEach(m => m.remove()), { once: true }), 0);
 }
+function _tempShareText(name, offsets) {
+  const lines = offsets.map((o, i) => {
+    const sign = o >= 0 ? '+' : '';
+    return `  ${NOTES[i].padEnd(3)} ${sign}${o.toFixed(2)}¢`;
+  });
+  return `🎹 ${name}\n\nDesviaciones vs ET (cents):\n${lines.join('\n')}`;
+}
+function _tempShareUrl(name, offsets) {
+  const offs = offsets.map(o => Math.round(o * 100) / 100).join(',');
+  return location.origin + location.pathname + '?t=' + encodeURIComponent(name) + '&o=' + encodeURIComponent(offs);
+}
 function doShareTemp(idx) {
   const t = all[idx];
   if (!t) return;
-  const offs = t.offsets.map(o => Math.round(o * 100) / 100).join(',');
-  const url = location.origin + location.pathname + '?t=' + encodeURIComponent(t.name) + '&o=' + encodeURIComponent(offs);
+  const url = _tempShareUrl(t.name, t.offsets);
+  const text = _tempShareText(t.name, t.offsets);
   if (navigator.share) {
-    navigator.share({ title: t.name, text: 'Temperamento: ' + t.name, url }).catch(() => {});
+    navigator.share({ title: t.name, text: text + '\n\n' + url }).catch(() => {});
   } else {
-    navigator.clipboard?.writeText(url)
-      .then(() => alert('Enlace copiado al portapapeles'))
-      .catch(() => { prompt('Copia este enlace:', url); });
+    navigator.clipboard?.writeText(text + '\n\n' + url)
+      .then(() => alert('Copiado al portapapeles'))
+      .catch(() => { prompt('Copia este texto:', text + '\n\n' + url); });
   }
 }
 
@@ -3775,9 +3786,11 @@ const DT = {
   _clearExport() { const ep = document.getElementById('dt-export-panel'); if (ep) ep.style.display='none'; },
   shareUrl() {
     const ep = document.getElementById('dt-export-panel'); if (!ep) return;
-    const url = location.origin + location.pathname + '?t=' + encodeURIComponent(ep.dataset.name) + '&o=' + ep.dataset.offsets;
-    if (navigator.share) navigator.share({ title: ep.dataset.name, url }).catch(() => this._copyToClipboard(url));
-    else this._copyToClipboard(url);
+    const offsets = ep.dataset.offsets.split(',').map(Number);
+    const url = _tempShareUrl(ep.dataset.name, offsets);
+    const text = _tempShareText(ep.dataset.name, offsets);
+    if (navigator.share) navigator.share({ title: ep.dataset.name, text: text + '\n\n' + url }).catch(() => this._copyToClipboard(text + '\n\n' + url));
+    else this._copyToClipboard(text + '\n\n' + url);
   },
   downloadJson() {
     const ep = document.getElementById('dt-export-panel'); if (!ep) return;
