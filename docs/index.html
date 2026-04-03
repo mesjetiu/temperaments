@@ -352,7 +352,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'fb86de0 · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = '326133b · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1058,7 +1058,7 @@ const KB = {
 
     const WN = [0,2,4,5,7,9,11];   // note idx for white keys
     const WL = ['C','D','E','F','G','A','B'];
-    const BK = [{ni:1,cx:.67},{ni:3,cx:1.67},{ni:6,cx:3.67},{ni:8,cx:4.67},{ni:10,cx:5.67}];
+    const BK = [{ni:1,cx:1},{ni:3,cx:2},{ni:6,cx:4},{ni:8,cx:5},{ni:10,cx:6}];
 
     let html = `<div id="kb" style="position:relative;height:${H+2}px;width:${totalW}px;user-select:none;-webkit-user-select:none;touch-action:pan-x">`;
 
@@ -2854,7 +2854,7 @@ const TUNER = {
     const W = Math.max(mob ? 20 : 26, Math.floor(availW / (nO * 7)));
     const H = Math.min(mob ? 72 : 96, Math.round(W * 2.8));
     const BW = Math.round(W * 0.58), BH = Math.round(H * 0.62);
-    const WN  = [0,2,4,5,7,9,11], BK = [{ni:1,cx:.67},{ni:3,cx:1.67},{ni:6,cx:3.67},{ni:8,cx:4.67},{ni:10,cx:5.67}];
+    const WN  = [0,2,4,5,7,9,11], BK = [{ni:1,cx:1},{ni:3,cx:2},{ni:6,cx:4},{ni:8,cx:5},{ni:10,cx:6}];
     const WL  = ['C','D','E','F','G','A','B'];
     let html = `<div style="position:relative;height:${H+2}px;width:${W*7*nO+1}px;user-select:none">`;
     for (let o = 0; o < nO; o++) {
