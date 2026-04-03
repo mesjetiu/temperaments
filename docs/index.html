@@ -210,6 +210,23 @@
   #kb-lbl { margin-top: 14px; font-size: 13px; color: var(--muted); text-align: center; letter-spacing: 0.3px; min-height: 1.4em; }
   #kb-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 
+  /* ═══ MEDIDOR ═══ */
+  #dt-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:14px; }
+  .dt-cell {
+    border:1px solid var(--border); border-radius:8px; padding:8px 6px; text-align:center;
+    cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background 0.15s, border-color 0.15s;
+    min-height:52px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+  }
+  .dt-cell .dt-note  { font-size:14px; font-weight:600; color:var(--text); }
+  .dt-cell .dt-val   { font-size:11px; color:var(--muted); }
+  .dt-cell.dt-done   { border-color:#4ade80; background:rgba(74,222,128,0.1); }
+  .dt-cell.dt-done .dt-val { color:#4ade80; }
+  .dt-cell.dt-active { border-color:var(--accent); background:var(--c0a); animation:dtpulse 0.7s ease-in-out infinite alternate; }
+  .dt-cell.dt-active .dt-val { color:var(--accent); }
+  @keyframes dtpulse { from { box-shadow:0 0 0 rgba(96,165,250,0); } to { box-shadow:0 0 8px rgba(96,165,250,0.5); } }
+  #dt-bar-wrap { background:#0f172a; border-radius:4px; height:6px; overflow:hidden; margin-bottom:14px; }
+  #dt-bar-fill { height:100%; width:0%; background:var(--accent); transition:width 0.1s; border-radius:4px; }
+
   /* ═══ AFINADOR ═══ */
   #strobe-canvas { display: block; width: 100%; border-radius: 6px; background: #000; image-rendering: pixelated; }
   #cents-track { position: relative; background: #0d1117; height: 28px; border-radius: 5px; border: 1px solid var(--border); overflow: visible; margin: 4px 0; }
@@ -243,6 +260,7 @@
       <button class="src-tab"     data-src="Scala"      onclick="setSrcFilter('Scala')">Scala</button>
       <button class="src-tab"     data-src="GrandOrgue" onclick="setSrcFilter('GrandOrgue')">GrandOrgue</button>
       <button class="src-tab"     data-src="Otros"      onclick="setSrcFilter('Otros')">Otros</button>
+      <button class="src-tab"     data-src="Usuario"    onclick="setSrcFilter('Usuario')">Mis</button>
     </div>
     <div id="count">Cargando...</div>
     <div id="list"><div style="padding:14px;font-size:11px;color:#6b7280">Cargando datos...</div></div>
@@ -284,6 +302,7 @@
       <div class="tab" data-tab="tonnetz">Tonnetz</div>
       <div class="tab" data-tab="scatter">Mapa</div>
       <div class="tab" data-tab="keyboard">Teclado</div>
+      <div class="tab" data-tab="medidor">Medidor</div>
       <div class="tab" data-tab="tuner" style="display:none">Afinador</div>
     </div>
     <!-- FAB flotante del afinador -->
@@ -352,7 +371,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'df4863c · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = 'e1899b9 · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -457,6 +476,49 @@ function setSrcFilter(src) {
   document.querySelectorAll('.src-tab').forEach(b => b.classList.toggle('sel', b.dataset.src === src));
   refreshList();
 }
+
+// ══════════════════════════════════════════════
+// TEMPERAMENTOS DE USUARIO (localStorage)
+// ══════════════════════════════════════════════
+const USER_KEY = 'userTemps';
+function loadUserTemps() { try { return JSON.parse(localStorage.getItem(USER_KEY) || '[]'); } catch(e) { return []; } }
+function saveUserTemps(arr) { localStorage.setItem(USER_KEY, JSON.stringify(arr)); }
+
+function injectUserTemps() {
+  all = all.filter(t => t.source !== 'Usuario');
+  loadUserTemps().forEach(t => all.push({ name: t.name, offsets: t.offsets, source: 'Usuario' }));
+}
+function addUserTemp(name, offsets) {
+  const arr = loadUserTemps();
+  const idx = arr.findIndex(t => t.name === name);
+  const entry = { name, offsets, source: 'Usuario' };
+  if (idx >= 0) arr[idx] = entry; else arr.push(entry);
+  saveUserTemps(arr);
+  injectUserTemps(); refreshList();
+}
+function deleteUserTemp(name) {
+  saveUserTemps(loadUserTemps().filter(t => t.name !== name));
+  selected = selected.map(s => s?.name === name ? null : s);
+  if (lastSelected?.name === name) lastSelected = selected.find(Boolean) ?? null;
+  injectUserTemps(); renderBadges(); refreshList(); renderContent();
+}
+
+// ── Importación por URL (?t=Nombre&o=0,-3.9,3.9,...) ──
+(function() {
+  const p = new URLSearchParams(location.search);
+  const tn = p.get('t'), os = p.get('o');
+  if (!tn || !os) return;
+  const offsets = os.split(',').map(Number);
+  if (offsets.length !== 12 || offsets.some(isNaN)) return;
+  addUserTemp(tn.trim(), offsets);
+  // Limpiar URL sin recargar
+  history.replaceState(null, '', location.pathname);
+  // Seleccionarlo tras la carga completa
+  window.addEventListener('_dataReady', () => {
+    const t = all.find(x => x.name === tn.trim() && x.source === 'Usuario');
+    if (t) { selected[0] = t; lastSelected = t; renderBadges(); refreshList(); renderContent(); }
+  }, { once: true });
+})();
 
 // ══════════════════════════════════════════════
 // PERSISTENCIA
@@ -1199,8 +1261,10 @@ function parseMarkdown(text) {
     temps.push({ source: (m ? m[1] : cells[1]).trim(), name: cells[2], offsets });
   }
   all = temps;
+  injectUserTemps();
   restoreSession();
   refreshList();
+  window.dispatchEvent(new Event('_dataReady'));
 }
 
 function restoreSession() {
@@ -1254,9 +1318,12 @@ function renderList(temps) {
 function itemHtml(t) {
   const i = all.indexOf(t);
   const isFav = favs.has(t.name);
+  const isUser = t.source === 'Usuario';
+  const safeName = t.name.replace(/'/g,"\\'");
   return `<div class="temp-item ${selClass(t)}" onclick="toggleSelect(${i})" title="${t.name} [${t.source}]">
-    <span class="fav-btn${isFav?' fav-on':''}" onclick="toggleFav('${t.name.replace(/'/g,"\\'")}',event)" title="${isFav?'Quitar de favoritos':'Añadir a favoritos'}">${isFav?'★':'☆'}</span>
+    <span class="fav-btn${isFav?' fav-on':''}" onclick="toggleFav('${safeName}',event)" title="${isFav?'Quitar de favoritos':'Añadir a favoritos'}">${isFav?'★':'☆'}</span>
     ${t.name}
+    ${isUser ? `<span onclick="deleteUserTemp('${safeName}');event.stopPropagation()" style="margin-left:auto;padding:0 4px;color:#6b7280;font-size:11px;cursor:pointer;flex-shrink:0" title="Eliminar">✕</span>` : ''}
   </div>`;
 }
 
@@ -1265,7 +1332,8 @@ function getFilteredList() {
   let f = all.filter(t => !q || t.name.toLowerCase().includes(q) || t.source.toLowerCase().includes(q));
   if (srcFilter === 'Scala')      f = f.filter(t => t.source === 'Scala');
   else if (srcFilter === 'GrandOrgue') f = f.filter(t => t.source === 'GrandOrgue');
-  else if (srcFilter === 'Otros') f = f.filter(t => t.source !== 'Scala' && t.source !== 'GrandOrgue');
+  else if (srcFilter === 'Otros')   f = f.filter(t => t.source !== 'Scala' && t.source !== 'GrandOrgue' && t.source !== 'Usuario');
+  else if (srcFilter === 'Usuario') f = f.filter(t => t.source === 'Usuario');
   if (showFavsOnly) f = f.filter(t => favs.has(t.name));
   return f;
 }
@@ -1344,6 +1412,7 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
     TUNER.stop();
     document.getElementById('tuner-screen')?.remove();
   }
+  if (activeTab === 'medidor' && this.dataset.tab !== 'medidor') DT.stopMic();
   document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
   this.classList.add('active'); activeTab = this.dataset.tab;
   // Hint de selección según pestaña
@@ -1359,7 +1428,7 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
 // SWIPE HORIZONTAL EN CONTENT PARA CAMBIAR PESTAÑA (móvil)
 // ══════════════════════════════════════════════
 (function() {
-  const TABS_ORDER = ['overview','fifths','thirds','compare','intervals','beats','tonnetz','scatter','keyboard'];
+  const TABS_ORDER = ['overview','fifths','thirds','compare','intervals','beats','tonnetz','scatter','keyboard','medidor'];
   let sx = 0, sy = 0, swiping = false;
   document.getElementById('content').addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
@@ -1598,10 +1667,10 @@ function renderContent() {
   if (activeTab !== 'keyboard') { /* KB keeps its chord */ }
   const act=selected.filter(Boolean);
   const el=document.getElementById('content');
-  if (activeTab !== 'keyboard' && activeTab !== 'tuner' && activeTab !== 'scatter' && !act.length) {
+  if (activeTab !== 'keyboard' && activeTab !== 'tuner' && activeTab !== 'scatter' && activeTab !== 'medidor' && !act.length) {
     el.innerHTML='<div class="empty-state">Selecciona un temperamento de la lista para empezar.</div>'; return;
   }
-  ({overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,intervals:viewIntervals,beats:viewBeats,tonnetz:viewTonnetz,scatter:viewScatter,keyboard:viewKeyboard,tuner:viewTuner}[activeTab])?.(act);
+  ({overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,intervals:viewIntervals,beats:viewBeats,tonnetz:viewTonnetz,scatter:viewScatter,keyboard:viewKeyboard,medidor:viewMedidor,tuner:viewTuner}[activeTab])?.(act);
 }
 
 // ─── VISTA GENERAL ───
@@ -3048,6 +3117,246 @@ function buildTunerScreen() {
     cv.getContext('2d').fillRect(0, 0, cv.width, cv.height);
     if (!TUNER.rafId) { TUNER.lastTs = performance.now(); TUNER.loop(TUNER.lastTs); }
   });
+}
+
+// ══════════════════════════════════════════════
+// MEDIDOR DE TEMPERAMENTO
+// ══════════════════════════════════════════════
+const NOTES_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+const DT = {
+  notes: new Array(12).fill(null),   // cents offset vs ET, null = sin medir
+  micOn: false, micStream: null, analyser: null,
+  rafId: null, lastAnalysis: 0,
+  _stableNi: -1, _stableCount: 0, _stableCents: 0, _buf: null,
+  STABLE_FRAMES: 18,   // ~1.8 s a 100 ms/análisis
+
+  getOffsets() { return this.notes.map(v => v === null ? 0 : v); },
+  measuredCount() { return this.notes.filter(v => v !== null).length; },
+
+  async toggleMic() { this.micOn ? this.stopMic() : await this.startMic(); },
+  async startMic() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(
+        { audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false } });
+      this.micStream = stream;
+      const ctx = getCtx();
+      this.analyser = ctx.createAnalyser();
+      this.analyser.fftSize = 4096;
+      this.analyser.smoothingTimeConstant = 0;
+      ctx.createMediaStreamSource(stream).connect(this.analyser);
+      this.micOn = true;
+      document.querySelectorAll('.dt-mic-track').forEach(el => el.style.background='#3b82f6');
+      document.querySelectorAll('.dt-mic-thumb').forEach(el => el.style.left='16px');
+      if (!this.rafId) this._scheduleLoop();
+    } catch(e) { alert('Sin acceso al micrófono:\n' + e.message); }
+  },
+  stopMic() {
+    if (this.micStream) { this.micStream.getTracks().forEach(t => t.stop()); this.micStream = null; }
+    if (this.analyser) { try { this.analyser.disconnect(); } catch(_){} this.analyser = null; }
+    this.micOn = false;
+    if (this.rafId) { cancelAnimationFrame(this.rafId); this.rafId = null; }
+    document.querySelectorAll('.dt-mic-track').forEach(el => el.style.background='#334155');
+    document.querySelectorAll('.dt-mic-thumb').forEach(el => el.style.left='2px');
+    this._setStatus('—', -1, 0);
+  },
+  _scheduleLoop() {
+    this.rafId = requestAnimationFrame(ts => {
+      if (!document.getElementById('dt-grid')) { this.stopMic(); return; }
+      this._scheduleLoop();
+      if (ts - this.lastAnalysis < 100) return;
+      this.lastAnalysis = ts;
+      this._analyze();
+    });
+  },
+  _analyze() {
+    if (!this.analyser) return;
+    const bufLen = this.analyser.fftSize;
+    if (!this._buf || this._buf.length !== bufLen) this._buf = new Float32Array(bufLen);
+    this.analyser.getFloatTimeDomainData(this._buf);
+    const res = detectPitch(this._buf, this.analyser.context.sampleRate);
+    if (!res || res.clarity < 0.55) {
+      this._stableNi = -1; this._stableCount = 0;
+      this._setStatus('—', -1, 0); return;
+    }
+    const { freq } = res;
+    const { ni, oct } = findClosestNote(freq);
+    // offset en cents respecto a ET puro (sin temperamento aplicado)
+    const etFreq = pitchA * Math.pow(2, (ET_FROM_A[ni] + (oct - 4) * 1200) / 1200);
+    const cents  = 1200 * Math.log2(freq / etFreq);
+
+    if (ni === this._stableNi) {
+      this._stableCount++;
+      this._stableCents = this._stableCents * 0.75 + cents * 0.25;
+    } else {
+      this._stableNi = ni; this._stableCount = 1; this._stableCents = cents;
+    }
+
+    const prog = Math.min(1, this._stableCount / this.STABLE_FRAMES);
+    this._setStatus(NOTES_NAMES[ni] + oct + '  ' + (cents >= 0 ? '+' : '') + cents.toFixed(1) + '¢', ni, prog);
+
+    if (this._stableCount >= this.STABLE_FRAMES) {
+      this.notes[ni] = Math.round(this._stableCents * 10) / 10;
+      this._stableNi = -1; this._stableCount = 0;
+      this._renderGrid();
+    }
+  },
+  _setStatus(txt, activeNi, prog) {
+    const el = document.getElementById('dt-status');
+    if (el) el.textContent = txt;
+    const bar = document.getElementById('dt-bar-fill');
+    if (bar) bar.style.width = (prog * 100) + '%';
+    document.querySelectorAll('.dt-cell').forEach(c => {
+      const ni = +c.dataset.ni;
+      c.classList.toggle('dt-active', ni === activeNi && prog > 0 && this.notes[ni] === null);
+    });
+  },
+  _renderGrid() {
+    const grid = document.getElementById('dt-grid');
+    if (!grid) return;
+    const n = this.measuredCount();
+    grid.innerHTML = this.notes.map((v, ni) => {
+      const done = v !== null;
+      return `<div class="dt-cell${done?' dt-done':''}" data-ni="${ni}" onclick="DT.clearNote(${ni})" title="${done?'Pulsa para borrar esta nota':''}">
+        <span class="dt-note">${NOTES_NAMES[ni]}</span>
+        <span class="dt-val">${done ? (v>=0?'+':'')+v+'¢' : '—'}</span>
+      </div>`;
+    }).join('');
+    const cnt = document.getElementById('dt-count');
+    if (cnt) cnt.textContent = n + '/12';
+    // Mostrar panel de guardado cuando hay al menos 1 nota
+    const sp = document.getElementById('dt-save-row');
+    if (sp) sp.style.display = n > 0 ? 'flex' : 'none';
+  },
+  clearNote(ni) {
+    if (this.notes[ni] === null) return;
+    this.notes[ni] = null;
+    this._renderGrid();
+    this._clearExport();
+  },
+  reset() {
+    this.notes = new Array(12).fill(null);
+    this._stableNi = -1; this._stableCount = 0;
+    this._renderGrid();
+    this._clearExport();
+    document.getElementById('dt-name-input').value = '';
+  },
+  save() {
+    const nameEl = document.getElementById('dt-name-input');
+    const name = nameEl.value.trim();
+    if (!name) { nameEl.focus(); return; }
+    if (this.measuredCount() === 0) return;
+    const offsets = this.getOffsets();
+    addUserTemp(name, offsets);
+    // Seleccionar automáticamente
+    const t = all.find(x => x.name === name && x.source === 'Usuario');
+    if (t) { selected[0] = t; lastSelected = t; renderBadges(); }
+    // Mostrar panel de exportar
+    this._showExport(name, offsets);
+  },
+  _showExport(name, offsets) {
+    const ep = document.getElementById('dt-export-panel');
+    if (!ep) return;
+    ep.style.display = 'flex';
+    ep.dataset.name = name;
+    ep.dataset.offsets = offsets.join(',');
+  },
+  _clearExport() {
+    const ep = document.getElementById('dt-export-panel');
+    if (ep) ep.style.display = 'none';
+  },
+  shareUrl() {
+    const ep = document.getElementById('dt-export-panel');
+    if (!ep) return;
+    const name = ep.dataset.name, ofs = ep.dataset.offsets;
+    const url = location.origin + location.pathname + '?t=' + encodeURIComponent(name) + '&o=' + ofs;
+    if (navigator.share) {
+      navigator.share({ title: name, text: 'Temperamento: ' + name, url })
+        .catch(() => this._copyToClipboard(url));
+    } else {
+      this._copyToClipboard(url);
+    }
+  },
+  downloadJson() {
+    const ep = document.getElementById('dt-export-panel');
+    if (!ep) return;
+    const name = ep.dataset.name;
+    const offsets = ep.dataset.offsets.split(',').map(Number);
+    const blob = new Blob([JSON.stringify({ name, offsets, source:'Usuario' }, null, 2)], { type:'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name.replace(/[^a-z0-9_\-]/gi,'_') + '.json';
+    a.click(); URL.revokeObjectURL(a.href);
+  },
+  importJson() {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = '.json';
+    inp.onchange = async () => {
+      try {
+        const text = await inp.files[0].text();
+        const obj = JSON.parse(text);
+        if (!obj.name || !Array.isArray(obj.offsets) || obj.offsets.length !== 12) throw new Error('Formato incorrecto');
+        addUserTemp(obj.name.trim(), obj.offsets.map(Number));
+        alert('Importado: ' + obj.name);
+      } catch(e) { alert('Error al importar:\n' + e.message); }
+    };
+    inp.click();
+  },
+  _copyToClipboard(txt) {
+    navigator.clipboard?.writeText(txt).then(() => alert('Enlace copiado al portapapeles'))
+      .catch(() => prompt('Copia este enlace:', txt));
+  }
+};
+
+function viewMedidor() {
+  const el = document.getElementById('content');
+  el.innerHTML = `
+    <div class="panel" style="width:100%;max-width:520px">
+      <!-- Cabecera -->
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+        <label onclick="DT.toggleMic()" style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none">
+          <span style="font-size:15px">🎤</span>
+          <div class="dt-mic-track" style="position:relative;width:34px;height:18px;background:${DT.micOn?'#3b82f6':'#334155'};border-radius:9px;transition:background 0.2s;flex-shrink:0">
+            <div class="dt-mic-thumb" style="position:absolute;top:2px;left:${DT.micOn?'16px':'2px'};width:14px;height:14px;background:#fff;border-radius:50%;transition:left 0.2s"></div>
+          </div>
+          <span style="font-size:12px;color:var(--muted)">Mic</span>
+        </label>
+        <button class="icon-btn" onclick="DT.importJson()" style="font-size:11px">⬆ Importar</button>
+        <span style="flex:1"></span>
+        <span id="dt-count" style="font-size:11px;color:var(--muted)">${DT.measuredCount()}/12</span>
+        <button class="icon-btn" onclick="DT.reset()">Reiniciar</button>
+      </div>
+
+      <!-- Instrucción -->
+      <p style="font-size:11px;color:#4b5563;margin-bottom:10px;line-height:1.5">
+        Activa el micrófono y toca cada nota de tu instrumento. Cuando una nota sea estable durante ~2 s se registra automáticamente.
+        Pulsa una celda ya medida para borrarla.
+      </p>
+
+      <!-- Rejilla de 12 notas -->
+      <div id="dt-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px"></div>
+
+      <!-- Barra de estabilidad -->
+      <div id="dt-bar-wrap" style="background:#0f172a;border-radius:4px;height:6px;overflow:hidden;margin-bottom:6px">
+        <div id="dt-bar-fill" style="height:100%;width:0%;background:var(--accent);transition:width 0.1s;border-radius:4px"></div>
+      </div>
+      <div id="dt-status" style="text-align:center;font-size:13px;color:var(--muted);min-height:1.4em;margin-bottom:14px">—</div>
+
+      <!-- Guardar -->
+      <div id="dt-save-row" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <input id="dt-name-input" type="text" placeholder="Nombre del temperamento…"
+          style="flex:1;min-width:140px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;outline:none"
+          onkeydown="if(event.key==='Enter')DT.save()">
+        <button class="icon-btn" onclick="DT.save()" style="background:#1d4ed8;color:#fff;border-color:#1d4ed8">Guardar</button>
+      </div>
+
+      <!-- Exportar (aparece tras guardar) -->
+      <div id="dt-export-panel" style="display:none;gap:8px;flex-wrap:wrap">
+        <button class="icon-btn" onclick="DT.shareUrl()">📤 Compartir enlace</button>
+        <button class="icon-btn" onclick="DT.downloadJson()">⬇ Descargar .json</button>
+      </div>
+    </div>`;
+  DT._renderGrid();
 }
 
 function viewTuner() {
