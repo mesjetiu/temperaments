@@ -371,7 +371,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'e1899b9 · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = 'f424ca3 · 2026-04-03';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3122,18 +3122,68 @@ function buildTunerScreen() {
 // ══════════════════════════════════════════════
 // MEDIDOR DE TEMPERAMENTO
 // ══════════════════════════════════════════════
+// MEDIDOR DE TEMPERAMENTO
+// ══════════════════════════════════════════════
 const NOTES_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
 const DT = {
-  notes: new Array(12).fill(null),   // cents offset vs ET, null = sin medir
+  notes: new Array(12).fill(null),  // cents vs ET, null = sin medir
+  mode: 'auto',          // 'auto' | 'manual'
+  phase: 'calibrating',  // 'calibrating' | 'measuring'
+  _targetNi: -1,         // nota objetivo en modo manual
   micOn: false, micStream: null, analyser: null,
   rafId: null, lastAnalysis: 0,
-  _stableNi: -1, _stableCount: 0, _stableCents: 0, _buf: null,
-  STABLE_FRAMES: 18,   // ~1.8 s a 100 ms/análisis
+  _stableNi: -1, _stableCount: 0, _stableCents: 0, _stableFreq: 0, _buf: null,
+  STABLE_FRAMES: 18,     // ~1.8 s a ≈100 ms/análisis
+  _calPitchA: null,      // pitchA detectado en calibración (null = sin calibrar aún)
 
-  getOffsets() { return this.notes.map(v => v === null ? 0 : v); },
+  getOffsets()    { return this.notes.map(v => v === null ? 0 : v); },
   measuredCount() { return this.notes.filter(v => v !== null).length; },
 
+  setMode(m) {
+    this.mode = m;
+    this._targetNi = -1; this._stableNi = -1; this._stableCount = 0;
+    document.querySelectorAll('.dt-mode-btn').forEach(b =>
+      b.classList.toggle('sel', b.dataset.m === m));
+    this._renderKeyboard();
+    this._updateStatus('—');
+  },
+
+  // ── Calibración ──────────────────────────────
+  skipCalibration() {
+    this.phase = 'measuring';
+    this._stableNi = -1; this._stableCount = 0;
+    this._updateCalibrationUI();
+    this._renderKeyboard();
+  },
+  _finishCalibration(detectedFreq) {
+    // Normalizar al rango de A4 (alrededor de 440)
+    let f = detectedFreq;
+    while (f < 300) f *= 2;
+    while (f > 600) f /= 2;
+    this._calPitchA = Math.round(f * 100) / 100;
+    pitchA = this._calPitchA;
+    savePrefs({ pitchA });
+    const inp = document.getElementById('pitch-input');
+    if (inp) inp.value = pitchA;
+    this.phase = 'measuring';
+    this._stableNi = -1; this._stableCount = 0;
+    this._updateCalibrationUI();
+    this._renderKeyboard();
+  },
+  _updateCalibrationUI() {
+    const el = document.getElementById('dt-calib-row');
+    if (!el) return;
+    if (this.phase === 'calibrating') {
+      el.innerHTML = `<span style="font-size:11px;color:#f59e0b">▶ Toca La (A) para calibrar el pitch de referencia</span>
+        <button class="icon-btn" onclick="DT.skipCalibration()" style="font-size:10px;margin-left:auto">Omitir (${pitchA} Hz)</button>`;
+    } else {
+      el.innerHTML = `<span style="font-size:11px;color:#4ade80">✓ La calibrado: ${pitchA} Hz</span>
+        <button class="icon-btn" onclick="DT.phase='calibrating';DT._stableNi=-1;DT._stableCount=0;DT._updateCalibrationUI();DT._renderKeyboard();" style="font-size:10px;margin-left:auto">Recalibrar</button>`;
+    }
+  },
+
+  // ── Mic ──────────────────────────────────────
   async toggleMic() { this.micOn ? this.stopMic() : await this.startMic(); },
   async startMic() {
     try {
@@ -3142,12 +3192,11 @@ const DT = {
       this.micStream = stream;
       const ctx = getCtx();
       this.analyser = ctx.createAnalyser();
-      this.analyser.fftSize = 4096;
-      this.analyser.smoothingTimeConstant = 0;
+      this.analyser.fftSize = 4096; this.analyser.smoothingTimeConstant = 0;
       ctx.createMediaStreamSource(stream).connect(this.analyser);
       this.micOn = true;
-      document.querySelectorAll('.dt-mic-track').forEach(el => el.style.background='#3b82f6');
-      document.querySelectorAll('.dt-mic-thumb').forEach(el => el.style.left='16px');
+      document.querySelectorAll('.dt-mic-track').forEach(e => e.style.background='#3b82f6');
+      document.querySelectorAll('.dt-mic-thumb').forEach(e => e.style.left='16px');
       if (!this.rafId) this._scheduleLoop();
     } catch(e) { alert('Sin acceso al micrófono:\n' + e.message); }
   },
@@ -3156,15 +3205,18 @@ const DT = {
     if (this.analyser) { try { this.analyser.disconnect(); } catch(_){} this.analyser = null; }
     this.micOn = false;
     if (this.rafId) { cancelAnimationFrame(this.rafId); this.rafId = null; }
-    document.querySelectorAll('.dt-mic-track').forEach(el => el.style.background='#334155');
-    document.querySelectorAll('.dt-mic-thumb').forEach(el => el.style.left='2px');
-    this._setStatus('—', -1, 0);
+    document.querySelectorAll('.dt-mic-track').forEach(e => e.style.background='#334155');
+    document.querySelectorAll('.dt-mic-thumb').forEach(e => e.style.left='2px');
+    this._stableNi = -1; this._stableCount = 0;
+    this._renderKeyboard(); this._updateStatus('—');
   },
+
+  // ── Loop de detección ────────────────────────
   _scheduleLoop() {
     this.rafId = requestAnimationFrame(ts => {
-      if (!document.getElementById('dt-grid')) { this.stopMic(); return; }
+      if (!document.getElementById('dt-kb-wrap')) { this.stopMic(); return; }
       this._scheduleLoop();
-      if (ts - this.lastAnalysis < 100) return;
+      if (ts - this.lastAnalysis < 90) return;
       this.lastAnalysis = ts;
       this._analyze();
     });
@@ -3176,12 +3228,39 @@ const DT = {
     this.analyser.getFloatTimeDomainData(this._buf);
     const res = detectPitch(this._buf, this.analyser.context.sampleRate);
     if (!res || res.clarity < 0.55) {
-      this._stableNi = -1; this._stableCount = 0;
-      this._setStatus('—', -1, 0); return;
+      if (this._stableNi !== -1) { this._stableNi = -1; this._stableCount = 0; this._renderKeyboard(); }
+      this._updateStatus('—');
+      return;
     }
     const { freq } = res;
-    const { ni, oct } = findClosestNote(freq);
-    // offset en cents respecto a ET puro (sin temperamento aplicado)
+    const { ni } = findClosestNote(freq);
+
+    // ── Fase calibración: solo detectar A (ni=9) ──
+    if (this.phase === 'calibrating') {
+      if (ni !== 9) { this._stableNi = -1; this._stableCount = 0; this._renderKeyboard(); this._updateStatus('—'); return; }
+      if (ni === this._stableNi) {
+        this._stableCount++;
+        this._stableFreq = this._stableFreq * 0.8 + freq * 0.2;
+      } else {
+        this._stableNi = 9; this._stableCount = 1; this._stableFreq = freq;
+      }
+      const prog = Math.min(1, this._stableCount / this.STABLE_FRAMES);
+      this._updateStatus(`La detectado: ${freq.toFixed(1)} Hz`, prog);
+      this._renderKeyboard();
+      if (this._stableCount >= this.STABLE_FRAMES) this._finishCalibration(this._stableFreq);
+      return;
+    }
+
+    // ── Fase medición ──
+    // En manual: solo aceptar la nota objetivo
+    if (this.mode === 'manual' && ni !== this._targetNi) {
+      if (this._stableNi !== -1) { this._stableNi = -1; this._stableCount = 0; this._renderKeyboard(); }
+      this._updateStatus(this._targetNi < 0 ? 'Pulsa una tecla para seleccionar nota' : `Toca ${NOTES_NAMES[this._targetNi]} en tu instrumento`);
+      return;
+    }
+
+    // Calcular offset en cents vs ET puro (sin el temperamento cargado)
+    const { oct } = findClosestNote(freq);
     const etFreq = pitchA * Math.pow(2, (ET_FROM_A[ni] + (oct - 4) * 1200) / 1200);
     const cents  = 1200 * Math.log2(freq / etFreq);
 
@@ -3191,55 +3270,144 @@ const DT = {
     } else {
       this._stableNi = ni; this._stableCount = 1; this._stableCents = cents;
     }
-
     const prog = Math.min(1, this._stableCount / this.STABLE_FRAMES);
-    this._setStatus(NOTES_NAMES[ni] + oct + '  ' + (cents >= 0 ? '+' : '') + cents.toFixed(1) + '¢', ni, prog);
+    const sign  = this._stableCents >= 0 ? '+' : '';
+    this._updateStatus(`${NOTES_NAMES[ni]}  ${sign}${this._stableCents.toFixed(1)}¢`, prog);
+    this._renderKeyboard();
 
     if (this._stableCount >= this.STABLE_FRAMES) {
       this.notes[ni] = Math.round(this._stableCents * 10) / 10;
       this._stableNi = -1; this._stableCount = 0;
-      this._renderGrid();
+      if (this.mode === 'manual') this._targetNi = -1;
+      const cnt = document.getElementById('dt-count');
+      if (cnt) cnt.textContent = this.measuredCount() + '/12';
+      const sp = document.getElementById('dt-save-row');
+      if (sp) sp.style.display = this.measuredCount() > 0 ? 'flex' : 'none';
+      this._renderKeyboard();
     }
   },
-  _setStatus(txt, activeNi, prog) {
+
+  _updateStatus(txt, prog) {
     const el = document.getElementById('dt-status');
     if (el) el.textContent = txt;
     const bar = document.getElementById('dt-bar-fill');
-    if (bar) bar.style.width = (prog * 100) + '%';
-    document.querySelectorAll('.dt-cell').forEach(c => {
-      const ni = +c.dataset.ni;
-      c.classList.toggle('dt-active', ni === activeNi && prog > 0 && this.notes[ni] === null);
-    });
+    if (bar) bar.style.width = ((prog ?? 0) * 100) + '%';
   },
-  _renderGrid() {
-    const grid = document.getElementById('dt-grid');
-    if (!grid) return;
-    const n = this.measuredCount();
-    grid.innerHTML = this.notes.map((v, ni) => {
-      const done = v !== null;
-      return `<div class="dt-cell${done?' dt-done':''}" data-ni="${ni}" onclick="DT.clearNote(${ni})" title="${done?'Pulsa para borrar esta nota':''}">
-        <span class="dt-note">${NOTES_NAMES[ni]}</span>
-        <span class="dt-val">${done ? (v>=0?'+':'')+v+'¢' : '—'}</span>
+
+  // ── Teclado de piano (1 octava) ──────────────
+  tapKey(ni) {
+    if (this.phase === 'calibrating') return; // durante calibración el teclado no hace nada
+    if (this.mode === 'manual') {
+      // Si ya medida: borrar; si no: apuntar
+      if (this.notes[ni] !== null) {
+        this.notes[ni] = null;
+        this._renderKeyboard();
+        const cnt = document.getElementById('dt-count');
+        if (cnt) cnt.textContent = this.measuredCount() + '/12';
+        const sp = document.getElementById('dt-save-row');
+        if (sp) sp.style.display = this.measuredCount() > 0 ? 'flex' : 'none';
+        this._clearExport();
+      } else {
+        this._targetNi = (this._targetNi === ni ? -1 : ni);
+        this._stableNi = -1; this._stableCount = 0;
+        this._renderKeyboard();
+        this._updateStatus(this._targetNi < 0 ? 'Pulsa una tecla para seleccionar nota'
+          : `Toca ${NOTES_NAMES[ni]} en tu instrumento`);
+      }
+    } else {
+      // Auto: borrar si medida
+      if (this.notes[ni] !== null) {
+        this.notes[ni] = null;
+        this._renderKeyboard();
+        const cnt = document.getElementById('dt-count');
+        if (cnt) cnt.textContent = this.measuredCount() + '/12';
+        const sp = document.getElementById('dt-save-row');
+        if (sp) sp.style.display = this.measuredCount() > 0 ? 'flex' : 'none';
+        this._clearExport();
+      }
+    }
+  },
+
+  _renderKeyboard() {
+    const wrap = document.getElementById('dt-kb-wrap');
+    if (!wrap) return;
+    const mob   = isMobile();
+    const availW = mob ? (window.innerWidth - 20) : Math.min(500, (wrap.clientWidth || 500) - 8);
+    const W  = Math.floor(availW / 7);      // 7 teclas blancas
+    const H  = Math.min(mob ? 170 : 210, Math.round(W * 3.4));
+    const BW = Math.round(W * 0.6);
+    const BH = Math.round(H * 0.62);
+    const WN = [0,2,4,5,7,9,11];
+    const BK = [{ni:1,cx:1},{ni:3,cx:2},{ni:6,cx:4},{ni:8,cx:5},{ni:10,cx:6}];
+
+    const keyHtml = (ni, x, w, h, isBlack) => {
+      const measured   = this.notes[ni] !== null;
+      const detecting  = this._stableNi === ni;
+      const isTarget   = this.mode === 'manual' && this._targetNi === ni;
+      const isCalibA   = this.phase === 'calibrating' && ni === 9;
+      const prog       = detecting ? Math.min(1, this._stableCount / this.STABLE_FRAMES)
+                       : (measured ? 1 : 0);
+      const val        = measured ? this.notes[ni] : (detecting ? this._stableCents : null);
+      const valStr     = val !== null ? (val >= 0 ? '+' : '') + val.toFixed(1) + '¢' : '';
+
+      // Color del fill de progreso
+      const fillColor  = measured ? 'rgba(74,222,128,0.45)' : 'rgba(96,165,250,0.40)';
+
+      // Fondo base de la tecla
+      let bg, border, labelColor, valColor;
+      if (isBlack) {
+        bg = measured   ? '#0f3320'
+           : isTarget   ? '#0c2a50'
+           : isCalibA   ? '#2d1a00'
+           : 'linear-gradient(180deg,#333 0%,#111 70%)';
+        border = measured ? '#4ade80' : isTarget ? '#60a5fa' : isCalibA ? '#f59e0b' : '#000';
+        labelColor = measured ? '#4ade80' : isTarget ? '#93c5fd' : isCalibA ? '#fcd34d' : '#ccc';
+        valColor   = measured ? '#4ade80' : detecting ? '#93c5fd' : 'transparent';
+      } else {
+        bg = measured   ? 'linear-gradient(175deg,#d4f7d4 0%,#a6e8a6 100%)'
+           : isTarget   ? 'linear-gradient(175deg,#dbeafe 0%,#93c5fd 100%)'
+           : isCalibA   ? 'linear-gradient(175deg,#fef3c7 0%,#fcd34d 100%)'
+           : 'linear-gradient(175deg,#fdfaf4 0%,#ece7db 90%)';
+        border = measured ? '#4ade80' : isTarget ? '#3b82f6' : isCalibA ? '#f59e0b' : '#999';
+        labelColor = measured ? '#166534' : isTarget ? '#1e40af' : isCalibA ? '#92400e' : '#555';
+        valColor   = measured ? '#166534' : detecting ? 'var(--accent)' : 'transparent';
+      }
+
+      const fs  = isBlack ? '8px' : '10px';
+      const fvs = isBlack ? '8px' : '9px';
+      const z   = isBlack ? 1 : 0;
+      const br  = isBlack ? 4 : 6;
+      const shadow = isBlack ? '0 5px 8px rgba(0,0,0,.65)' : '0 4px 6px rgba(0,0,0,.25)';
+      const borderTop = isBlack ? 'none' : '2px solid #bbb';
+
+      return `<div data-ni="${ni}" onclick="DT.tapKey(${ni})"
+        style="position:absolute;left:${x}px;width:${w}px;height:${h}px;z-index:${z};
+               background:${bg};border:1.5px solid ${border};border-top:${borderTop};
+               border-radius:0 0 ${br}px ${br}px;cursor:pointer;-webkit-tap-highlight-color:transparent;
+               display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+               padding-bottom:5px;overflow:hidden;box-shadow:${shadow};transition:border-color 0.15s,background 0.15s;">
+        <div style="position:absolute;bottom:0;left:0;right:0;height:${prog*100}%;background:${fillColor};transition:height 0.12s;pointer-events:none;border-radius:0 0 ${br}px ${br}px"></div>
+        <span style="font-size:${fs};font-weight:700;color:${labelColor};z-index:1;pointer-events:none;line-height:1.2">${NOTES_NAMES[ni]}</span>
+        <span style="font-size:${fvs};color:${valColor};z-index:1;pointer-events:none;line-height:1.1">${valStr || ' '}</span>
       </div>`;
-    }).join('');
-    const cnt = document.getElementById('dt-count');
-    if (cnt) cnt.textContent = n + '/12';
-    // Mostrar panel de guardado cuando hay al menos 1 nota
-    const sp = document.getElementById('dt-save-row');
-    if (sp) sp.style.display = n > 0 ? 'flex' : 'none';
+    };
+
+    let html = `<div style="position:relative;height:${H}px;width:${W*7}px;user-select:none;touch-action:manipulation">`;
+    WN.forEach((ni, wi) => { html += keyHtml(ni, wi*W, W-1, H, false); });
+    BK.forEach(({ni,cx}) => { html += keyHtml(ni, cx*W-BW/2, BW, BH, true); });
+    html += '</div>';
+    wrap.innerHTML = html;
   },
-  clearNote(ni) {
-    if (this.notes[ni] === null) return;
-    this.notes[ni] = null;
-    this._renderGrid();
-    this._clearExport();
-  },
+
   reset() {
     this.notes = new Array(12).fill(null);
+    this.phase = 'calibrating'; this._targetNi = -1;
     this._stableNi = -1; this._stableCount = 0;
-    this._renderGrid();
+    this._renderKeyboard(); this._updateCalibrationUI(); this._updateStatus('—');
     this._clearExport();
-    document.getElementById('dt-name-input').value = '';
+    const ni = document.getElementById('dt-name-input'); if (ni) ni.value = '';
+    const cnt = document.getElementById('dt-count'); if (cnt) cnt.textContent = '0/12';
+    const sp = document.getElementById('dt-save-row'); if (sp) sp.style.display = 'none';
   },
   save() {
     const nameEl = document.getElementById('dt-name-input');
@@ -3248,56 +3416,35 @@ const DT = {
     if (this.measuredCount() === 0) return;
     const offsets = this.getOffsets();
     addUserTemp(name, offsets);
-    // Seleccionar automáticamente
     const t = all.find(x => x.name === name && x.source === 'Usuario');
     if (t) { selected[0] = t; lastSelected = t; renderBadges(); }
-    // Mostrar panel de exportar
     this._showExport(name, offsets);
   },
   _showExport(name, offsets) {
     const ep = document.getElementById('dt-export-panel');
     if (!ep) return;
-    ep.style.display = 'flex';
-    ep.dataset.name = name;
-    ep.dataset.offsets = offsets.join(',');
+    ep.style.display = 'flex'; ep.dataset.name = name; ep.dataset.offsets = offsets.join(',');
   },
-  _clearExport() {
-    const ep = document.getElementById('dt-export-panel');
-    if (ep) ep.style.display = 'none';
-  },
+  _clearExport() { const ep = document.getElementById('dt-export-panel'); if (ep) ep.style.display='none'; },
   shareUrl() {
-    const ep = document.getElementById('dt-export-panel');
-    if (!ep) return;
-    const name = ep.dataset.name, ofs = ep.dataset.offsets;
-    const url = location.origin + location.pathname + '?t=' + encodeURIComponent(name) + '&o=' + ofs;
-    if (navigator.share) {
-      navigator.share({ title: name, text: 'Temperamento: ' + name, url })
-        .catch(() => this._copyToClipboard(url));
-    } else {
-      this._copyToClipboard(url);
-    }
+    const ep = document.getElementById('dt-export-panel'); if (!ep) return;
+    const url = location.origin + location.pathname + '?t=' + encodeURIComponent(ep.dataset.name) + '&o=' + ep.dataset.offsets;
+    if (navigator.share) navigator.share({ title: ep.dataset.name, url }).catch(() => this._copyToClipboard(url));
+    else this._copyToClipboard(url);
   },
   downloadJson() {
-    const ep = document.getElementById('dt-export-panel');
-    if (!ep) return;
-    const name = ep.dataset.name;
-    const offsets = ep.dataset.offsets.split(',').map(Number);
-    const blob = new Blob([JSON.stringify({ name, offsets, source:'Usuario' }, null, 2)], { type:'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name.replace(/[^a-z0-9_\-]/gi,'_') + '.json';
-    a.click(); URL.revokeObjectURL(a.href);
+    const ep = document.getElementById('dt-export-panel'); if (!ep) return;
+    const blob = new Blob([JSON.stringify({ name:ep.dataset.name, offsets:ep.dataset.offsets.split(',').map(Number), source:'Usuario' }, null, 2)], { type:'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = ep.dataset.name.replace(/[^a-z0-9_\-]/gi,'_') + '.json'; a.click(); URL.revokeObjectURL(a.href);
   },
   importJson() {
-    const inp = document.createElement('input');
-    inp.type = 'file'; inp.accept = '.json';
+    const inp = document.createElement('input'); inp.type='file'; inp.accept='.json';
     inp.onchange = async () => {
       try {
-        const text = await inp.files[0].text();
-        const obj = JSON.parse(text);
+        const obj = JSON.parse(await inp.files[0].text());
         if (!obj.name || !Array.isArray(obj.offsets) || obj.offsets.length !== 12) throw new Error('Formato incorrecto');
-        addUserTemp(obj.name.trim(), obj.offsets.map(Number));
-        alert('Importado: ' + obj.name);
+        addUserTemp(obj.name.trim(), obj.offsets.map(Number)); alert('Importado: ' + obj.name);
       } catch(e) { alert('Error al importar:\n' + e.message); }
     };
     inp.click();
@@ -3309,54 +3456,56 @@ const DT = {
 };
 
 function viewMedidor() {
-  const el = document.getElementById('content');
-  el.innerHTML = `
-    <div class="panel" style="width:100%;max-width:520px">
-      <!-- Cabecera -->
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">
-        <label onclick="DT.toggleMic()" style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none">
+  document.getElementById('content').innerHTML = `
+    <div class="panel" style="width:100%;max-width:560px">
+
+      <!-- Controles superiores -->
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        <label onclick="DT.toggleMic()" style="display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none">
           <span style="font-size:15px">🎤</span>
-          <div class="dt-mic-track" style="position:relative;width:34px;height:18px;background:${DT.micOn?'#3b82f6':'#334155'};border-radius:9px;transition:background 0.2s;flex-shrink:0">
+          <div class="dt-mic-track" style="position:relative;width:34px;height:18px;background:${DT.micOn?'#3b82f6':'#334155'};border-radius:9px;flex-shrink:0">
             <div class="dt-mic-thumb" style="position:absolute;top:2px;left:${DT.micOn?'16px':'2px'};width:14px;height:14px;background:#fff;border-radius:50%;transition:left 0.2s"></div>
           </div>
-          <span style="font-size:12px;color:var(--muted)">Mic</span>
         </label>
-        <button class="icon-btn" onclick="DT.importJson()" style="font-size:11px">⬆ Importar</button>
+        <button class="dt-mode-btn icon-btn${DT.mode==='auto'?' sel':''}" data-m="auto"  onclick="DT.setMode('auto')">Auto</button>
+        <button class="dt-mode-btn icon-btn${DT.mode==='manual'?' sel':''}" data-m="manual" onclick="DT.setMode('manual')">Manual</button>
         <span style="flex:1"></span>
         <span id="dt-count" style="font-size:11px;color:var(--muted)">${DT.measuredCount()}/12</span>
-        <button class="icon-btn" onclick="DT.reset()">Reiniciar</button>
+        <button class="icon-btn" onclick="DT.importJson()" style="font-size:11px">⬆</button>
+        <button class="icon-btn" onclick="DT.reset()">↺ Reiniciar</button>
       </div>
 
-      <!-- Instrucción -->
-      <p style="font-size:11px;color:#4b5563;margin-bottom:10px;line-height:1.5">
-        Activa el micrófono y toca cada nota de tu instrumento. Cuando una nota sea estable durante ~2 s se registra automáticamente.
-        Pulsa una celda ya medida para borrarla.
-      </p>
+      <!-- Fila de calibración -->
+      <div id="dt-calib-row" style="display:flex;align-items:center;gap:6px;background:#0f172a;border-radius:6px;padding:7px 10px;margin-bottom:12px;min-height:34px"></div>
 
-      <!-- Rejilla de 12 notas -->
-      <div id="dt-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px"></div>
+      <!-- Teclado de piano -->
+      <div id="dt-kb-wrap" style="overflow-x:auto;padding-bottom:6px;margin-bottom:10px;-webkit-overflow-scrolling:touch"></div>
 
-      <!-- Barra de estabilidad -->
-      <div id="dt-bar-wrap" style="background:#0f172a;border-radius:4px;height:6px;overflow:hidden;margin-bottom:6px">
+      <!-- Barra de estabilidad + estado -->
+      <div style="background:#0f172a;border-radius:4px;height:5px;overflow:hidden;margin-bottom:5px">
         <div id="dt-bar-fill" style="height:100%;width:0%;background:var(--accent);transition:width 0.1s;border-radius:4px"></div>
       </div>
-      <div id="dt-status" style="text-align:center;font-size:13px;color:var(--muted);min-height:1.4em;margin-bottom:14px">—</div>
+      <div id="dt-status" style="text-align:center;font-size:12px;color:var(--muted);min-height:1.5em;margin-bottom:14px">—</div>
 
-      <!-- Guardar -->
-      <div id="dt-save-row" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <!-- Guardar (aparece cuando hay notas) -->
+      <div id="dt-save-row" style="display:${DT.measuredCount()>0?'flex':'none'};align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
         <input id="dt-name-input" type="text" placeholder="Nombre del temperamento…"
           style="flex:1;min-width:140px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;outline:none"
           onkeydown="if(event.key==='Enter')DT.save()">
         <button class="icon-btn" onclick="DT.save()" style="background:#1d4ed8;color:#fff;border-color:#1d4ed8">Guardar</button>
       </div>
 
-      <!-- Exportar (aparece tras guardar) -->
+      <!-- Exportar (tras guardar) -->
       <div id="dt-export-panel" style="display:none;gap:8px;flex-wrap:wrap">
         <button class="icon-btn" onclick="DT.shareUrl()">📤 Compartir enlace</button>
         <button class="icon-btn" onclick="DT.downloadJson()">⬇ Descargar .json</button>
       </div>
+
     </div>`;
-  DT._renderGrid();
+
+  DT._updateCalibrationUI();
+  DT._renderKeyboard();
+  if (DT.micOn && !DT.rafId) DT._scheduleLoop();
 }
 
 function viewTuner() {
