@@ -390,7 +390,7 @@
 </div>
 
 <script>
-const APP_VERSION = '4433ba2 · 2026-04-04';// ── Service Worker ──
+const APP_VERSION = '0ffb493 · 2026-04-04';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3619,14 +3619,20 @@ const DT = {
   _analyze() {
     if (!this.analyser) return;
     const bufLen = this.analyser.fftSize;
-    if (!this._buf || this._buf.length !== bufLen) this._buf = new Float32Array(bufLen);
+    if (!this._buf || this._buf.length !== bufLen) {
+      this._buf = new Float32Array(bufLen);
+      this._freqBuf = new Float32Array(this.analyser.frequencyBinCount);
+    }
     this.analyser.getFloatTimeDomainData(this._buf);
+    this.analyser.getFloatFrequencyData(this._freqBuf);
     const res = detectPitch(this._buf, this.analyser.context.sampleRate);
-    if (!res || res.clarity < 0.55) {
+    if (!res || res.clarity < 0.15) {
       if (this._stableNi !== -1) { this._stableNi = -1; this._stableCount = 0; this._renderKeyboard(); }
       this._updateStatus('—');
       return;
     }
+    // Refinar frecuencia con interpolación parabólica sobre FFT nativa
+    res.freq = _refineFFT(res.freq, this._freqBuf, this.analyser.context.sampleRate);
     const { freq } = res;
     const { ni } = findClosestNote(freq);
 
