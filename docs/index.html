@@ -390,7 +390,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'c00baad · 2026-04-04';// ── Service Worker ──
+const APP_VERSION = '064966d · 2026-04-04';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3677,8 +3677,12 @@ const DT = {
     }
 
     // ── Fase medición ──
-    // En manual con nota seleccionada: asignar cualquier pitch a esa nota
-    const measureNi = (this.mode === 'manual' && this._targetNi >= 0) ? this._targetNi : ni;
+    // En manual: solo medir si hay nota seleccionada
+    if (this.mode === 'manual' && this._targetNi < 0) {
+      this._updateStatus('Pulsa una tecla para seleccionar nota');
+      return;
+    }
+    const measureNi = (this.mode === 'manual') ? this._targetNi : ni;
 
     // Calcular offset en cents vs ET puro de la nota objetivo
     const { oct } = findClosestNote(freq);
