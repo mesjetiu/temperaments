@@ -390,7 +390,7 @@
 </div>
 
 <script>
-const APP_VERSION = '8203f1d · 2026-04-04';// ── Service Worker ──
+const APP_VERSION = '7b65983 · 2026-04-04';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3658,10 +3658,11 @@ const DT = {
     }
 
     // ── Fase medición ──
-    // En manual: solo aceptar la nota objetivo
-    if (this.mode === 'manual' && ni !== this._targetNi) {
+    // En manual con nota seleccionada: solo aceptar esa nota
+    // En manual sin nota seleccionada: aceptar cualquiera (como auto)
+    if (this.mode === 'manual' && this._targetNi >= 0 && ni !== this._targetNi) {
       if (this._stableNi !== -1) { this._stableNi = -1; this._stableCount = 0; this._renderKeyboard(); }
-      this._updateStatus(this._targetNi < 0 ? 'Pulsa una tecla para seleccionar nota' : `Toca ${NOTES_NAMES[this._targetNi]} en tu instrumento`);
+      this._updateStatus(`Toca ${NOTES_NAMES[this._targetNi]} · detectando ${NOTES_NAMES[ni]}…`);
       return;
     }
 
