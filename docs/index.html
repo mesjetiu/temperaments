@@ -219,7 +219,7 @@
   }
   .kb2:hover { background: linear-gradient(180deg, #445 0%, #223 70%); }
   .kb2.ka  { background: #1d4ed8; box-shadow: 0 2px 4px rgba(0,0,0,.4); }
-  .klbl { font-size: 9px; color: #888; pointer-events: none; user-select: none; }
+  .klbl { font-size: clamp(9px, 2.5vw, 13px); color: #888; pointer-events: none; user-select: none; }
   #kb-lbl { margin-top: 14px; font-size: 13px; color: var(--muted); text-align: center; letter-spacing: 0.3px; min-height: 1.4em; }
   #kb-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 
@@ -390,7 +390,7 @@
 </div>
 
 <script>
-const APP_VERSION = '51964a7 · 2026-04-04';// ── Service Worker ──
+const APP_VERSION = '4433ba2 · 2026-04-04';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1126,6 +1126,8 @@ const KB = {
     document.querySelectorAll('.kb-mode').forEach(b => b.classList.toggle('sel', b.dataset.mode === m));
     const btn = document.getElementById('kb-clear-btn');
     if (btn) btn.style.display = m === 'chord' ? 'inline-block' : 'none';
+    const semi = document.getElementById('kb-semi-btns');
+    if (semi) semi.style.display = m === 'legato' ? 'flex' : 'none';
   },
 
   shiftOct(d) {
@@ -1161,6 +1163,22 @@ const KB = {
     if (lbl) lbl.textContent = `Oct. ${this.octave}–${this.octave+2}`;
     this.render();
     this.updateKeys();
+  },
+
+  shiftSemitone(d) {
+    if (this.mode !== 'legato' || !this.singleNode) return;
+    let ni = this.singleNode.ni + d;
+    let oct = this.singleNode.oct;
+    if (ni > 11) { ni = 0; oct++; }
+    else if (ni < 0) { ni = 11; oct--; }
+    if (oct < 1 || oct > 8) return;
+    // Adjust visible octave range if needed
+    if (oct < this.octave) this.octave = oct;
+    else if (oct > this.octave + 2) this.octave = oct - 2;
+    this.press(ni, oct);
+    const lbl = document.getElementById('kb-oct-lbl');
+    if (lbl) lbl.textContent = `Oct. ${this.octave}–${this.octave+2}`;
+    this.render();
   },
 
   // ── state ──
@@ -1244,9 +1262,9 @@ const KB = {
     // 3 octavas siempre; en móvil se ajusta para que 2 octavas sean cómodas (3ª scrollable)
     const nO = 3;
     const availW = mob ? (window.innerWidth - 16) : Math.max(480, (document.getElementById('kb-wrap')?.clientWidth || 700) - 8);
-    const visOct = mob ? 2 : 3;
-    const W  = Math.max(mob ? 22 : 28, Math.floor(availW / (visOct * 7)));
-    const H  = Math.round(W * 3.6);
+    const visOct = mob ? 1.5 : 3;
+    const W  = Math.max(mob ? 36 : 28, Math.floor(availW / (visOct * 7)));
+    const H  = Math.round(W * (mob ? 4.5 : 3.6));
     const BW = Math.round(W * 0.58);
     const BH = Math.round(H * 0.62);
     const totalW = W * 7 * nO + 1;
@@ -2561,6 +2579,12 @@ function viewKeyboard() {
           <span id="kb-oct-lbl" style="font-size:11px;color:var(--muted);white-space:nowrap">Oct. ${KB.octave}–${KB.octave+2}</span>
           <button class="icon-btn" onclick="KB.shiftOct(+1)">▶</button>
         </div>
+        <!-- Semitono (legato) -->
+        <div id="kb-semi-btns" style="display:${KB.mode==='legato'?'flex':'none'};align-items:center;gap:4px">
+          <button class="icon-btn" onclick="KB.shiftSemitone(-1)" style="padding:4px 12px;font-size:15px">−</button>
+          <span style="font-size:10px;color:var(--muted);white-space:nowrap">Semitono</span>
+          <button class="icon-btn" onclick="KB.shiftSemitone(+1)" style="padding:4px 12px;font-size:15px">+</button>
+        </div>
         <!-- Limpiar acorde -->
         <button id="kb-clear-btn" class="icon-btn" onclick="KB.clearAll()"
           style="margin-left:auto;display:${KB.mode==='chord'?'inline-block':'none'};opacity:${KB.chordMap.size>0?'1':'0.4'}">
@@ -2780,6 +2804,18 @@ const TUNER = {
     this.tunerOct = Math.max(1, Math.min(7, this.tunerOct + d));
     document.querySelectorAll('#tuner-oct-lbl,#tuner-oct-lbl2').forEach(el => el.textContent = 'Oct ' + this.tunerOct);
     savePrefs({ tunerOct: this.tunerOct });
+    this.renderMiniKb();
+  },
+
+  shiftSemitone(d) {
+    let ni = this.targetNi + d;
+    let oct = this.targetOct;
+    if (ni > 11) { ni = 0; oct++; }
+    else if (ni < 0) { ni = 11; oct--; }
+    if (oct < 1 || oct > 8) return;
+    if (oct < this.tunerOct) { this.tunerOct = oct; document.querySelectorAll('#tuner-oct-lbl,#tuner-oct-lbl2').forEach(el => el.textContent = 'Oct ' + this.tunerOct); }
+    else if (oct > this.tunerOct + 1) { this.tunerOct = oct - 1; document.querySelectorAll('#tuner-oct-lbl,#tuner-oct-lbl2').forEach(el => el.textContent = 'Oct ' + this.tunerOct); }
+    this.setTarget(ni, oct);
     this.renderMiniKb();
   },
 
@@ -3437,6 +3473,10 @@ function buildTunerScreen() {
         <button class="icon-btn" onclick="TUNER.shiftOct(-1)" style="padding:2px 14px;font-size:14px">◀</button>
         <span id="tuner-oct-lbl2" style="font-size:12px;color:#cbd5e1;min-width:44px;text-align:center">Oct ${TUNER.tunerOct}</span>
         <button class="icon-btn" onclick="TUNER.shiftOct(+1)" style="padding:2px 14px;font-size:14px">▶</button>
+        <span style="width:16px"></span>
+        <button class="icon-btn" onclick="TUNER.shiftSemitone(-1)" style="padding:2px 10px;font-size:14px;color:#93c5fd">−</button>
+        <span style="font-size:10px;color:#64748b;white-space:nowrap">Semi</span>
+        <button class="icon-btn" onclick="TUNER.shiftSemitone(+1)" style="padding:2px 10px;font-size:14px;color:#93c5fd">+</button>
       </div>
       <div id="tuner-mini-kb" style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px"></div>
     </div>`;
