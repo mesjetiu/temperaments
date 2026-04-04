@@ -390,7 +390,7 @@
 </div>
 
 <script>
-const APP_VERSION = '7a0ab2c · 2026-04-04';// ── Service Worker ──
+const APP_VERSION = 'c00baad · 2026-04-04';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3677,32 +3677,27 @@ const DT = {
     }
 
     // ── Fase medición ──
-    // En manual con nota seleccionada: solo aceptar esa nota
-    // En manual sin nota seleccionada: aceptar cualquiera (como auto)
-    if (this.mode === 'manual' && this._targetNi >= 0 && ni !== this._targetNi) {
-      if (this._stableNi !== -1) { this._stableNi = -1; this._stableCount = 0; this._renderKeyboard(); }
-      this._updateStatus(`Toca ${NOTES_NAMES[this._targetNi]} · detectando ${NOTES_NAMES[ni]}…`);
-      return;
-    }
+    // En manual con nota seleccionada: asignar cualquier pitch a esa nota
+    const measureNi = (this.mode === 'manual' && this._targetNi >= 0) ? this._targetNi : ni;
 
-    // Calcular offset en cents vs ET puro (sin el temperamento cargado)
+    // Calcular offset en cents vs ET puro de la nota objetivo
     const { oct } = findClosestNote(freq);
-    const etFreq = pitchA * Math.pow(2, (ET_FROM_A[ni] + (oct - 4) * 1200) / 1200);
+    const etFreq = pitchA * Math.pow(2, (ET_FROM_A[measureNi] + (oct - 4) * 1200) / 1200);
     const cents  = 1200 * Math.log2(freq / etFreq);
 
-    if (ni === this._stableNi) {
+    if (measureNi === this._stableNi) {
       this._stableCount++;
       this._stableCents = this._stableCents * 0.75 + cents * 0.25;
     } else {
-      this._stableNi = ni; this._stableCount = 1; this._stableCents = cents;
+      this._stableNi = measureNi; this._stableCount = 1; this._stableCents = cents;
     }
     const prog = Math.min(1, this._stableCount / this.STABLE_FRAMES);
     const sign  = this._stableCents >= 0 ? '+' : '';
-    this._updateStatus(`${NOTES_NAMES[ni]}  ${sign}${this._stableCents.toFixed(1)}¢`, prog);
+    this._updateStatus(`${NOTES_NAMES[measureNi]}  ${sign}${this._stableCents.toFixed(1)}¢`, prog);
     this._renderKeyboard();
 
     if (this._stableCount >= this.STABLE_FRAMES) {
-      this.notes[ni] = Math.round(this._stableCents * 10) / 10;
+      this.notes[measureNi] = Math.round(this._stableCents * 10) / 10;
       this._stableNi = -1; this._stableCount = 0;
       if (this.mode === 'manual') this._targetNi = -1;
       const cnt = document.getElementById('dt-count');
