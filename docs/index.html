@@ -390,7 +390,7 @@
 </div>
 
 <script>
-const APP_VERSION = '12d4cf2 · 2026-04-04';// ── Service Worker ──
+const APP_VERSION = '8203f1d · 2026-04-04';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3524,7 +3524,7 @@ const NOTES_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const DT = {
   notes: new Array(12).fill(null),  // cents vs ET, null = sin medir
   mode: 'auto',          // 'auto' | 'manual'
-  phase: 'calibrating',  // 'calibrating' | 'measuring'
+  phase: 'measuring',    // 'calibrating' | 'measuring'
   _targetNi: -1,         // nota objetivo en modo manual
   micOn: false, micStream: null, analyser: null,
   rafId: null, lastAnalysis: 0,
@@ -3625,10 +3625,15 @@ const DT = {
     }
     this.analyser.getFloatTimeDomainData(this._buf);
     this.analyser.getFloatFrequencyData(this._freqBuf);
+    // RMS para indicador de nivel
+    let rmsSum = 0;
+    for (let i = 0; i < Math.min(1024, bufLen); i++) rmsSum += this._buf[i] * this._buf[i];
+    const rms = Math.sqrt(rmsSum / Math.min(1024, bufLen));
     const res = detectPitch(this._buf, this.analyser.context.sampleRate);
     if (!res || res.clarity < 0.15) {
       if (this._stableNi !== -1) { this._stableNi = -1; this._stableCount = 0; this._renderKeyboard(); }
-      this._updateStatus('—');
+      const lvl = Math.min(100, Math.round(rms * 1000));
+      this._updateStatus(lvl > 1 ? `🎤 ${lvl}% — escuchando…` : '—');
       return;
     }
     // Refinar frecuencia con interpolación parabólica sobre FFT nativa
