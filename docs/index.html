@@ -390,7 +390,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'e103efb · 2026-04-03';// ── Service Worker ──
+const APP_VERSION = '51964a7 · 2026-04-04';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2882,8 +2882,8 @@ const TUNER = {
 
       const p = detectPitch(buf, getCtx().sampleRate);
       // Refinar frecuencia con interpolación parabólica sobre FFT nativa (coste JS ≈ 0)
-      if (p && p.clarity >= 0.5) p.freq = _refineFFT(p.freq, this._freqBuf, getCtx().sampleRate);
-      if (p && p.clarity >= 0.5) {
+      if (p && p.clarity >= 0.15) p.freq = _refineFFT(p.freq, this._freqBuf, getCtx().sampleRate);
+      if (p && p.clarity >= 0.15) {
         this.detectedFreq = p.freq;
         this._lastFreq = p.freq;
         this._lastNi = this.targetNi; this._lastOct = this.targetOct;
