@@ -142,7 +142,7 @@
     white-space: nowrap;
   }
   .wb:hover, .icon-btn:hover, .kb-mode:hover { background: #1e2d45; color: var(--text); }
-  .wb.sel, .kb-mode.sel { background: #1d4ed8; color: #fff; border-color: var(--accent); }
+  .wb.sel, .kb-mode.sel, .icon-btn.sel { background: #1d4ed8; color: #fff; border-color: var(--accent); }
   .icon-btn { padding: 3px 10px; }
   #pitch-input { width: 72px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 4px; padding: 3px 5px; font-size: 11px; text-align: center; outline: none; }
   #pitch-input:focus { border-color: var(--accent); }
@@ -390,7 +390,7 @@
 </div>
 
 <script>
-const APP_VERSION = '0ffb493 · 2026-04-04';// ── Service Worker ──
+const APP_VERSION = '12d4cf2 · 2026-04-04';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3996,6 +3996,11 @@ function viewMedidor() {
   DT._renderKeyboard();
   DT._renderSuggestions();
   if (DT.micOn && !DT.rafId) DT._scheduleLoop();
+  // Auto-arrancar mic si el usuario ya lo autorizó antes, o si nunca lo ha activado (primera vez)
+  if (!DT.micOn) {
+    const _micPref = localStorage.getItem('micAutoStart');
+    if (_micPref === null || _micPref === '1') DT.startMic();
+  }
 }
 
 function viewTuner() {
