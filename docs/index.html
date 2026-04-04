@@ -390,7 +390,7 @@
 </div>
 
 <script>
-const APP_VERSION = '7b65983 · 2026-04-04';// ── Service Worker ──
+const APP_VERSION = 'c185609 · 2026-04-04';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1126,8 +1126,6 @@ const KB = {
     document.querySelectorAll('.kb-mode').forEach(b => b.classList.toggle('sel', b.dataset.mode === m));
     const btn = document.getElementById('kb-clear-btn');
     if (btn) btn.style.display = m === 'chord' ? 'inline-block' : 'none';
-    const semi = document.getElementById('kb-semi-btns');
-    if (semi) semi.style.display = m === 'legato' ? 'flex' : 'none';
   },
 
   shiftOct(d) {
@@ -1166,16 +1164,31 @@ const KB = {
   },
 
   shiftSemitone(d) {
-    if (this.mode !== 'legato' || !this.singleNode) return;
-    let ni = this.singleNode.ni + d;
-    let oct = this.singleNode.oct;
+    // En legato/normal con nota sonando: avanzar desde la nota activa
+    // Sin nota sonando: empezar desde C de la octava actual
+    let ni, oct;
+    if (this.singleNode) {
+      ni = this.singleNode.ni + d;
+      oct = this.singleNode.oct;
+    } else {
+      ni = d > 0 ? 0 : 11;
+      oct = d > 0 ? this.octave : this.octave + 2;
+    }
     if (ni > 11) { ni = 0; oct++; }
     else if (ni < 0) { ni = 11; oct--; }
     if (oct < 1 || oct > 8) return;
-    // Adjust visible octave range if needed
     if (oct < this.octave) this.octave = oct;
     else if (oct > this.octave + 2) this.octave = oct - 2;
-    this.press(ni, oct);
+    // En normal: simular pulsación breve; en legato/chord: press normal
+    if (this.mode === 'normal') {
+      this.stopNode(this.singleNode);
+      this.singleNode = this.startNode(ni, oct);
+      this.singleKey = this.key(ni, oct);
+      this.updateKeys();
+      this.showLabel(ni, oct);
+    } else {
+      this.press(ni, oct);
+    }
     const lbl = document.getElementById('kb-oct-lbl');
     if (lbl) lbl.textContent = `Oct. ${this.octave}–${this.octave+2}`;
     this.render();
@@ -2580,7 +2593,7 @@ function viewKeyboard() {
           <button class="icon-btn" onclick="KB.shiftOct(+1)">▶</button>
         </div>
         <!-- Semitono (legato) -->
-        <div id="kb-semi-btns" style="display:${KB.mode==='legato'?'flex':'none'};align-items:center;gap:4px">
+        <div id="kb-semi-btns" style="display:flex;align-items:center;gap:4px">
           <button class="icon-btn" onclick="KB.shiftSemitone(-1)" style="padding:4px 12px;font-size:15px">−</button>
           <span style="font-size:10px;color:var(--muted);white-space:nowrap">Semitono</span>
           <button class="icon-btn" onclick="KB.shiftSemitone(+1)" style="padding:4px 12px;font-size:15px">+</button>
