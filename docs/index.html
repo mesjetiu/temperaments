@@ -390,7 +390,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'c185609 · 2026-04-04';// ── Service Worker ──
+const APP_VERSION = '7a0ab2c · 2026-04-04';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3574,10 +3574,16 @@ const DT = {
     savePrefs({ pitchA });
     const inp = document.getElementById('pitch-input');
     if (inp) inp.value = pitchA;
+    // La calibrado → fijar A = 0 cents
+    this.notes[9] = 0;
     this.phase = 'measuring';
     this._stableNi = -1; this._stableCount = 0;
     this._updateCalibrationUI();
     this._renderKeyboard();
+    const cnt = document.getElementById('dt-count');
+    if (cnt) cnt.textContent = this.measuredCount() + '/12';
+    const sp = document.getElementById('dt-save-row');
+    if (sp) sp.style.display = 'flex';
   },
   _updateCalibrationUI() {
     const el = document.getElementById('dt-calib-row');
@@ -3837,7 +3843,10 @@ const DT = {
     const name = nameEl.value.trim();
     if (!name) { nameEl.focus(); return; }
     if (this.measuredCount() === 0) return;
-    const offsets = this.getOffsets();
+    // Normalizar: A = 0 cents (restar el valor de La a todos)
+    const raw = this.getOffsets();
+    const aOffset = raw[9] || 0;
+    const offsets = raw.map(v => Math.round((v - aOffset) * 10) / 10);
     addUserTemp(name, offsets);
     const t = all.find(x => x.name === name && x.source === 'Usuario');
     if (t) { selected[0] = t; lastSelected = t; renderBadges(); }
