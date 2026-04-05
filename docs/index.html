@@ -406,7 +406,7 @@
 </div>
 
 <script>
-const APP_VERSION = '97bb3e0 · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '75e856f · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2660,18 +2660,15 @@ function viewKeyboard() {
         </button>
       </div>
 
-      <!-- La de referencia (editable, visible en fullscreen) -->
-      <div style="display:flex;align-items:center;gap:5px;margin-bottom:8px;flex-wrap:wrap">
-        <span style="font-size:11px;color:var(--muted)">La =</span>
+      <!-- La + Temperamento en la misma fila -->
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:#4b5563;margin-bottom:10px">
+        <span style="color:var(--muted)">La =</span>
         <input id="kb-pitch-input" type="number" value="${pitchA}" min="390" max="470" step="0.1"
-          style="width:64px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:12px;text-align:center;outline:none"
+          style="width:58px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:11px;text-align:center;outline:none"
           onchange="setPitchAGlobal(this.value)"
           onkeydown="if(event.key==='Enter')setPitchAGlobal(this.value)">
-        <span style="font-size:11px;color:var(--muted)">Hz</span>
-      </div>
-
-      <!-- Temperamento activo -->
-      <div style="font-size:11px;color:#4b5563;margin-bottom:10px">
+        <span style="color:var(--muted)">Hz</span>
+        <span style="color:var(--border)">·</span>
         Temperamento: <span style="color:var(--c0)">${tempName}</span>
         ${!selected.find(Boolean) ? '<span style="color:#f87171"> — selecciona uno en la lista</span>' : ''}
       </div>
