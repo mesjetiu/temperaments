@@ -22,7 +22,7 @@
     <circle r="60"  fill="#0d1520" stroke="#1f2937" stroke-width="1.5"/>
     <text x="0" y="0" text-anchor="middle" dominant-baseline="central"
           font-family="'Cinzel', 'Trajan Pro', Georgia, serif"
-          font-size="78" font-weight="700" fill="#c9a227">S</text>
+          font-size="195" font-weight="700" font-style="italic" fill="#c9a227">S</text>
 
     <!-- Segmentos: cada uno ocupa 30° (360/12). Arco desde r=112 a r=191 -->
     <!-- gap de 2° en cada lado → arco neto 26° -->
