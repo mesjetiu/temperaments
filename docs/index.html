@@ -432,7 +432,7 @@
 </div>
 
 <script>
-const APP_VERSION = '514e8d1 · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '238ac04 · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1590,6 +1590,8 @@ function restoreSession() {
   if (p.tunerVizMode) TUNER.vizMode = p.tunerVizMode;
   // Restaurar octava del afinador
   if (p.tunerOct !== undefined) TUNER.tunerOct = p.tunerOct;
+  // Restaurar filtro de fuentes del medidor
+  if (p.dtSuggSources !== undefined) DT._suggSources = p.dtSuggSources ? new Set(p.dtSuggSources) : null;
   // Restaurar pestaña activa (no restaurar 'tuner' al inicio)
   if (p.activeTab && p.activeTab !== 'tuner') {
     activeTab = p.activeTab;
@@ -3741,6 +3743,7 @@ const DT = {
   rafId: null, lastAnalysis: 0,
   _stableNi: -1, _stableCount: 0, _stableCents: 0, _stableFreq: 0, _buf: null,
   _captureA: false,      // auto mode: capturando La para calibrar pitchA
+  _suggSources: null,    // Set de fuentes activas para sugerencias (null = todas)
   _statusLock: 0,        // timestamp hasta el que no sobreescribir el status
   STABLE_FRAMES: 18,     // ~1.8 s a ≈100 ms/análisis
 
@@ -4153,7 +4156,12 @@ const DT = {
     const idxs = measured.map((_,i) => i).filter(i => measured[i] !== null);
     if (idxs.length < 3) return [];
     const mMean = idxs.reduce((s,i) => s + measured[i], 0) / idxs.length;
-    return all
+    const sources = this._suggSources;
+    const pool = sources === null ? all : all.filter(t => {
+      if (sources.has('Favoritos') && favs.has(t.name)) return true;
+      return sources.has(t.source);
+    });
+    return pool
       .map(t => {
         const rMean = idxs.reduce((s,i) => s + t.offsets[i], 0) / idxs.length;
         const rms = Math.sqrt(
@@ -4165,12 +4173,49 @@ const DT = {
       .slice(0, n);
   },
 
+  _allSources() {
+    const srcs = [...new Set(all.map(t => t.source))].sort();
+    if (favs.size > 0) srcs.unshift('Favoritos');
+    return srcs;
+  },
+  toggleSuggSource(src) {
+    if (this._suggSources === null) {
+      // pasar de "todas" a "todas excepto src"
+      const all_srcs = new Set(this._allSources());
+      all_srcs.delete(src);
+      this._suggSources = all_srcs;
+    } else {
+      if (this._suggSources.has(src)) this._suggSources.delete(src);
+      else this._suggSources.add(src);
+      // si están todas activas, volver a null
+      const total = this._allSources();
+      if (total.every(s => this._suggSources.has(s))) this._suggSources = null;
+    }
+    savePrefs({ dtSuggSources: this._suggSources ? [...this._suggSources] : null });
+    this._renderSuggestions();
+  },
+
   _renderSuggestions() {
     const el = document.getElementById('dt-suggestions');
     if (!el) return;
     const n = this.measuredCount();
+
+    // ── Chips de filtro de fuentes ──
+    const allSrcs = this._allSources();
+    const chips = allSrcs.map(src => {
+      const active = this._suggSources === null || this._suggSources.has(src);
+      const isFav = src === 'Favoritos';
+      const col = active ? (isFav ? '#fbbf24' : '#60a5fa') : '#374151';
+      const bg  = active ? (isFav ? 'rgba(251,191,36,0.15)' : 'rgba(96,165,250,0.15)') : 'transparent';
+      return `<button onclick="DT.toggleSuggSource('${src}')"
+        style="font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${col};background:${bg};color:${col};cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent">
+        ${isFav ? '★ ' : ''}${src}
+      </button>`;
+    }).join('');
+    const filterRow = `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">${chips}</div>`;
+
     if (n < 3) {
-      el.innerHTML = `<div style="font-size:11px;color:#4b5563;text-align:center;padding:10px 0">
+      el.innerHTML = filterRow + `<div style="font-size:11px;color:#4b5563;text-align:center;padding:10px 0">
         Mide al menos 3 notas para ver sugerencias (${n}/3)
       </div>`;
       return;
@@ -4201,7 +4246,7 @@ const DT = {
         <div style="font-size:9px;color:#4b5563;flex-shrink:0;max-width:54px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.source}</div>
       </div>`;
     }).join('');
-    el.innerHTML = hdr + rows;
+    el.innerHTML = filterRow + hdr + (sugs.length ? rows : '<div style="font-size:11px;color:#4b5563;text-align:center;padding:8px 0">Sin resultados con los filtros activos</div>');
   },
 
   selectSuggested(idx) {
