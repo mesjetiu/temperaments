@@ -169,7 +169,7 @@
   .panel h3 { font-size: 12px; color: var(--accent); margin-bottom: 12px; font-weight: 600; }
   .panel-h3-row { display:flex; align-items:flex-start; gap:6px; margin-bottom:12px; }
   .panel-h3-row h3 { margin-bottom:0; flex:1; }
-  .panel-zoom-btn { background:none; border:none; color:#6b7280; cursor:pointer; font-size:20px; line-height:1; padding:2px 4px; flex-shrink:0; -webkit-tap-highlight-color:transparent; transition:color 0.15s; }
+  .panel-zoom-btn { background:none; border:none; color:#6b7280; cursor:pointer; padding:4px; flex-shrink:0; display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent; transition:color 0.15s; }
   .panel-zoom-btn:hover { color:#94a3b8; }
   .chart-resize-handle { display:flex; align-items:center; justify-content:center; height:22px; margin:4px 0 0; cursor:ns-resize; touch-action:none; border-top:1px solid var(--border); -webkit-tap-highlight-color:transparent; }
   .chart-resize-handle::after { content:''; display:block; width:44px; height:4px; border-radius:2px; background:#2d3f55; }
@@ -314,7 +314,7 @@
     <div id="desk-header">
       <span id="desk-header-hint" style="font-size:12px;color:#6b7280;white-space:nowrap">Selecciona un temperamento:</span>
       <div id="desk-badges" style="display:flex;gap:6px;flex-wrap:wrap;flex:1"></div>
-      <button onclick="toggleContentFullscreen()" title="Pantalla completa" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:22px;padding:2px 6px;flex-shrink:0;line-height:1" id="desk-fullscreen-btn">⤢</button>
+      <button onclick="toggleContentFullscreen()" title="Pantalla completa" style="background:none;border:none;color:#6b7280;cursor:pointer;padding:4px 6px;flex-shrink:0;display:flex;align-items:center;justify-content:center" id="desk-fullscreen-btn"></button>
     </div>
 
     <div id="tabs">
@@ -406,7 +406,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'c882372 · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '90f267c · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -759,6 +759,9 @@ document.getElementById('wave-sel').addEventListener('change', function() {
 
 
 // ── Pitch A ──
+const ICON_EXPAND   = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`;
+const ICON_COLLAPSE = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>`;
+
 document.getElementById('pitch-input').addEventListener('input', function() {
   const v = parseFloat(this.value);
   if (v > 0) { pitchA = v; savePrefs({ pitchA: v }); }
@@ -788,7 +791,7 @@ function toggleTopBar(forceHide) {
 function toggleKbFullscreen() {
   const isFs = document.body.classList.toggle('kb-fullscreen');
   const btn = document.getElementById('kb-fs-btn');
-  if (btn) btn.textContent = isFs ? '⤡' : '⤢';
+  if (btn) btn.innerHTML = isFs ? ICON_COLLAPSE : ICON_EXPAND;
   if (isFs) closeSidebar();
   if (activeTab === 'keyboard') KB.render();
 }
@@ -800,7 +803,7 @@ function toggleContentFullscreen() {
   const isFs = content.classList.toggle('content-fullscreen');
   if (closeBtn) closeBtn.style.display = isFs ? 'flex' : 'none';
   ['mob-fullscreen-btn','desk-fullscreen-btn'].forEach(id => {
-    const b = document.getElementById(id); if (b) b.textContent = isFs ? '⤡' : '⤢';
+    const b = document.getElementById(id); if (b) b.innerHTML = isFs ? ICON_COLLAPSE : ICON_EXPAND;
   });
   renderContent();
 }
@@ -1910,7 +1913,7 @@ function mkRadar(id, datasets) {
 // En móvil genera un panel con header clicable que colapsa el contenido.
 // En desktop devuelve el HTML tal cual (sin wrapper extra).
 function panel(title, bodyHtml, style = '') {
-  const zoomBtn = `<button class="panel-zoom-btn" onclick="toggleContentFullscreen()" title="Pantalla completa">⤢</button>`;
+  const zoomBtn = `<button class="panel-zoom-btn" onclick="toggleContentFullscreen()" title="Pantalla completa">${ICON_EXPAND}</button>`;
   if (!isMobile()) {
     return `<div class="panel" style="${style}"><div class="panel-h3-row"><h3>${title}</h3>${zoomBtn}</div>${bodyHtml}</div>`;
   }
@@ -2655,8 +2658,8 @@ function viewKeyboard() {
           Limpiar ✕
         </button>
         <!-- Pantalla completa -->
-        <button id="kb-fs-btn" class="icon-btn" onclick="toggleKbFullscreen()" title="Pantalla completa" style="margin-left:auto;font-size:20px;padding:2px 8px">
-          ${document.body.classList.contains('kb-fullscreen') ? '⤡' : '⤢'}
+        <button id="kb-fs-btn" class="icon-btn" onclick="toggleKbFullscreen()" title="Pantalla completa" style="margin-left:auto;display:flex;align-items:center;justify-content:center;padding:4px 8px">
+          ${document.body.classList.contains('kb-fullscreen') ? ICON_COLLAPSE : ICON_EXPAND}
         </button>
       </div>
 
@@ -4182,6 +4185,9 @@ screen.orientation?.addEventListener('change', _onResize);
 // ══════════════════════════════════════════════
 // ARRANQUE
 // ══════════════════════════════════════════════
+// Inicializar iconos SVG en botones estáticos
+document.getElementById('desk-fullscreen-btn').innerHTML = ICON_EXPAND;
+
 loadData();
 </script>
 </body>
