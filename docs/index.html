@@ -94,6 +94,16 @@
   #content-fullscreen-close { display: none; position: fixed; top: 10px; right: 10px; z-index: 960; background: rgba(15,23,42,0.85); border: 1px solid #334155; color: #e2e8f0; border-radius: 50%; width: 36px; height: 36px; font-size: 18px; cursor: pointer; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
   #content.content-fullscreen { position: fixed !important; inset: 0 !important; z-index: 950 !important; overflow-y: auto !important; padding: 12px !important; box-sizing: border-box !important; }
 
+  /* ═══ TECLADO FULLSCREEN ═══ */
+  body.kb-fullscreen #mob-header,
+  body.kb-fullscreen #desk-header,
+  body.kb-fullscreen #tabs,
+  body.kb-fullscreen #top-collapsible,
+  body.kb-fullscreen #tuner-fab { display: none !important; }
+  body.kb-fullscreen #content { position: fixed !important; inset: 0 !important; z-index: 950 !important; overflow-y: auto !important; padding: 8px !important; box-sizing: border-box !important; }
+  #kb-fs-close { display: none; position: fixed; top: 8px; right: 8px; z-index: 960; background: rgba(15,23,42,0.85); border: 1px solid #334155; color: #e2e8f0; border-radius: 50%; width: 36px; height: 36px; font-size: 18px; cursor: pointer; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
+  body.kb-fullscreen #kb-fs-close { display: flex !important; }
+
 
   /* ═══ DESK HEADER ═══ */
   #desk-header { padding: 10px 18px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-height: 46px; flex-shrink: 0; }
@@ -299,6 +309,7 @@
       <div id="mob-badges"></div>
     </div>
     <button id="content-fullscreen-close" onclick="toggleContentFullscreen()" title="Salir de pantalla completa">✕</button>
+    <button id="kb-fs-close" onclick="toggleKbFullscreen()" title="Salir de pantalla completa">✕</button>
 
     <div id="desk-header">
       <span id="desk-header-hint" style="font-size:12px;color:#6b7280;white-space:nowrap">Selecciona un temperamento:</span>
@@ -395,7 +406,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'bb3045c · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = 'c0174e0 · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -764,6 +775,15 @@ function toggleTopBar(forceHide) {
   coll.classList.toggle('top-hidden', hide);
   if (arrow) arrow.style.transform = hide ? 'rotate(180deg)' : 'rotate(0deg)';
   savePrefs({ audioBarHidden: hide });
+}
+
+// ── Pantalla completa del teclado ──
+function toggleKbFullscreen() {
+  const isFs = document.body.classList.toggle('kb-fullscreen');
+  const btn = document.getElementById('kb-fs-btn');
+  if (btn) btn.textContent = isFs ? '⤡' : '⤢';
+  if (isFs) closeSidebar();
+  if (activeTab === 'keyboard') KB.render();
 }
 
 // ── Pantalla completa de gráfica ──
@@ -1619,6 +1639,7 @@ function clearSel(i) { selected[i]=null; renderBadges(); refreshList(); renderCo
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', function() {
   if (activeTab === 'keyboard' && this.dataset.tab !== 'keyboard') {
     if (KB.mode !== 'chord') KB.clearAll();
+    if (document.body.classList.contains('kb-fullscreen')) toggleKbFullscreen();
   }
   if (activeTab === 'tuner' && this.dataset.tab !== 'tuner') {
     TUNER.stop();
@@ -2623,8 +2644,12 @@ function viewKeyboard() {
         </div>
         <!-- Limpiar acorde -->
         <button id="kb-clear-btn" class="icon-btn" onclick="KB.clearAll()"
-          style="margin-left:auto;display:${KB.mode==='chord'?'inline-block':'none'};opacity:${KB.chordMap.size>0?'1':'0.4'}">
+          style="display:${KB.mode==='chord'?'inline-block':'none'};opacity:${KB.chordMap.size>0?'1':'0.4'}">
           Limpiar ✕
+        </button>
+        <!-- Pantalla completa -->
+        <button id="kb-fs-btn" class="icon-btn" onclick="toggleKbFullscreen()" title="Pantalla completa" style="margin-left:auto">
+          ${document.body.classList.contains('kb-fullscreen') ? '⤡' : '⤢'}
         </button>
       </div>
 
