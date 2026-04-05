@@ -64,6 +64,26 @@
   .temp-ctx-disabled { color: #4b5563 !important; cursor: default !important; }
   .temp-ctx-disabled:hover { background: none !important; }
 
+  /* ═══ UPDATE TOAST ═══ */
+  #update-toast {
+    display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.7); z-index: 9999;
+    padding: 14px 18px; display: none; align-items: center; gap: 14px;
+    font-size: 13px; color: #e2e8f0; white-space: nowrap; max-width: calc(100vw - 32px);
+  }
+  #update-toast.visible { display: flex; }
+  #update-toast button {
+    background: #1d4ed8; border: none; color: #fff; border-radius: 7px;
+    padding: 7px 14px; cursor: pointer; font-size: 13px; font-weight: 600; flex-shrink: 0;
+  }
+  #update-toast button:hover { background: #2563eb; }
+  #update-toast-dismiss {
+    background: none !important; border: 1px solid #475569 !important; color: #94a3b8 !important;
+    padding: 6px 10px !important; font-weight: 400 !important;
+  }
+  #update-toast-dismiss:hover { background: #1f2937 !important; }
+
   /* ═══ SHARE DIALOG ═══ */
   #share-dialog { display:none; position:fixed; inset:0; z-index:2000; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; padding:16px; }
   #share-dialog.open { display:flex; }
@@ -434,19 +454,43 @@
   </div>
 </div>
 
+<div id="update-toast">
+  <span>Nueva versión disponible</span>
+  <button onclick="applyUpdate()">Actualizar</button>
+  <button id="update-toast-dismiss" onclick="dismissUpdateToast()">Ahora no</button>
+</div>
+
 <script>
-const APP_VERSION = 'bf16d33 · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = 'f765cb2 · 2026-04-05';
+
+// ── Update toast ──
+let _pendingUpdateSW = null;
+function showUpdateToast(waitingSW) {
+  _pendingUpdateSW = waitingSW || null;
+  document.getElementById('update-toast').classList.add('visible');
+}
+function dismissUpdateToast() {
+  document.getElementById('update-toast').classList.remove('visible');
+}
+function applyUpdate() {
+  if (_pendingUpdateSW) {
+    _pendingUpdateSW.postMessage({ type: 'SKIP_WAITING' });
+  } else {
+    window.location.reload();
+  }
+}
+
+// ── Service Worker ──
 if ('serviceWorker' in navigator) {
-  let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!reloading) { reloading = true; window.location.reload(); }
+    window.location.reload();
   });
 
-  function activateSW(sw) {
+  function onSWInstalled(sw) {
     if (!sw) return;
     if (navigator.serviceWorker.controller) {
-      // Update real: hay un SW antiguo controlando → forzar relevo
-      sw.postMessage({ type: 'SKIP_WAITING' });
+      // Update real: hay un SW antiguo controlando → avisar al usuario
+      showUpdateToast(sw);
     }
     // Sin controller (primera instalación): el activate + claim() lo gestiona solo
   }
@@ -456,15 +500,14 @@ if ('serviceWorker' in navigator) {
       reg.update().catch(() => {});
 
       // SW ya esperando (de una visita anterior que no completó la transición)
-      if (reg.waiting) activateSW(reg.waiting);
+      if (reg.waiting) onSWInstalled(reg.waiting);
 
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
         if (!newSW) return;
-        // Race condition fix: comprobar estado actual antes de esperar eventos
-        if (newSW.state === 'installed') { activateSW(newSW); return; }
+        if (newSW.state === 'installed') { onSWInstalled(newSW); return; }
         newSW.addEventListener('statechange', () => {
-          if (newSW.state === 'installed') activateSW(newSW);
+          if (newSW.state === 'installed') onSWInstalled(newSW);
         });
       });
     }).catch(() => {});
@@ -472,19 +515,15 @@ if ('serviceWorker' in navigator) {
 }
 
 // ── Chequeo de versión independiente del ciclo SW ──────────────────────────
-// Garantía adicional: si el SW no detecta la actualización, este chequeo sí lo hace.
-// version.json siempre se sirve desde red (el SW nunca lo cachea).
 async function checkForNewVersion() {
   try {
-    // Query param único → bypasea cualquier caché intermedia
     const r = await fetch('./version.json?_=' + Date.now(), { cache: 'no-cache' });
     if (!r.ok) return;
     const { v } = await r.json();
     if (!v || v === APP_VERSION) return;
-    // Nueva versión detectada: activar SW en espera si existe, luego recargar
+    // Nueva versión detectada: mostrar aviso (no recargar automáticamente)
     const reg = await navigator.serviceWorker.getRegistration('./');
-    if (reg?.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-    setTimeout(() => window.location.reload(), 400);
+    showUpdateToast(reg?.waiting || null);
   } catch (e) {}
 }
 window.addEventListener('load', () => setTimeout(checkForNewVersion, 3000));
