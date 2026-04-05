@@ -390,7 +390,7 @@
 </div>
 
 <script>
-const APP_VERSION = '064966d · 2026-04-04';// ── Service Worker ──
+const APP_VERSION = '808e3e0 · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3690,8 +3690,13 @@ const DT = {
     const cents  = 1200 * Math.log2(freq / etFreq);
 
     if (measureNi === this._stableNi) {
-      this._stableCount++;
-      this._stableCents = this._stableCents * 0.75 + cents * 0.25;
+      // Resetear si el pitch saltó más de 80¢ (nota inestable / cambio de nota)
+      if (Math.abs(cents - this._stableCents) > 80) {
+        this._stableNi = measureNi; this._stableCount = 1; this._stableCents = cents;
+      } else {
+        this._stableCount++;
+        this._stableCents = this._stableCents * 0.75 + cents * 0.25;
+      }
     } else {
       this._stableNi = measureNi; this._stableCount = 1; this._stableCents = cents;
     }
@@ -3701,7 +3706,8 @@ const DT = {
     this._renderKeyboard();
 
     if (this._stableCount >= this.STABLE_FRAMES) {
-      this.notes[measureNi] = Math.round(this._stableCents * 10) / 10;
+      // La (A) es siempre 0: es la referencia de calibración por definición
+      this.notes[measureNi] = (measureNi === 9) ? 0 : Math.round(this._stableCents * 10) / 10;
       this._stableNi = -1; this._stableCount = 0;
       if (this.mode === 'manual') this._targetNi = -1;
       const cnt = document.getElementById('dt-count');
@@ -3829,7 +3835,7 @@ const DT = {
 
   reset() {
     this.notes = new Array(12).fill(null);
-    this.phase = 'calibrating'; this._targetNi = -1;
+    this.phase = 'measuring'; this._targetNi = -1;
     this._stableNi = -1; this._stableCount = 0;
     this._renderKeyboard(); this._updateCalibrationUI(); this._updateStatus('—');
     this._clearExport();
