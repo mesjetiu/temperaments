@@ -354,7 +354,12 @@
 
       <div class="ab-sep"></div>
 
-      <button id="play-mode-btn" class="icon-btn" onclick="toggleChartPlayMode()" title="Modo de reproducción en gráficas">Normal</button>
+      <label onclick="toggleChartPlayMode()" style="display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none" title="Sustain: la nota sigue sonando al soltar">
+        <div id="play-mode-track" style="position:relative;width:28px;height:15px;background:${chartPlayMode==='legato'?'#3b82f6':'#334155'};border-radius:8px;flex-shrink:0;transition:background 0.2s">
+          <div id="play-mode-thumb" style="position:absolute;top:2px;left:${chartPlayMode==='legato'?'13px':'2px'};width:11px;height:11px;background:#fff;border-radius:50%;transition:left 0.2s"></div>
+        </div>
+        <span style="font-size:11px;color:var(--muted)">Sustain</span>
+      </label>
 
       <span id="audio-hint">mantén pulsado sobre las gráficas para escuchar</span>
     </div>
@@ -390,7 +395,7 @@
 </div>
 
 <script>
-const APP_VERSION = '9fbfc4d · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = 'bbd687b · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -947,12 +952,12 @@ function _initZoomTable(wrap) {
 // ── Modo reproducción gráficas ──
 function toggleChartPlayMode() {
   chartPlayMode = chartPlayMode === 'normal' ? 'legato' : 'normal';
-  const btn = document.getElementById('play-mode-btn');
-  if (btn) {
-    btn.textContent = chartPlayMode === 'legato' ? 'Legato' : 'Normal';
-    btn.classList.toggle('sel', chartPlayMode === 'legato');
-  }
-  if (chartPlayMode === 'normal') stopSound(true);
+  const on = chartPlayMode === 'legato';
+  const track = document.getElementById('play-mode-track');
+  const thumb = document.getElementById('play-mode-thumb');
+  if (track) track.style.background = on ? '#3b82f6' : '#334155';
+  if (thumb) thumb.style.left = on ? '13px' : '2px';
+  if (!on) stopSound(true);
 }
 
 // ── Octava gráficas ──
