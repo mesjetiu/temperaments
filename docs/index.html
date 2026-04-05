@@ -390,7 +390,7 @@
 </div>
 
 <script>
-const APP_VERSION = '808e3e0 · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '997587b · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1440,7 +1440,8 @@ function parseMarkdown(text) {
 function restoreSession() {
   const p = loadPrefs();
   // Restaurar pitch A
-  if (p.pitchA) {
+  // Validar rango: pitchA debe estar entre 390–470 Hz (A4 estándar ± ~3 semitonos)
+  if (p.pitchA && p.pitchA >= 390 && p.pitchA <= 470) {
     pitchA = p.pitchA;
     document.getElementById('pitch-input').value = p.pitchA;
   }
@@ -3570,6 +3571,8 @@ const DT = {
     while (f < 300) f *= 2;
     while (f > 600) f /= 2;
     this._calPitchA = Math.round(f * 100) / 100;
+    // Sanity: rechazar calibración fuera de rango A4 ± 3 semitonos
+    if (this._calPitchA < 390 || this._calPitchA > 470) return;
     pitchA = this._calPitchA;
     savePrefs({ pitchA });
     const inp = document.getElementById('pitch-input');
