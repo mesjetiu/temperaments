@@ -432,7 +432,7 @@
 </div>
 
 <script>
-const APP_VERSION = '8de40a5 · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '7194278 · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -557,14 +557,31 @@ function addUserTemp(name, offsets, notes) {
   saveUserTemps(arr);
   injectUserTemps(); refreshList();
 }
-function saveUserTempNotes(name, notes) {
+const NOTES_KEY = 'tempNotes';
+function loadTempNotesStore() { try { return JSON.parse(localStorage.getItem(NOTES_KEY) || '{}'); } catch(e) { return {}; } }
+function getTempNotes(name) {
+  // User temps: notes live in user array; all others: in the notes store
+  const t = all.find(x => x.name === name && x.source === 'Usuario');
+  if (t) return t.notes || '';
+  return loadTempNotesStore()[name] || '';
+}
+function saveTempNotes(name, notes) {
+  // User temps: persist in user array
   const arr = loadUserTemps();
   const idx = arr.findIndex(t => t.name === name);
-  if (idx < 0) return;
-  arr[idx].notes = notes;
-  saveUserTemps(arr);
-  // update in-memory `all` array too
-  const t = all.find(x => x.name === name && x.source === 'Usuario');
+  if (idx >= 0) {
+    arr[idx].notes = notes;
+    saveUserTemps(arr);
+    const t = all.find(x => x.name === name && x.source === 'Usuario');
+    if (t) t.notes = notes;
+    return;
+  }
+  // All other temps: persist in notes store
+  const store = loadTempNotesStore();
+  if (notes) store[name] = notes; else delete store[name];
+  localStorage.setItem(NOTES_KEY, JSON.stringify(store));
+  // update in-memory
+  const t = all.find(x => x.name === name);
   if (t) t.notes = notes;
 }
 function deleteUserTemp(name) {
@@ -609,14 +626,11 @@ let _shareTemp = null;
 function showShareDialog(t) {
   _shareTemp = t;
   document.getElementById('share-name-input').value = t.name;
+  const notes = getTempNotes(t.name);
   const notesSection = document.getElementById('share-notes-section');
   const notesInput = document.getElementById('share-notes-input');
-  if (t.notes) {
-    notesInput.value = t.notes;
-    notesSection.style.display = 'block';
-  } else {
-    notesSection.style.display = 'none';
-  }
+  notesInput.value = notes;
+  notesSection.style.display = notes ? 'block' : 'none';
   document.getElementById('share-dialog').classList.add('open');
 }
 function closeShareDialog() {
@@ -2038,13 +2052,10 @@ function viewOverview(act) {
           </div>
         </div>
         <div style="margin-top:14px">
-          <div style="font-size:11px;color:#64748b;margin-bottom:5px">Notas${isUser?' <span style="color:#1d4ed8">(editable)</span>':''}</div>
-          ${isUser
-            ? `<textarea id="overview-notes" rows="3" placeholder="Descripción, origen histórico, características…"
-                style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;color:#cbd5e1;border-radius:6px;padding:8px 10px;font-size:12px;outline:none;resize:vertical;font-family:inherit"
-                onblur="saveUserTempNotes('${t.name.replace(/'/g,"\\'")}', this.value)">${t.notes||''}</textarea>`
-            : `<div style="font-size:12px;color:#94a3b8;line-height:1.6;min-height:1.5em">${t.notes ? t.notes.replace(/\n/g,'<br>') : '<span style="color:#334155">Sin descripción</span>'}</div>`
-          }
+          <div style="font-size:11px;color:#64748b;margin-bottom:5px">Notas</div>
+          <textarea id="overview-notes" rows="3" placeholder="Descripción, origen histórico, características…"
+            style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;color:#cbd5e1;border-radius:6px;padding:8px 10px;font-size:12px;outline:none;resize:vertical;font-family:inherit"
+            onblur="saveTempNotes('${t.name.replace(/'/g,"\\'")}', this.value)">${getTempNotes(t.name)}</textarea>
         </div>
       </div>`
       // ── STAT CARDS ──
