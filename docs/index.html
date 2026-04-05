@@ -406,7 +406,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'c0174e0 · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '4191d1c · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3591,6 +3591,7 @@ const DT = {
   micOn: false, micStream: null, analyser: null,
   rafId: null, lastAnalysis: 0,
   _stableNi: -1, _stableCount: 0, _stableCents: 0, _buf: null,
+  _captureA: false,      // auto mode: capturando La para calibrar pitchA
   STABLE_FRAMES: 18,     // ~1.8 s a ≈100 ms/análisis
 
   getOffsets()    { return this.notes.map(v => v === null ? 0 : v); },
@@ -3598,10 +3599,12 @@ const DT = {
 
   setMode(m) {
     this.mode = m;
+    this._captureA = false;
     this._targetNi = -1; this._stableNi = -1; this._stableCount = 0;
     document.querySelectorAll('.dt-mode-btn').forEach(b =>
       b.classList.toggle('sel', b.dataset.m === m));
     this._renderKeyboard();
+    this._updatePitchRow();
     this._updateStatus(m === 'manual' ? 'Pulsa una tecla para seleccionar nota' : '—');
   },
 
@@ -3625,19 +3628,41 @@ const DT = {
     if (this.notes[9] === null) return;
     const aFreq = pitchA * Math.pow(2, this.notes[9] / 1200);
     this.setPitchA(aFreq);
+    this.notes[9] = 0;  // forzar 0 exacto (evitar residuo por redondeo)
+    this._renderKeyboard();
+    this._updatePitchRow();
     this._updateStatus(`✓ Normalizado — La: ${pitchA} Hz`);
+  },
+
+  startCaptureA() {
+    this._captureA = true;
+    this._stableNi = -1; this._stableCount = 0;
+    this._updatePitchRow();
+    this._updateStatus('Toca La en tu instrumento…');
+  },
+  stopCaptureA() {
+    this._captureA = false;
+    this._stableNi = -1; this._stableCount = 0;
+    this._updatePitchRow();
+    this._updateStatus('—');
   },
 
   _updatePitchRow() {
     const el = document.getElementById('dt-pitch-row');
     if (!el) return;
     const canNorm = this.notes[9] !== null && this.notes[9] !== 0;
+    const captureBtn = this.mode === 'auto'
+      ? (this._captureA
+          ? `<button class="icon-btn" onclick="DT.stopCaptureA()" style="font-size:10px;color:#f87171;border-color:#b91c1c;margin-left:4px">✕ Cancelar</button>`
+          : `<button class="icon-btn" onclick="DT.startCaptureA()" style="font-size:10px;margin-left:4px">🎤 Tomar La</button>`)
+      : '';
     el.innerHTML =
       `<span style="font-size:11px;color:var(--muted)">La ref:</span>
        <input id="dt-pitch-input" type="number" value="${pitchA}" step="0.01" min="390" max="470"
          style="width:64px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:11px;text-align:center;outline:none"
          onchange="DT.setPitchA(this.value)" onkeydown="if(event.key==='Enter')DT.setPitchA(this.value)">
        <span style="font-size:11px;color:var(--muted)">Hz</span>`
+      + captureBtn
       + (canNorm ? `<button class="icon-btn" onclick="DT.normalize()" style="font-size:10px;margin-left:4px;color:#fcd34d;border-color:#b45309">Normalizar A→0</button>` : '');
   },
 
@@ -3667,6 +3692,7 @@ const DT = {
     if (this.rafId) { cancelAnimationFrame(this.rafId); this.rafId = null; }
     document.querySelectorAll('.dt-mic-track').forEach(e => e.style.background='#334155');
     document.querySelectorAll('.dt-mic-thumb').forEach(e => e.style.left='2px');
+    this._captureA = false;
     this._stableNi = -1; this._stableCount = 0;
     this._renderKeyboard(); this._updateStatus('—');
   },
@@ -3697,14 +3723,54 @@ const DT = {
     const res = detectPitch(this._buf, this.analyser.context.sampleRate);
     if (!res || res.clarity < 0.15) {
       if (this._stableNi !== -1) { this._stableNi = -1; this._stableCount = 0; this._renderKeyboard(); }
+      // En manual sin nota seleccionada: mostrar instrucción, no "escuchando"
+      if (this.mode === 'manual' && this._targetNi < 0) {
+        this._updateStatus('Pulsa una tecla para seleccionar nota');
+        return;
+      }
       const lvl = Math.min(100, Math.round(rms * 1000));
-      this._updateStatus(lvl > 1 ? `🎤 ${lvl}% — escuchando…` : '—');
+      this._updateStatus(lvl > 1 ? `🎤 ${lvl}% — escuchando…` : (this._captureA ? 'Toca La en tu instrumento…' : '—'));
       return;
     }
     // Refinar frecuencia con interpolación parabólica sobre FFT nativa
     res.freq = _refineFFT(res.freq, this._freqBuf, this.analyser.context.sampleRate);
     const { freq } = res;
     const { ni } = findClosestNote(freq);
+
+    // ── captureA mode (auto): capturar La para calibrar pitchA ──
+    if (this._captureA) {
+      if (ni !== 9) {
+        if (this._stableNi !== -1) { this._stableNi = -1; this._stableCount = 0; }
+        this._updateStatus('Buscando La…');
+        return;
+      }
+      const { oct } = findClosestNote(freq);
+      const etFreq = pitchA * Math.pow(2, (ET_FROM_A[9] + (oct - 4) * 1200) / 1200);
+      const cents = 1200 * Math.log2(freq / etFreq);
+      if (this._stableNi === 9) {
+        if (Math.abs(cents - this._stableCents) > 80) {
+          this._stableCount = 1; this._stableCents = cents;
+        } else {
+          this._stableCount++;
+          this._stableCents = this._stableCents * 0.75 + cents * 0.25;
+        }
+      } else {
+        this._stableNi = 9; this._stableCount = 1; this._stableCents = cents;
+      }
+      const prog = Math.min(1, this._stableCount / this.STABLE_FRAMES);
+      const sign = this._stableCents >= 0 ? '+' : '';
+      this._updateStatus(`La  ${sign}${this._stableCents.toFixed(1)}¢`, prog);
+      if (this._stableCount >= this.STABLE_FRAMES) {
+        this.setPitchA(pitchA * Math.pow(2, this._stableCents / 1200));
+        if (this.notes[9] !== null) this.notes[9] = 0;
+        this._captureA = false;
+        this._stableNi = -1; this._stableCount = 0;
+        this._updateStatus(`✓ La: ${pitchA} Hz — ref actualizada`);
+        this._updatePitchRow();
+        this._renderKeyboard();
+      }
+      return;
+    }
 
     // ── Medición ──
     // En manual: solo medir si hay nota seleccionada
@@ -3746,6 +3812,7 @@ const DT = {
       // Manual: al medir A, fijar pitchA a la frecuencia real detectada (offset queda en 0)
       if (measureNi === 9 && this.mode === 'manual') {
         this.setPitchA(pitchA * Math.pow(2, this._stableCents / 1200));
+        this.notes[9] = 0;  // forzar 0 exacto (evitar residuo por redondeo)
         this._updateStatus(`✓ La: ${pitchA} Hz — ref actualizada`);
       }
       this._renderKeyboard();
@@ -3861,6 +3928,7 @@ const DT = {
 
   reset() {
     this.notes = new Array(12).fill(null);
+    this._captureA = false;
     this._targetNi = -1; this._stableNi = -1; this._stableCount = 0;
     this._renderKeyboard(); this._updatePitchRow(); this._updateStatus('—');
     this._clearExport();
