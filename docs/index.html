@@ -406,7 +406,7 @@
 </div>
 
 <script>
-const APP_VERSION = '9a3d8eb · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '97bb3e0 · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3780,8 +3780,8 @@ const DT = {
         if (this.notes[9] !== null) this.notes[9] = 0;
         this._captureA = false;
         this._stableNi = -1; this._stableCount = 0;
-        this._statusLock = Date.now() + 3000;
         this._updateStatus(`✓ La: ${oldPitchA.toFixed(2)} → ${pitchA.toFixed(2)} Hz`);
+        this._statusLock = Date.now() + 3000;
         this._updatePitchRow();
         this._renderKeyboard();
       }
@@ -3834,8 +3834,8 @@ const DT = {
         const oldPitchA = pitchA;
         this.setPitchA(aFreq);
         this.notes[9] = 0;
-        this._statusLock = Date.now() + 3000;  // bloquear loop 3s para que se vea el mensaje
         this._updateStatus(`✓ La: ${oldPitchA.toFixed(2)} → ${pitchA.toFixed(2)} Hz`);
+        this._statusLock = Date.now() + 3000;  // bloquear loop 3s DESPUÉS de mostrar
       }
       this._renderKeyboard();
       this._updatePitchRow();
