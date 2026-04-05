@@ -406,7 +406,7 @@
 </div>
 
 <script>
-const APP_VERSION = '9cb1642 · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = 'd46e464 · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3607,7 +3607,7 @@ const DT = {
   _targetNi: -1,         // nota objetivo en modo manual
   micOn: false, micStream: null, analyser: null,
   rafId: null, lastAnalysis: 0,
-  _stableNi: -1, _stableCount: 0, _stableCents: 0, _buf: null,
+  _stableNi: -1, _stableCount: 0, _stableCents: 0, _stableFreq: 0, _buf: null,
   _captureA: false,      // auto mode: capturando La para calibrar pitchA
   STABLE_FRAMES: 18,     // ~1.8 s a ≈100 ms/análisis
 
@@ -3757,22 +3757,26 @@ const DT = {
 
     // ── captureA mode: tomar cualquier pitch estable como nueva referencia La ──
     if (this._captureA) {
-      // Estabilidad sobre frecuencia directa (ratio respecto al último valor)
-      if (this._stableNi === 0 && this._stableCents > 0) {
-        const ratio = freq / this._stableCents;  // _stableCents guarda freq promedio aquí
+      // Estabilidad sobre frecuencia directa
+      if (this._stableNi === 0 && this._stableFreq > 0) {
+        const ratio = freq / this._stableFreq;
         if (ratio < 0.95 || ratio > 1.05) {
-          this._stableCount = 1; this._stableCents = freq;
+          this._stableCount = 1; this._stableFreq = freq;
         } else {
           this._stableCount++;
-          this._stableCents = this._stableCents * 0.8 + freq * 0.2;
+          this._stableFreq = this._stableFreq * 0.8 + freq * 0.2;
         }
       } else {
-        this._stableNi = 0; this._stableCount = 1; this._stableCents = freq;
+        this._stableNi = 0; this._stableCount = 1; this._stableFreq = freq;
       }
       const prog = Math.min(1, this._stableCount / this.STABLE_FRAMES);
-      this._updateStatus(`🎤 ${this._stableCents.toFixed(2)} Hz`, prog);
+      this._updateStatus(`🎤 ${this._stableFreq.toFixed(2)} Hz`, prog);
       if (this._stableCount >= this.STABLE_FRAMES) {
-        this.setPitchA(this._stableCents);
+        // Normalizar a la octava de A4 (390–470 Hz)
+        let aFreq = this._stableFreq;
+        while (aFreq < 390) aFreq *= 2;
+        while (aFreq > 470) aFreq /= 2;
+        this.setPitchA(aFreq);
         if (this.notes[9] !== null) this.notes[9] = 0;
         this._captureA = false;
         this._stableNi = -1; this._stableCount = 0;
@@ -3799,13 +3803,14 @@ const DT = {
     if (measureNi === this._stableNi) {
       // Resetear si el pitch saltó más de 80¢ (nota inestable / cambio de nota)
       if (Math.abs(cents - this._stableCents) > 80) {
-        this._stableNi = measureNi; this._stableCount = 1; this._stableCents = cents;
+        this._stableNi = measureNi; this._stableCount = 1; this._stableCents = cents; this._stableFreq = freq;
       } else {
         this._stableCount++;
         this._stableCents = this._stableCents * 0.75 + cents * 0.25;
+        this._stableFreq  = this._stableFreq  * 0.75 + freq  * 0.25;
       }
     } else {
-      this._stableNi = measureNi; this._stableCount = 1; this._stableCents = cents;
+      this._stableNi = measureNi; this._stableCount = 1; this._stableCents = cents; this._stableFreq = freq;
     }
     const prog = Math.min(1, this._stableCount / this.STABLE_FRAMES);
     const sign  = this._stableCents >= 0 ? '+' : '';
@@ -3822,8 +3827,12 @@ const DT = {
       if (sp) sp.style.display = this.measuredCount() > 0 ? 'flex' : 'none';
       // Manual: al medir A, fijar pitchA a la frecuencia real detectada (offset queda en 0)
       if (measureNi === 9 && this.mode === 'manual') {
-        this.setPitchA(pitchA * Math.pow(2, this._stableCents / 1200));
-        this.notes[9] = 0;  // forzar 0 exacto (evitar residuo por redondeo)
+        // Normalizar _stableFreq a la octava de A4 (390–470 Hz)
+        let aFreq = this._stableFreq;
+        while (aFreq < 390) aFreq *= 2;
+        while (aFreq > 470) aFreq /= 2;
+        this.setPitchA(aFreq);
+        this.notes[9] = 0;  // forzar 0 exacto
         this._updateStatus(`✓ La: ${pitchA} Hz — ref actualizada`);
       }
       this._renderKeyboard();
