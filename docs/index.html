@@ -406,7 +406,7 @@
 </div>
 
 <script>
-const APP_VERSION = '0dd0eda · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '977581c · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -762,9 +762,16 @@ document.getElementById('wave-sel').addEventListener('change', function() {
 document.getElementById('pitch-input').addEventListener('input', function() {
   const v = parseFloat(this.value);
   if (v > 0) { pitchA = v; savePrefs({ pitchA: v }); }
-  const tp = document.getElementById('tuner-pitch-input');
-  if (tp) tp.value = this.value;
+  document.querySelectorAll('#tuner-pitch-input,#kb-pitch-input,#dt-pitch-input').forEach(el => { if (el !== this) el.value = this.value; });
 });
+
+function setPitchAGlobal(val) {
+  const v = parseFloat(val);
+  if (!v || v < 390 || v > 470) return;
+  pitchA = v; savePrefs({ pitchA: v });
+  document.querySelectorAll('#pitch-input,#tuner-pitch-input,#kb-pitch-input,#dt-pitch-input').forEach(el => el.value = v);
+  if (TUNER.refOsc) TUNER.refOsc.frequency.setTargetAtTime(TUNER.getTargetFreq(), getCtx().currentTime, 0.01);
+}
 
 // ── Persiana móvil ──
 function toggleTopBar(forceHide) {
@@ -2651,6 +2658,16 @@ function viewKeyboard() {
         <button id="kb-fs-btn" class="icon-btn" onclick="toggleKbFullscreen()" title="Pantalla completa" style="margin-left:auto">
           ${document.body.classList.contains('kb-fullscreen') ? '⤡' : '⤢'}
         </button>
+      </div>
+
+      <!-- La de referencia (editable, visible en fullscreen) -->
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:8px;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--muted)">La =</span>
+        <input id="kb-pitch-input" type="number" value="${pitchA}" min="390" max="470" step="0.1"
+          style="width:64px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:12px;text-align:center;outline:none"
+          onchange="setPitchAGlobal(this.value)"
+          onkeydown="if(event.key==='Enter')setPitchAGlobal(this.value)">
+        <span style="font-size:11px;color:var(--muted)">Hz</span>
       </div>
 
       <!-- Temperamento activo -->
