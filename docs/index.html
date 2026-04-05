@@ -390,7 +390,7 @@
 </div>
 
 <script>
-const APP_VERSION = '997587b · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '46039c4 · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -609,6 +609,23 @@ let envGain    = null;
 let activeOscs = [];
 let currentWave = _prefs.wave ?? 'sawtooth';
 const currentVol = 0.14; // volumen fijo conservador; el usuario usa el volumen del dispositivo
+
+// ── Wake Lock: evita que la pantalla se apague mientras el micrófono está activo ──
+let _wakeLock = null;
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    _wakeLock = await navigator.wakeLock.request('screen');
+    _wakeLock.addEventListener('release', () => { _wakeLock = null; });
+  } catch(_) {}
+}
+function releaseWakeLock() {
+  if (_wakeLock) { _wakeLock.release(); _wakeLock = null; }
+}
+// Reactivar tras volver a primer plano (el wake lock se libera al minimizar)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && (TUNER?.micOn || DT?.micOn)) requestWakeLock();
+});
 
 function getCtx() {
   if (!audioCtx || audioCtx.state === 'closed') {
@@ -2879,6 +2896,7 @@ const TUNER = {
       this.analyser.smoothingTimeConstant = 0;
       src.connect(this.analyser);
       this.micOn = true;
+      requestWakeLock();
       localStorage.setItem('micAutoStart', '1');
       document.querySelectorAll('.mic-toggle-track').forEach(t => t.style.background = '#3b82f6');
       document.querySelectorAll('.mic-toggle-thumb').forEach(t => t.style.left = '16px');
@@ -2896,6 +2914,7 @@ const TUNER = {
     if (this.micStream) { this.micStream.getTracks().forEach(t => t.stop()); this.micStream = null; }
     if (this.analyser) { try { this.analyser.disconnect(); } catch(e){} this.analyser = null; }
     this.micOn = false;
+    if (!DT?.micOn) releaseWakeLock();
     document.querySelectorAll('.mic-toggle-track').forEach(t => t.style.background = '#334155');
     document.querySelectorAll('.mic-toggle-thumb').forEach(t => t.style.left = '2px');
     document.querySelectorAll('.mic-toggle-lbl').forEach(t => { t.style.color = '#64748b'; });
@@ -3612,6 +3631,7 @@ const DT = {
       this.analyser.fftSize = 4096; this.analyser.smoothingTimeConstant = 0;
       ctx.createMediaStreamSource(stream).connect(this.analyser);
       this.micOn = true;
+      requestWakeLock();
       document.querySelectorAll('.dt-mic-track').forEach(e => e.style.background='#3b82f6');
       document.querySelectorAll('.dt-mic-thumb').forEach(e => e.style.left='16px');
       if (!this.rafId) this._scheduleLoop();
@@ -3621,6 +3641,7 @@ const DT = {
     if (this.micStream) { this.micStream.getTracks().forEach(t => t.stop()); this.micStream = null; }
     if (this.analyser) { try { this.analyser.disconnect(); } catch(_){} this.analyser = null; }
     this.micOn = false;
+    if (!TUNER?.micOn) releaseWakeLock();
     if (this.rafId) { cancelAnimationFrame(this.rafId); this.rafId = null; }
     document.querySelectorAll('.dt-mic-track').forEach(e => e.style.background='#334155');
     document.querySelectorAll('.dt-mic-thumb').forEach(e => e.style.left='2px');
