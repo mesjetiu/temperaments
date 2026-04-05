@@ -435,7 +435,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'b085996 · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '9912be7 · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1896,17 +1896,32 @@ function maj3DevColor(dev) {
 }
 // Tabla de offsets respecto al ET
 function offsetsTable(temps) {
+  if (temps.length === 1) {
+    // Vista compacta 2×6 para un solo temperamento
+    const t = temps[0];
+    const cell = i => {
+      const v = t.offsets[i];
+      const c = Math.abs(v) < 1 ? '#4ade80' : Math.abs(v) < 5 ? '#facc15' : '#f87171';
+      return `<td style="color:#94a3b8;font-weight:600;padding:2px 4px 2px 0">${NOTES[i]}</td>`
+           + `<td style="text-align:right;padding:2px 0 2px 6px;color:${c};font-variant-numeric:tabular-nums">${v>=0?'+':''}${v.toFixed(2)}¢</td>`;
+    };
+    const rows = Array.from({length:6}, (_,i) =>
+      `<tr>${cell(i)}<td style="width:16px"></td>${cell(i+6)}</tr>`
+    ).join('');
+    return `<table style="border-collapse:collapse;font-size:12px">${rows}</table>`;
+  }
+  // Vista multi-temperamento (comparar): tabla original
   const rows = NOTES.map((n, i) =>
-    `<tr><td style="color:#94a3b8;font-weight:600;padding:3px 8px">${n}</td>${
+    `<tr><td style="color:#94a3b8;font-weight:600;padding:2px 6px">${n}</td>${
       temps.map(t => {
         const v = t.offsets[i];
         const c = Math.abs(v) < 1 ? '#4ade80' : Math.abs(v) < 5 ? '#facc15' : '#f87171';
-        return `<td style="text-align:right;padding:3px 8px;color:${c}">${v >= 0 ? '+' : ''}${v.toFixed(3)}</td>`;
+        return `<td style="text-align:right;padding:2px 6px;color:${c}">${v>=0?'+':''}${v.toFixed(2)}¢</td>`;
       }).join('')
     }</tr>`
   ).join('');
-  return `<table>
-    <tr><th>Nota</th>${temps.map(t => `<th style="text-align:right">${shortName(t, 22)}</th>`).join('')}</tr>
+  return `<table style="border-collapse:collapse;font-size:12px">
+    <tr><th style="padding:2px 6px">Nota</th>${temps.map(t=>`<th style="text-align:right;padding:2px 6px">${shortName(t,18)}</th>`).join('')}</tr>
     ${rows}
   </table>`;
 }
