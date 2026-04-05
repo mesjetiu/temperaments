@@ -435,7 +435,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'f2175ad · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = 'bf16d33 · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2101,8 +2101,12 @@ function viewOverview(act) {
           `<div class="grad-bar"><span>−8¢</span><div class="grad-strip"></div><span>+4¢</span><span style="color:#4b5563">● pura=701.955¢</span></div>
            <div id="circle-wrap">${drawCircle(selected)}</div>`,
           mob?'':'width:290px')
-      + panel('Offsets respecto al ET (¢)', offsetsTable(act), mob?'':'flex:1;min-width:240px');
+      + panel('Radar — offsets <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un punto</small>',
+          `<canvas id="c-radar" ${mob?'height="200"':'height="240"'}></canvas>`,
+          mob?'':'flex:1;min-width:280px')
+      + panel('Offsets respecto al ET (¢)', offsetsTable(act), mob?'':'flex:1;min-width:200px');
 
+    mkRadar('c-radar', selected.map((t,i) => !t?null:({label:shortName(t),data:t.offsets,backgroundColor:COLORS_A[i],borderColor:COLORS[i],borderWidth:2,pointRadius:4})).filter(Boolean));
     bindCircleAudio();
     return;
   }
