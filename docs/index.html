@@ -433,7 +433,7 @@
 </div>
 
 <script>
-const APP_VERSION = '638d9ae · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '4c18e29 · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -4172,9 +4172,12 @@ const DT = {
     if (idxs.length < 3) return [];
     const mMean = idxs.reduce((s,i) => s + measured[i], 0) / idxs.length;
     const sources = this._suggSources;
+    const MAIN_SRCS = ['Scala','GrandOrgue','Asselin','Usuario'];
     const pool = sources === null ? all : all.filter(t => {
       if (sources.has('Favoritos') && favs.has(t.name)) return true;
-      return sources.has(t.source);
+      if (sources.has(t.source)) return true;
+      if (sources.has('Otros') && !MAIN_SRCS.includes(t.source)) return true;
+      return false;
     });
     return pool
       .map(t => {
@@ -4189,7 +4192,10 @@ const DT = {
   },
 
   _allSources() {
-    const srcs = [...new Set(all.map(t => t.source))].sort();
+    const MAIN_SRCS = ['Scala','GrandOrgue','Asselin','Usuario'];
+    const raw = [...new Set(all.map(t => t.source))];
+    const srcs = MAIN_SRCS.filter(s => raw.includes(s));
+    if (raw.some(s => !MAIN_SRCS.includes(s))) srcs.push('Otros');
     if (favs.size > 0) srcs.unshift('Favoritos');
     return srcs;
   },
