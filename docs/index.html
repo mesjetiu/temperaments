@@ -371,8 +371,8 @@
       <div class="ab-sep"></div>
 
       <label onclick="toggleChartPlayMode()" style="display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none" title="Sustain: la nota sigue sonando al soltar">
-        <div id="play-mode-track" style="position:relative;width:28px;height:15px;background:${chartPlayMode==='legato'?'#3b82f6':'#334155'};border-radius:8px;flex-shrink:0;transition:background 0.2s">
-          <div id="play-mode-thumb" style="position:absolute;top:2px;left:${chartPlayMode==='legato'?'13px':'2px'};width:11px;height:11px;background:#fff;border-radius:50%;transition:left 0.2s"></div>
+        <div id="play-mode-track" style="position:relative;width:28px;height:15px;background:#334155;border-radius:8px;flex-shrink:0;transition:background 0.2s">
+          <div id="play-mode-thumb" style="position:absolute;top:2px;left:2px;width:11px;height:11px;background:#fff;border-radius:50%;transition:left 0.2s"></div>
         </div>
         <span style="font-size:11px;color:var(--muted)">Sustain</span>
       </label>
@@ -432,7 +432,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'de1ec5d · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '58a014a · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
