@@ -163,7 +163,6 @@
   #pitch-input:focus { border-color: var(--accent); }
   #oct-disp { font-size: 11px; color: var(--muted); min-width: 22px; text-align: center; }
   #audio-hint { font-size: 10px; color: #374151; font-style: italic; margin-left: auto; }
-  #playing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--c2); display: none; flex-shrink: 0; box-shadow: 0 0 6px var(--c2); animation: pulse 0.8s ease-in-out infinite alternate; }
   @keyframes pulse { from { opacity:.5; } to { opacity:1; } }
 
   /* ═══ CONTENT ═══ */
@@ -344,7 +343,6 @@
     <div id="top-collapsible">
     <!-- AUDIO BAR -->
     <div id="audio-bar">
-      <div id="playing-dot"></div>
 
       <!-- Onda -->
       <label>Onda:</label>
@@ -363,10 +361,12 @@
       <div class="ab-sep"></div>
 
       <!-- Octava gráficas -->
-      <label>Octava:</label>
-      <button class="icon-btn" onclick="octShift(-1)">−</button>
-      <span id="oct-disp">0</span>
-      <button class="icon-btn" onclick="octShift(+1)">+</button>
+      <div style="display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0">
+        <label>Octava:</label>
+        <button class="icon-btn" onclick="octShift(-1)">−</button>
+        <span id="oct-disp">0</span>
+        <button class="icon-btn" onclick="octShift(+1)">+</button>
+      </div>
 
       <div class="ab-sep"></div>
 
@@ -432,7 +432,7 @@
 </div>
 
 <script>
-const APP_VERSION = '41fecc5 · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = 'de1ec5d · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -774,7 +774,7 @@ function playFreqs(freqs) {
       activeOscs[i].frequency.cancelScheduledValues(now);
       activeOscs[i].frequency.setTargetAtTime(freq, now, 0.006);
     });
-    document.getElementById('playing-dot').style.display = 'block';
+    
     return;
   }
 
@@ -804,12 +804,12 @@ function playFreqs(freqs) {
     osc.start(now);
     return osc;
   });
-  document.getElementById('playing-dot').style.display = 'block';
+  
 }
 
 function stopSound(hard = false) {
   if (!hard && chartPlayMode === 'legato') return;
-  document.getElementById('playing-dot').style.display = 'none';
+  
   if (!activeOscs.length) return;
   const ctx = audioCtx;
   const now = ctx?.currentTime ?? 0;
