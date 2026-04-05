@@ -23,7 +23,7 @@
     --c1: #f87171; --c1a: rgba(248,113,113,0.18);
     --c2: #4ade80; --c2a: rgba(74,222,128,0.18);
   }
-  html, body { height: 100%; }
+  html, body { height: 100%; overscroll-behavior: none; }
   body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.4; }
 
   /* ═══ LAYOUT ═══ */
@@ -406,7 +406,7 @@
 </div>
 
 <script>
-const APP_VERSION = '5285977 · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '0dd0eda · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
