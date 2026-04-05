@@ -432,7 +432,7 @@
 </div>
 
 <script>
-const APP_VERSION = '238ac04 · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '41fecc5 · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2055,6 +2055,8 @@ function viewOverview(act) {
               <span style="font-size:11px;color:#475569">avg quinta ${f(avgF)}</span>
             </div>
           </div>
+          <button onclick="openTempMenu(${all.indexOf(t)},event)" title="Opciones"
+            style="background:none;border:none;color:#475569;cursor:pointer;font-size:22px;line-height:1;padding:0 4px;flex-shrink:0;-webkit-tap-highlight-color:transparent">···</button>
         </div>
         <div style="margin-top:14px">
           <div style="font-size:11px;color:#64748b;margin-bottom:5px">Notas</div>
