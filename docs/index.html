@@ -283,11 +283,11 @@
       <button id="fav-btn" title="Solo favoritos" onclick="toggleFavFilter()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 7px;cursor:pointer;font-size:13px;color:#9ca3af">★</button>
     </div>
     <div id="source-tabs" style="display:flex;gap:3px;flex-wrap:wrap;margin-top:4px">
-      <button class="src-tab sel" data-src="Todos"      onclick="setSrcFilter('Todos')">Todos</button>
-      <button class="src-tab"     data-src="Scala"      onclick="setSrcFilter('Scala')">Scala</button>
-      <button class="src-tab"     data-src="GrandOrgue" onclick="setSrcFilter('GrandOrgue')">GrandOrgue</button>
-      <button class="src-tab"     data-src="Otros"      onclick="setSrcFilter('Otros')">Otros</button>
-      <button class="src-tab"     data-src="Usuario"    onclick="setSrcFilter('Usuario')">Mis</button>
+      <button class="src-tab sel" data-src="Todos">Todos</button>
+      <button class="src-tab"     data-src="Scala">Scala</button>
+      <button class="src-tab"     data-src="GrandOrgue">GrandOrgue</button>
+      <button class="src-tab"     data-src="Otros">Otros</button>
+      <button class="src-tab"     data-src="Usuario">Mis</button>
     </div>
     <div id="count">Cargando...</div>
     <div id="list"><div style="padding:14px;font-size:11px;color:#6b7280">Cargando datos...</div></div>
@@ -432,7 +432,7 @@
 </div>
 
 <script>
-const APP_VERSION = '47b2634 · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = 'fc98105 · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -537,6 +537,9 @@ function setSrcFilter(src) {
   document.querySelectorAll('.src-tab').forEach(b => b.classList.toggle('sel', b.dataset.src === src));
   refreshList();
 }
+document.querySelectorAll('.src-tab').forEach(b => {
+  b.addEventListener('click', () => setSrcFilter(b.dataset.src));
+});
 
 // ══════════════════════════════════════════════
 // TEMPERAMENTOS DE USUARIO (localStorage)
@@ -1639,7 +1642,7 @@ function renderList(temps) {
   let html = '';
   if (fav.length && rest.length) html += `<div style="font-size:9px;color:#6b7280;padding:4px 8px 2px;letter-spacing:.5px">★ FAVORITOS</div>`;
   html += fav.map(t => itemHtml(t)).join('');
-  if (fav.length && rest.length) html += `<div style="font-size:9px;color:#6b7280;padding:6px 8px 2px;letter-spacing:.5px">TODOS</div>`;
+  if (fav.length && rest.length) html += `<div style="font-size:9px;color:#6b7280;padding:6px 8px 2px;letter-spacing:.5px">OTROS</div>`;
   html += rest.map(t => itemHtml(t)).join('');
   el.innerHTML = html;
 }
