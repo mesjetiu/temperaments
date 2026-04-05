@@ -406,7 +406,7 @@
 </div>
 
 <script>
-const APP_VERSION = '977581c · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '3979204 · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3635,7 +3635,7 @@ const DT = {
     }
     pitchA = newP;
     savePrefs({ pitchA });
-    document.querySelectorAll('#pitch-input, #dt-pitch-input').forEach(el => el.value = pitchA);
+    document.querySelectorAll('#pitch-input, #dt-pitch-input, #kb-pitch-input, #tuner-pitch-input').forEach(el => el.value = pitchA);
     this._renderKeyboard();
     this._updatePitchRow();
   },
@@ -3651,11 +3651,12 @@ const DT = {
     this._updateStatus(`✓ Normalizado — La: ${pitchA} Hz`);
   },
 
-  startCaptureA() {
+  async startCaptureA() {
     this._captureA = true;
     this._stableNi = -1; this._stableCount = 0;
     this._updatePitchRow();
     this._updateStatus('Toca La en tu instrumento…');
+    if (!this.micOn) await this.startMic();
   },
   stopCaptureA() {
     this._captureA = false;
