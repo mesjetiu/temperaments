@@ -432,7 +432,7 @@
 </div>
 
 <script>
-const APP_VERSION = '7194278 · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = 'c9b2b6f · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1554,8 +1554,11 @@ function parseMarkdown(text) {
     for (let i = 3; i <= 14; i++) { const v = parseFloat(cells[i]); if (isNaN(v)) { ok=false; break; } offsets.push(v); }
     if (!ok || offsets.length !== 12) continue;
     const m = cells[1].match(/\[([^\]]+)\]/);
-    temps.push({ source: (m ? m[1] : cells[1]).trim(), name: cells[2], offsets });
+    temps.push({ source: (m ? m[1] : cells[1]).trim(), name: cells[2], offsets, notes: '' });
   }
+  // Aplicar notas del usuario guardadas en el store a los temperamentos del repositorio
+  const _notesStore = loadTempNotesStore();
+  temps.forEach(t => { if (_notesStore[t.name]) t.notes = _notesStore[t.name]; });
   all = temps;
   injectUserTemps();
   restoreSession();
