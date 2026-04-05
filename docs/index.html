@@ -390,7 +390,7 @@
 </div>
 
 <script>
-const APP_VERSION = '46039c4 · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = 'e60f95b · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3557,13 +3557,11 @@ const NOTES_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const DT = {
   notes: new Array(12).fill(null),  // cents vs ET, null = sin medir
   mode: 'auto',          // 'auto' | 'manual'
-  phase: 'measuring',    // 'calibrating' | 'measuring'
   _targetNi: -1,         // nota objetivo en modo manual
   micOn: false, micStream: null, analyser: null,
   rafId: null, lastAnalysis: 0,
-  _stableNi: -1, _stableCount: 0, _stableCents: 0, _stableFreq: 0, _buf: null,
+  _stableNi: -1, _stableCount: 0, _stableCents: 0, _buf: null,
   STABLE_FRAMES: 18,     // ~1.8 s a ≈100 ms/análisis
-  _calPitchA: null,      // pitchA detectado en calibración (null = sin calibrar aún)
 
   getOffsets()    { return this.notes.map(v => v === null ? 0 : v); },
   measuredCount() { return this.notes.filter(v => v !== null).length; },
@@ -3574,49 +3572,33 @@ const DT = {
     document.querySelectorAll('.dt-mode-btn').forEach(b =>
       b.classList.toggle('sel', b.dataset.m === m));
     this._renderKeyboard();
-    this._updateStatus('—');
+    this._updateStatus(m === 'manual' ? 'Pulsa una tecla para seleccionar nota' : '—');
   },
 
-  // ── Calibración ──────────────────────────────
-  skipCalibration() {
-    this.phase = 'measuring';
-    this._stableNi = -1; this._stableCount = 0;
-    this._updateCalibrationUI();
-    this._renderKeyboard();
-  },
-  _finishCalibration(detectedFreq) {
-    // Normalizar al rango de A4 (alrededor de 440)
-    let f = detectedFreq;
-    while (f < 300) f *= 2;
-    while (f > 600) f /= 2;
-    this._calPitchA = Math.round(f * 100) / 100;
-    // Sanity: rechazar calibración fuera de rango A4 ± 3 semitonos
-    if (this._calPitchA < 390 || this._calPitchA > 470) return;
-    pitchA = this._calPitchA;
+  // ── Normalización: A → 0, pitchA actualizado, resto recalculado ──
+  normalize() {
+    if (this.notes[9] === null) return;
+    const aVal = this.notes[9];
+    if (aVal === 0) return;
+    const newPitchA = Math.round(pitchA * Math.pow(2, aVal / 1200) * 100) / 100;
+    if (newPitchA < 390 || newPitchA > 470) return;
+    for (let ni = 0; ni < 12; ni++) {
+      if (this.notes[ni] !== null) this.notes[ni] = Math.round((this.notes[ni] - aVal) * 10) / 10;
+    }
+    pitchA = newPitchA;
     savePrefs({ pitchA });
     const inp = document.getElementById('pitch-input');
     if (inp) inp.value = pitchA;
-    // La calibrado → fijar A = 0 cents
-    this.notes[9] = 0;
-    this.phase = 'measuring';
-    this._stableNi = -1; this._stableCount = 0;
-    this._updateCalibrationUI();
     this._renderKeyboard();
-    const cnt = document.getElementById('dt-count');
-    if (cnt) cnt.textContent = this.measuredCount() + '/12';
-    const sp = document.getElementById('dt-save-row');
-    if (sp) sp.style.display = 'flex';
+    this._updatePitchRow();
   },
-  _updateCalibrationUI() {
-    const el = document.getElementById('dt-calib-row');
+
+  _updatePitchRow() {
+    const el = document.getElementById('dt-pitch-row');
     if (!el) return;
-    if (this.phase === 'calibrating') {
-      el.innerHTML = `<span style="font-size:11px;color:#f59e0b">▶ Toca La (A) para calibrar el pitch de referencia</span>
-        <button class="icon-btn" onclick="DT.skipCalibration()" style="font-size:10px;margin-left:auto">Omitir (${pitchA} Hz)</button>`;
-    } else {
-      el.innerHTML = `<span style="font-size:11px;color:#4ade80">✓ La calibrado: ${pitchA} Hz</span>
-        <button class="icon-btn" onclick="DT.phase='calibrating';DT._stableNi=-1;DT._stableCount=0;DT._updateCalibrationUI();DT._renderKeyboard();" style="font-size:10px;margin-left:auto">Recalibrar</button>`;
-    }
+    const canNorm = this.notes[9] !== null && this.notes[9] !== 0;
+    el.innerHTML = `<span style="font-size:11px;color:var(--muted)">La ref: <b style="color:var(--text)">${pitchA} Hz</b></span>`
+      + (canNorm ? `<button class="icon-btn" onclick="DT.normalize()" style="font-size:10px;margin-left:auto;color:#fcd34d;border-color:#b45309">Normalizar (A→0)</button>` : '');
   },
 
   // ── Mic ──────────────────────────────────────
@@ -3684,23 +3666,7 @@ const DT = {
     const { freq } = res;
     const { ni } = findClosestNote(freq);
 
-    // ── Fase calibración: solo detectar A (ni=9) ──
-    if (this.phase === 'calibrating') {
-      if (ni !== 9) { this._stableNi = -1; this._stableCount = 0; this._renderKeyboard(); this._updateStatus('—'); return; }
-      if (ni === this._stableNi) {
-        this._stableCount++;
-        this._stableFreq = this._stableFreq * 0.8 + freq * 0.2;
-      } else {
-        this._stableNi = 9; this._stableCount = 1; this._stableFreq = freq;
-      }
-      const prog = Math.min(1, this._stableCount / this.STABLE_FRAMES);
-      this._updateStatus(`La detectado: ${freq.toFixed(1)} Hz`, prog);
-      this._renderKeyboard();
-      if (this._stableCount >= this.STABLE_FRAMES) this._finishCalibration(this._stableFreq);
-      return;
-    }
-
-    // ── Fase medición ──
+    // ── Medición ──
     // En manual: solo medir si hay nota seleccionada
     if (this.mode === 'manual' && this._targetNi < 0) {
       this._updateStatus('Pulsa una tecla para seleccionar nota');
@@ -3730,15 +3696,20 @@ const DT = {
     this._renderKeyboard();
 
     if (this._stableCount >= this.STABLE_FRAMES) {
-      // La (A) es siempre 0: es la referencia de calibración por definición
-      this.notes[measureNi] = (measureNi === 9) ? 0 : Math.round(this._stableCents * 10) / 10;
+      this.notes[measureNi] = Math.round(this._stableCents * 10) / 10;
       this._stableNi = -1; this._stableCount = 0;
       if (this.mode === 'manual') this._targetNi = -1;
       const cnt = document.getElementById('dt-count');
       if (cnt) cnt.textContent = this.measuredCount() + '/12';
       const sp = document.getElementById('dt-save-row');
       if (sp) sp.style.display = this.measuredCount() > 0 ? 'flex' : 'none';
-      this._renderKeyboard();
+      // Manual: al medir A, normalizar automáticamente (A→0, pitchA actualizado)
+      if (measureNi === 9 && this.mode === 'manual') {
+        this.normalize();
+      } else {
+        this._renderKeyboard();
+        this._updatePitchRow();
+      }
       this._renderSuggestions();
     }
   },
@@ -3752,7 +3723,6 @@ const DT = {
 
   // ── Teclado de piano (1 octava) ──────────────
   tapKey(ni) {
-    if (this.phase === 'calibrating') return; // durante calibración el teclado no hace nada
     if (this.mode === 'manual') {
       // Si ya medida: borrar; si no: apuntar
       if (this.notes[ni] !== null) {
@@ -3802,32 +3772,24 @@ const DT = {
       const measured   = this.notes[ni] !== null;
       const detecting  = this._stableNi === ni;
       const isTarget   = this.mode === 'manual' && this._targetNi === ni;
-      const isCalibA   = this.phase === 'calibrating' && ni === 9;
       const prog       = detecting ? Math.min(1, this._stableCount / this.STABLE_FRAMES)
                        : (measured ? 1 : 0);
       const val        = measured ? this.notes[ni] : (detecting ? this._stableCents : null);
       const valStr     = val !== null ? (val >= 0 ? '+' : '') + val.toFixed(1) + '¢' : '';
 
-      // Color del fill de progreso
       const fillColor  = measured ? 'rgba(74,222,128,0.45)' : 'rgba(96,165,250,0.40)';
-
-      // Fondo base de la tecla
       let bg, border, labelColor, valColor;
       if (isBlack) {
-        bg = measured   ? '#0f3320'
-           : isTarget   ? '#0c2a50'
-           : isCalibA   ? '#2d1a00'
-           : 'linear-gradient(180deg,#333 0%,#111 70%)';
-        border = measured ? '#4ade80' : isTarget ? '#60a5fa' : isCalibA ? '#f59e0b' : '#000';
-        labelColor = measured ? '#4ade80' : isTarget ? '#93c5fd' : isCalibA ? '#fcd34d' : '#ccc';
+        bg = measured ? '#0f3320' : isTarget ? '#0c2a50' : 'linear-gradient(180deg,#333 0%,#111 70%)';
+        border = measured ? '#4ade80' : isTarget ? '#60a5fa' : '#000';
+        labelColor = measured ? '#4ade80' : isTarget ? '#93c5fd' : '#ccc';
         valColor   = measured ? '#4ade80' : detecting ? '#93c5fd' : 'transparent';
       } else {
-        bg = measured   ? 'linear-gradient(175deg,#d4f7d4 0%,#a6e8a6 100%)'
-           : isTarget   ? 'linear-gradient(175deg,#dbeafe 0%,#93c5fd 100%)'
-           : isCalibA   ? 'linear-gradient(175deg,#fef3c7 0%,#fcd34d 100%)'
+        bg = measured ? 'linear-gradient(175deg,#d4f7d4 0%,#a6e8a6 100%)'
+           : isTarget  ? 'linear-gradient(175deg,#dbeafe 0%,#93c5fd 100%)'
            : 'linear-gradient(175deg,#fdfaf4 0%,#ece7db 90%)';
-        border = measured ? '#4ade80' : isTarget ? '#3b82f6' : isCalibA ? '#f59e0b' : '#999';
-        labelColor = measured ? '#166534' : isTarget ? '#1e40af' : isCalibA ? '#92400e' : '#555';
+        border = measured ? '#4ade80' : isTarget ? '#3b82f6' : '#999';
+        labelColor = measured ? '#166534' : isTarget ? '#1e40af' : '#555';
         valColor   = measured ? '#166534' : detecting ? 'var(--accent)' : 'transparent';
       }
 
@@ -3859,9 +3821,8 @@ const DT = {
 
   reset() {
     this.notes = new Array(12).fill(null);
-    this.phase = 'measuring'; this._targetNi = -1;
-    this._stableNi = -1; this._stableCount = 0;
-    this._renderKeyboard(); this._updateCalibrationUI(); this._updateStatus('—');
+    this._targetNi = -1; this._stableNi = -1; this._stableCount = 0;
+    this._renderKeyboard(); this._updatePitchRow(); this._updateStatus('—');
     this._clearExport();
     const ni = document.getElementById('dt-name-input'); if (ni) ni.value = '';
     const cnt = document.getElementById('dt-count'); if (cnt) cnt.textContent = '0/12';
@@ -4016,8 +3977,8 @@ function viewMedidor() {
         <button class="icon-btn" onclick="DT.reset()">↺ Reiniciar</button>
       </div>
 
-      <!-- Fila de calibración -->
-      <div id="dt-calib-row" style="display:flex;align-items:center;gap:6px;background:#0f172a;border-radius:6px;padding:7px 10px;margin-bottom:12px;min-height:34px"></div>
+      <!-- Fila pitchA + normalizar -->
+      <div id="dt-pitch-row" style="display:flex;align-items:center;gap:6px;background:#0f172a;border-radius:6px;padding:7px 10px;margin-bottom:12px;min-height:34px"></div>
 
       <!-- Teclado de piano -->
       <div id="dt-kb-wrap" style="overflow-x:auto;padding-bottom:6px;margin-bottom:10px;-webkit-overflow-scrolling:touch"></div>
@@ -4049,7 +4010,7 @@ function viewMedidor() {
 
     </div>`;
 
-  DT._updateCalibrationUI();
+  DT._updatePitchRow();
   DT._renderKeyboard();
   DT._renderSuggestions();
   if (DT.micOn && !DT.rafId) DT._scheduleLoop();
