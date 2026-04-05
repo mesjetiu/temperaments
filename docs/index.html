@@ -395,7 +395,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'bbd687b · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = 'bb3045c · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3580,32 +3580,40 @@ const DT = {
     this._updateStatus(m === 'manual' ? 'Pulsa una tecla para seleccionar nota' : '—');
   },
 
-  // ── Normalización: A → 0, pitchA actualizado, resto recalculado ──
-  normalize() {
-    if (this.notes[9] === null) return;
-    const aVal = this.notes[9];  // puede ser 0 — igualmente recalculamos todo
-    const newPitchA = Math.round(pitchA * Math.pow(2, aVal / 1200) * 100) / 100;
-    if (newPitchA < 390 || newPitchA > 470) return;
+  // ── pitchA: cambiar referencia y recalcular todos los offsets medidos ──
+  setPitchA(newVal) {
+    const newP = Math.round(parseFloat(newVal) * 100) / 100;
+    if (isNaN(newP) || newP < 390 || newP > 470) return;
+    const shift = 1200 * Math.log2(pitchA / newP);  // cuánto se desplazan los offsets
     for (let ni = 0; ni < 12; ni++) {
-      if (this.notes[ni] !== null) this.notes[ni] = Math.round((this.notes[ni] - aVal) * 10) / 10;
+      if (this.notes[ni] !== null) this.notes[ni] = Math.round((this.notes[ni] + shift) * 10) / 10;
     }
-    // notes[9] = 0 ahora
-    pitchA = newPitchA;
+    pitchA = newP;
     savePrefs({ pitchA });
-    const inp = document.getElementById('pitch-input');
-    if (inp) inp.value = pitchA;
+    document.querySelectorAll('#pitch-input, #dt-pitch-input').forEach(el => el.value = pitchA);
     this._renderKeyboard();
     this._updatePitchRow();
+  },
+
+  // Normalizar: tomar la frecuencia real de A medida como nueva referencia → A queda a 0
+  normalize() {
+    if (this.notes[9] === null) return;
+    const aFreq = pitchA * Math.pow(2, this.notes[9] / 1200);
+    this.setPitchA(aFreq);
     this._updateStatus(`✓ Normalizado — La: ${pitchA} Hz`);
   },
 
   _updatePitchRow() {
     const el = document.getElementById('dt-pitch-row');
     if (!el) return;
-    // Mostrar botón Normalizar en auto cuando A está medida (aunque sea 0¢ — confirma explícitamente)
-    const canNorm = this.mode === 'auto' && this.notes[9] !== null;
-    el.innerHTML = `<span style="font-size:11px;color:var(--muted)">La ref: <b style="color:var(--text)">${pitchA} Hz</b></span>`
-      + (canNorm ? `<button class="icon-btn" onclick="DT.normalize()" style="font-size:10px;margin-left:auto;color:#fcd34d;border-color:#b45309">Normalizar (A→0)</button>` : '');
+    const canNorm = this.notes[9] !== null && this.notes[9] !== 0;
+    el.innerHTML =
+      `<span style="font-size:11px;color:var(--muted)">La ref:</span>
+       <input id="dt-pitch-input" type="number" value="${pitchA}" step="0.01" min="390" max="470"
+         style="width:64px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:11px;text-align:center;outline:none"
+         onchange="DT.setPitchA(this.value)" onkeydown="if(event.key==='Enter')DT.setPitchA(this.value)">
+       <span style="font-size:11px;color:var(--muted)">Hz</span>`
+      + (canNorm ? `<button class="icon-btn" onclick="DT.normalize()" style="font-size:10px;margin-left:4px;color:#fcd34d;border-color:#b45309">Normalizar A→0</button>` : '');
   },
 
   // ── Mic ──────────────────────────────────────
@@ -3710,27 +3718,13 @@ const DT = {
       if (cnt) cnt.textContent = this.measuredCount() + '/12';
       const sp = document.getElementById('dt-save-row');
       if (sp) sp.style.display = this.measuredCount() > 0 ? 'flex' : 'none';
-      // Manual: al medir A, normalizar automáticamente usando valor sin redondear
+      // Manual: al medir A, fijar pitchA a la frecuencia real detectada (offset queda en 0)
       if (measureNi === 9 && this.mode === 'manual') {
-        // Usar _stableCents sin redondear para mayor precisión en pitchA
-        const aValRaw = this._stableCents;
-        const newPitchA = Math.round(pitchA * Math.pow(2, aValRaw / 1200) * 100) / 100;
-        if (newPitchA >= 390 && newPitchA <= 470) {
-          for (let ni = 0; ni < 12; ni++) {
-            if (this.notes[ni] !== null) this.notes[ni] = Math.round((this.notes[ni] - aValRaw) * 10) / 10;
-          }
-          pitchA = newPitchA;
-          savePrefs({ pitchA });
-          const inp = document.getElementById('pitch-input');
-          if (inp) inp.value = pitchA;
-          this._updateStatus(`✓ La normalizado — ref: ${pitchA} Hz`);
-        }
-        this._renderKeyboard();
-        this._updatePitchRow();
-      } else {
-        this._renderKeyboard();
-        this._updatePitchRow();
+        this.setPitchA(pitchA * Math.pow(2, this._stableCents / 1200));
+        this._updateStatus(`✓ La: ${pitchA} Hz — ref actualizada`);
       }
+      this._renderKeyboard();
+      this._updatePitchRow();
       this._renderSuggestions();
     }
   },
