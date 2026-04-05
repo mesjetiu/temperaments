@@ -406,7 +406,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'd46e464 · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = 'f6d845f · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3776,13 +3776,18 @@ const DT = {
         let aFreq = this._stableFreq;
         while (aFreq < 390) aFreq *= 2;
         while (aFreq > 470) aFreq /= 2;
+        const oldPitchA = pitchA;
         this.setPitchA(aFreq);
         if (this.notes[9] !== null) this.notes[9] = 0;
         this._captureA = false;
         this._stableNi = -1; this._stableCount = 0;
-        this._updateStatus(`✓ La: ${pitchA} Hz — ref actualizada`);
-        this._updatePitchRow();
-        this._renderKeyboard();
+        this._updateStatus(`✓ La: ${oldPitchA.toFixed(2)} → ${pitchA.toFixed(2)} Hz`);
+        setTimeout(() => {
+          document.querySelectorAll('#pitch-input,#dt-pitch-input,#kb-pitch-input,#tuner-pitch-input')
+            .forEach(el => el.value = pitchA.toFixed(2));
+          this._updatePitchRow();
+          this._renderKeyboard();
+        }, 0);
       }
       return;
     }
@@ -3831,9 +3836,16 @@ const DT = {
         let aFreq = this._stableFreq;
         while (aFreq < 390) aFreq *= 2;
         while (aFreq > 470) aFreq /= 2;
+        const oldPitchA = pitchA;
         this.setPitchA(aFreq);
         this.notes[9] = 0;  // forzar 0 exacto
-        this._updateStatus(`✓ La: ${pitchA} Hz — ref actualizada`);
+        this._updateStatus(`✓ La: ${oldPitchA.toFixed(2)} → ${pitchA.toFixed(2)} Hz`);
+        // Sync DOM en próximo tick (por si _updatePitchRow interno no alcanzó a pintar)
+        setTimeout(() => {
+          document.querySelectorAll('#pitch-input,#dt-pitch-input,#kb-pitch-input,#tuner-pitch-input')
+            .forEach(el => el.value = pitchA.toFixed(2));
+          this._updatePitchRow();
+        }, 0);
       }
       this._renderKeyboard();
       this._updatePitchRow();
