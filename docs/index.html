@@ -169,7 +169,7 @@
   .panel h3 { font-size: 12px; color: var(--accent); margin-bottom: 12px; font-weight: 600; }
   .panel-h3-row { display:flex; align-items:flex-start; gap:6px; margin-bottom:12px; }
   .panel-h3-row h3 { margin-bottom:0; flex:1; }
-  .panel-zoom-btn { background:none; border:none; color:#4b5563; cursor:pointer; font-size:14px; line-height:1; padding:0 2px; flex-shrink:0; -webkit-tap-highlight-color:transparent; transition:color 0.15s; }
+  .panel-zoom-btn { background:none; border:none; color:#6b7280; cursor:pointer; font-size:20px; line-height:1; padding:2px 4px; flex-shrink:0; -webkit-tap-highlight-color:transparent; transition:color 0.15s; }
   .panel-zoom-btn:hover { color:#94a3b8; }
   .chart-resize-handle { display:flex; align-items:center; justify-content:center; height:22px; margin:4px 0 0; cursor:ns-resize; touch-action:none; border-top:1px solid var(--border); -webkit-tap-highlight-color:transparent; }
   .chart-resize-handle::after { content:''; display:block; width:44px; height:4px; border-radius:2px; background:#2d3f55; }
@@ -314,7 +314,7 @@
     <div id="desk-header">
       <span id="desk-header-hint" style="font-size:12px;color:#6b7280;white-space:nowrap">Selecciona un temperamento:</span>
       <div id="desk-badges" style="display:flex;gap:6px;flex-wrap:wrap;flex:1"></div>
-      <button onclick="toggleContentFullscreen()" title="Pantalla completa" style="background:none;border:none;color:#4b5563;cursor:pointer;font-size:17px;padding:2px 4px;flex-shrink:0;line-height:1" id="desk-fullscreen-btn">⤢</button>
+      <button onclick="toggleContentFullscreen()" title="Pantalla completa" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:22px;padding:2px 6px;flex-shrink:0;line-height:1" id="desk-fullscreen-btn">⤢</button>
     </div>
 
     <div id="tabs">
@@ -406,7 +406,7 @@
 </div>
 
 <script>
-const APP_VERSION = '75e856f · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = 'c882372 · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2655,7 +2655,7 @@ function viewKeyboard() {
           Limpiar ✕
         </button>
         <!-- Pantalla completa -->
-        <button id="kb-fs-btn" class="icon-btn" onclick="toggleKbFullscreen()" title="Pantalla completa" style="margin-left:auto">
+        <button id="kb-fs-btn" class="icon-btn" onclick="toggleKbFullscreen()" title="Pantalla completa" style="margin-left:auto;font-size:20px;padding:2px 8px">
           ${document.body.classList.contains('kb-fullscreen') ? '⤡' : '⤢'}
         </button>
       </div>
