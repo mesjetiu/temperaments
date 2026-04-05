@@ -62,6 +62,11 @@
   .temp-ctx-disabled { color: #4b5563 !important; cursor: default !important; }
   .temp-ctx-disabled:hover { background: none !important; }
 
+  /* ═══ SHARE DIALOG ═══ */
+  #share-dialog { display:none; position:fixed; inset:0; z-index:2000; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; padding:16px; }
+  #share-dialog.open { display:flex; }
+  #share-dialog-box { background:#1e293b; border:1px solid #334155; border-radius:12px; padding:20px; width:100%; max-width:400px; display:flex; flex-direction:column; gap:12px; }
+
   @media (max-width: 767px) {
     #app { flex-direction: column; height: 100dvh; }
     #sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: min(85vw,320px); transform: translateX(-105%); box-shadow: 4px 0 24px rgba(0,0,0,.5); }
@@ -405,8 +410,29 @@
   </div>
 </div>
 
+<div id="share-dialog">
+  <div id="share-dialog-box">
+    <div style="font-size:14px;font-weight:600;color:#e2e8f0">Compartir temperamento</div>
+    <div>
+      <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px">Nombre</label>
+      <input id="share-name-input" type="text" style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:7px 10px;font-size:13px;outline:none">
+    </div>
+    <div id="share-notes-section">
+      <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px">Notas <span style="color:#475569">(se incluirán en el enlace)</span></label>
+      <textarea id="share-notes-input" rows="4" style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:7px 10px;font-size:12px;outline:none;resize:vertical"></textarea>
+      <label style="display:flex;align-items:center;gap:6px;margin-top:6px;cursor:pointer;font-size:11px;color:#94a3b8">
+        <input type="checkbox" id="share-include-notes" checked> Incluir notas en el enlace
+      </label>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+      <button onclick="closeShareDialog()" style="background:none;border:1px solid #334155;color:#94a3b8;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:12px">Cancelar</button>
+      <button onclick="confirmShare()" style="background:#1d4ed8;border:none;color:#fff;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600">Compartir</button>
+    </div>
+  </div>
+</div>
+
 <script>
-const APP_VERSION = '90f267c · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '8de40a5 · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -521,15 +547,25 @@ function saveUserTemps(arr) { localStorage.setItem(USER_KEY, JSON.stringify(arr)
 
 function injectUserTemps() {
   all = all.filter(t => t.source !== 'Usuario');
-  loadUserTemps().forEach(t => all.push({ name: t.name, offsets: t.offsets, source: 'Usuario' }));
+  loadUserTemps().forEach(t => all.push({ name: t.name, offsets: t.offsets, source: 'Usuario', notes: t.notes || '' }));
 }
-function addUserTemp(name, offsets) {
+function addUserTemp(name, offsets, notes) {
   const arr = loadUserTemps();
   const idx = arr.findIndex(t => t.name === name);
-  const entry = { name, offsets, source: 'Usuario' };
+  const entry = { name, offsets, source: 'Usuario', notes: notes || '' };
   if (idx >= 0) arr[idx] = entry; else arr.push(entry);
   saveUserTemps(arr);
   injectUserTemps(); refreshList();
+}
+function saveUserTempNotes(name, notes) {
+  const arr = loadUserTemps();
+  const idx = arr.findIndex(t => t.name === name);
+  if (idx < 0) return;
+  arr[idx].notes = notes;
+  saveUserTemps(arr);
+  // update in-memory `all` array too
+  const t = all.find(x => x.name === name && x.source === 'Usuario');
+  if (t) t.notes = notes;
 }
 function deleteUserTemp(name) {
   saveUserTemps(loadUserTemps().filter(t => t.name !== name));
@@ -563,32 +599,56 @@ function _tempShareText(name, offsets) {
   });
   return `🎹 ${name}\n\nDesviaciones vs ET (cents):\n${lines.join('\n')}`;
 }
-function _tempShareUrl(name, offsets) {
+function _tempShareUrl(name, offsets, notes) {
   const offs = offsets.map(o => Math.round(o * 100) / 100).join(',');
-  return location.origin + location.pathname + '?t=' + encodeURIComponent(name) + '&o=' + encodeURIComponent(offs);
+  let url = location.origin + location.pathname + '?t=' + encodeURIComponent(name) + '&o=' + encodeURIComponent(offs);
+  if (notes) url += '&n=' + encodeURIComponent(notes);
+  return url;
+}
+let _shareTemp = null;
+function showShareDialog(t) {
+  _shareTemp = t;
+  document.getElementById('share-name-input').value = t.name;
+  const notesSection = document.getElementById('share-notes-section');
+  const notesInput = document.getElementById('share-notes-input');
+  if (t.notes) {
+    notesInput.value = t.notes;
+    notesSection.style.display = 'block';
+  } else {
+    notesSection.style.display = 'none';
+  }
+  document.getElementById('share-dialog').classList.add('open');
+}
+function closeShareDialog() {
+  document.getElementById('share-dialog').classList.remove('open');
+  _shareTemp = null;
+}
+function confirmShare() {
+  if (!_shareTemp) return;
+  const name = document.getElementById('share-name-input').value.trim() || _shareTemp.name;
+  const includeNotes = document.getElementById('share-include-notes').checked;
+  const notesRaw = document.getElementById('share-notes-input').value.trim();
+  const notes = includeNotes ? notesRaw : '';
+  const url = _tempShareUrl(name, _shareTemp.offsets, notes);
+  const text = _tempShareText(name, _shareTemp.offsets);
+  closeShareDialog();
+  if (navigator.share) navigator.share({ title: name, text: text + '\n\n' + url }).catch(() => {});
+  else navigator.clipboard?.writeText(text + '\n\n' + url).then(() => alert('Copiado al portapapeles')).catch(() => { prompt('Copia este enlace:', text + '\n\n' + url); });
 }
 function doShareTemp(idx) {
   const t = all[idx];
   if (!t) return;
-  const url = _tempShareUrl(t.name, t.offsets);
-  const text = _tempShareText(t.name, t.offsets);
-  if (navigator.share) {
-    navigator.share({ title: t.name, text: text + '\n\n' + url }).catch(() => {});
-  } else {
-    navigator.clipboard?.writeText(text + '\n\n' + url)
-      .then(() => alert('Copiado al portapapeles'))
-      .catch(() => { prompt('Copia este texto:', text + '\n\n' + url); });
-  }
+  showShareDialog(t);
 }
 
 // ── Importación por URL (?t=Nombre&o=0,-3.9,3.9,...) ──
 (function() {
   const p = new URLSearchParams(location.search);
-  const tn = p.get('t'), os = p.get('o');
+  const tn = p.get('t'), os = p.get('o'), ns = p.get('n');
   if (!tn || !os) return;
   const offsets = os.split(',').map(Number);
   if (offsets.length !== 12 || offsets.some(isNaN)) return;
-  addUserTemp(tn.trim(), offsets);
+  addUserTemp(tn.trim(), offsets, ns ? ns.trim() : '');
   // Limpiar URL sin recargar
   history.replaceState(null, '', location.pathname);
   // Seleccionarlo tras la carga completa
@@ -1942,8 +2002,71 @@ function renderContent() {
 
 // ─── VISTA GENERAL ───
 function viewOverview(act) {
-  const mob=isMobile();
-  document.getElementById('content').innerHTML=
+  const mob = isMobile();
+  if (act.length === 1) {
+    const t = act[0];
+    const isUser = t.source === 'Usuario';
+    const fif = getFifths(t.offsets), maj = getMaj3(t.offsets);
+    const wf = fif.reduce((a,b) => Math.abs(a.dev)>Math.abs(b.dev)?a:b);
+    const bf = fif.reduce((a,b) => Math.abs(a.dev)<Math.abs(b.dev)?a:b);
+    const wm = maj.reduce((a,b) => Math.abs(a.dev)>Math.abs(b.dev)?a:b);
+    const bm = maj.reduce((a,b) => Math.abs(a.dev)<Math.abs(b.dev)?a:b);
+    const avgF = fif.reduce((s,f) => s+f.dev, 0) / 12;
+    const f = v => `${v>=0?'+':''}${v.toFixed(2)}¢`;
+    const cc = v => v>8?'#f87171':v<-4?'#fb923c':Math.abs(v)<0.5?'#4ade80':v>3?'#a78bfa':'#facc15';
+
+    // stat card html
+    const statCard = (label, note, value, color) =>
+      `<div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px 12px;flex:1;min-width:120px">
+        <div style="font-size:10px;color:#64748b;margin-bottom:2px">${label}</div>
+        <div style="font-size:12px;color:#94a3b8;margin-bottom:4px">${note}</div>
+        <div style="font-size:15px;font-weight:700;color:${color}">${value}</div>
+      </div>`;
+
+    document.getElementById('content').innerHTML =
+      // ── HERO ──
+      `<div style="width:100%;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);border:1px solid #1e293b;border-radius:12px;padding:20px 24px;box-sizing:border-box">
+        <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="font-size:22px;font-weight:700;color:#e2e8f0;line-height:1.2;margin-bottom:6px">${t.name}</div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="font-size:11px;background:#1e3a5f;color:#60a5fa;border-radius:4px;padding:2px 8px">${t.source}</span>
+              <span style="font-size:11px;color:#475569">${fif.filter(f=>Math.abs(f.dev)<0.5).length} quintas puras</span>
+              <span style="font-size:11px;color:#475569">·</span>
+              <span style="font-size:11px;color:#475569">avg quinta ${f(avgF)}</span>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:14px">
+          <div style="font-size:11px;color:#64748b;margin-bottom:5px">Notas${isUser?' <span style="color:#1d4ed8">(editable)</span>':''}</div>
+          ${isUser
+            ? `<textarea id="overview-notes" rows="3" placeholder="Descripción, origen histórico, características…"
+                style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;color:#cbd5e1;border-radius:6px;padding:8px 10px;font-size:12px;outline:none;resize:vertical;font-family:inherit"
+                onblur="saveUserTempNotes('${t.name.replace(/'/g,"\\'")}', this.value)">${t.notes||''}</textarea>`
+            : `<div style="font-size:12px;color:#94a3b8;line-height:1.6;min-height:1.5em">${t.notes ? t.notes.replace(/\n/g,'<br>') : '<span style="color:#334155">Sin descripción</span>'}</div>`
+          }
+        </div>
+      </div>`
+      // ── STAT CARDS ──
+      + `<div style="width:100%;display:flex;gap:8px;flex-wrap:wrap">
+          ${statCard('Quinta más pura', bf.from+'→'+bf.to, bf.size.toFixed(2)+'¢ ('+f(bf.dev)+')', cc(bf.dev))}
+          ${statCard('Quinta más impura', wf.from+'→'+wf.to, wf.size.toFixed(2)+'¢ ('+f(wf.dev)+')', cc(wf.dev))}
+          ${statCard('3ª mayor más pura', bm.from+'→'+bm.to, bm.size.toFixed(2)+'¢ ('+f(bm.dev)+')', '#4ade80')}
+          ${statCard('3ª mayor más impura', wm.from+'→'+wm.to, wm.size.toFixed(2)+'¢ ('+f(wm.dev)+')', '#f87171')}
+        </div>`
+      // ── CIRCLE + OFFSETS ──
+      + panel('Círculo de quintas <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un sector</small>',
+          `<div class="grad-bar"><span>−8¢</span><div class="grad-strip"></div><span>+4¢</span><span style="color:#4b5563">● pura=701.955¢</span></div>
+           <div id="circle-wrap">${drawCircle(selected)}</div>`,
+          mob?'':'width:290px')
+      + panel('Offsets respecto al ET (¢)', offsetsTable(act), mob?'':'flex:1;min-width:240px');
+
+    bindCircleAudio();
+    return;
+  }
+
+  // ── multi-temp: vista original ──
+  document.getElementById('content').innerHTML =
     panel('Círculo de quintas <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un sector</small>',
       `<div class="grad-bar"><span>−8¢</span><div class="grad-strip"></div><span>+4¢</span><span style="color:#4b5563">● pura=701.955¢</span></div>
        <div id="circle-wrap">${drawCircle(selected)}</div>`,
@@ -1951,13 +2074,8 @@ function viewOverview(act) {
     + panel('Radar — offsets <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un punto</small>',
       `<canvas id="c-radar" ${mob?'height="200"':'height="240"'}></canvas>`,
       mob?'':'flex:1;min-width:280px')
-    + (act.length===1 ? panel('Estadísticas',
-      `<div style="font-size:10px;color:#6b7280;margin-bottom:8px">${act[0].name}</div>${statsTable(act[0])}`,
-      mob?'':'width:320px') : '')
-    + panel('Offsets respecto al ET (¢)',
-      offsetsTable(act),
-      mob?'':'width:100%');
-  mkRadar('c-radar',selected.map((t,i)=>!t?null:({label:shortName(t),data:t.offsets,backgroundColor:COLORS_A[i],borderColor:COLORS[i],borderWidth:2,pointRadius:4})).filter(Boolean));
+    + panel('Offsets respecto al ET (¢)', offsetsTable(act), mob?'':'width:100%');
+  mkRadar('c-radar', selected.map((t,i) => !t?null:({label:shortName(t),data:t.offsets,backgroundColor:COLORS_A[i],borderColor:COLORS[i],borderWidth:2,pointRadius:4})).filter(Boolean));
   bindCircleAudio();
 }
 
@@ -3968,7 +4086,7 @@ const DT = {
     const raw = this.getOffsets();
     const aOffset = raw[9] || 0;
     const offsets = raw.map(v => Math.round((v - aOffset) * 10) / 10);
-    addUserTemp(name, offsets);
+    addUserTemp(name, offsets, '');
     const t = all.find(x => x.name === name && x.source === 'Usuario');
     if (t) { selected[0] = t; lastSelected = t; renderBadges(); }
     this._showExport(name, offsets);
@@ -3981,6 +4099,9 @@ const DT = {
   _clearExport() { const ep = document.getElementById('dt-export-panel'); if (ep) ep.style.display='none'; },
   shareUrl() {
     const ep = document.getElementById('dt-export-panel'); if (!ep) return;
+    const t = all.find(x => x.name === ep.dataset.name && x.source === 'Usuario');
+    if (t) { showShareDialog(t); return; }
+    // fallback
     const offsets = ep.dataset.offsets.split(',').map(Number);
     const url = _tempShareUrl(ep.dataset.name, offsets);
     const text = _tempShareText(ep.dataset.name, offsets);
