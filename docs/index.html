@@ -432,7 +432,7 @@
 </div>
 
 <script>
-const APP_VERSION = '906d7fe · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '47b2634 · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -712,9 +712,19 @@ async function requestWakeLock() {
 function releaseWakeLock() {
   if (_wakeLock) { _wakeLock.release(); _wakeLock = null; }
 }
-// Reactivar tras volver a primer plano (el wake lock se libera al minimizar)
+// Liberar micrófono al salir de la app; reactivar al volver
+let _tunerMicPaused = false, _dtMicPaused = false;
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && (TUNER?.micOn || DT?.micOn)) requestWakeLock();
+  if (document.visibilityState === 'hidden') {
+    // Pausar micrófonos para que otras apps puedan usarlos
+    if (TUNER?.micOn) { _tunerMicPaused = true; TUNER.stopMic(); }
+    if (DT?.micOn)    { _dtMicPaused = true;    DT.stopMic(); }
+  } else {
+    // Reactivar wake lock y micrófonos si estaban activos
+    if (_tunerMicPaused) { _tunerMicPaused = false; TUNER.startMic(); }
+    if (_dtMicPaused)    { _dtMicPaused = false;    DT.startMic(); }
+    if (TUNER?.micOn || DT?.micOn) requestWakeLock();
+  }
 });
 
 function getCtx() {
