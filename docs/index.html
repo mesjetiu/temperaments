@@ -406,7 +406,7 @@
 </div>
 
 <script>
-const APP_VERSION = '3979204 · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '9cb1642 · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3755,31 +3755,24 @@ const DT = {
     const { freq } = res;
     const { ni } = findClosestNote(freq);
 
-    // ── captureA mode (auto): capturar La para calibrar pitchA ──
+    // ── captureA mode: tomar cualquier pitch estable como nueva referencia La ──
     if (this._captureA) {
-      if (ni !== 9) {
-        if (this._stableNi !== -1) { this._stableNi = -1; this._stableCount = 0; }
-        this._updateStatus('Buscando La…');
-        return;
-      }
-      const { oct } = findClosestNote(freq);
-      const etFreq = pitchA * Math.pow(2, (ET_FROM_A[9] + (oct - 4) * 1200) / 1200);
-      const cents = 1200 * Math.log2(freq / etFreq);
-      if (this._stableNi === 9) {
-        if (Math.abs(cents - this._stableCents) > 80) {
-          this._stableCount = 1; this._stableCents = cents;
+      // Estabilidad sobre frecuencia directa (ratio respecto al último valor)
+      if (this._stableNi === 0 && this._stableCents > 0) {
+        const ratio = freq / this._stableCents;  // _stableCents guarda freq promedio aquí
+        if (ratio < 0.95 || ratio > 1.05) {
+          this._stableCount = 1; this._stableCents = freq;
         } else {
           this._stableCount++;
-          this._stableCents = this._stableCents * 0.75 + cents * 0.25;
+          this._stableCents = this._stableCents * 0.8 + freq * 0.2;
         }
       } else {
-        this._stableNi = 9; this._stableCount = 1; this._stableCents = cents;
+        this._stableNi = 0; this._stableCount = 1; this._stableCents = freq;
       }
       const prog = Math.min(1, this._stableCount / this.STABLE_FRAMES);
-      const sign = this._stableCents >= 0 ? '+' : '';
-      this._updateStatus(`La  ${sign}${this._stableCents.toFixed(1)}¢`, prog);
+      this._updateStatus(`🎤 ${this._stableCents.toFixed(2)} Hz`, prog);
       if (this._stableCount >= this.STABLE_FRAMES) {
-        this.setPitchA(pitchA * Math.pow(2, this._stableCents / 1200));
+        this.setPitchA(this._stableCents);
         if (this.notes[9] !== null) this.notes[9] = 0;
         this._captureA = false;
         this._stableNi = -1; this._stableCount = 0;
