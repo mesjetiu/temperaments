@@ -406,7 +406,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'f6d845f · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '9a3d8eb · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -3609,6 +3609,7 @@ const DT = {
   rafId: null, lastAnalysis: 0,
   _stableNi: -1, _stableCount: 0, _stableCents: 0, _stableFreq: 0, _buf: null,
   _captureA: false,      // auto mode: capturando La para calibrar pitchA
+  _statusLock: 0,        // timestamp hasta el que no sobreescribir el status
   STABLE_FRAMES: 18,     // ~1.8 s a ≈100 ms/análisis
 
   getOffsets()    { return this.notes.map(v => v === null ? 0 : v); },
@@ -3629,13 +3630,11 @@ const DT = {
   setPitchA(newVal) {
     const newP = Math.round(parseFloat(newVal) * 100) / 100;
     if (isNaN(newP) || newP < 390 || newP > 470) return;
-    const shift = 1200 * Math.log2(pitchA / newP);  // cuánto se desplazan los offsets
+    const shift = 1200 * Math.log2(pitchA / newP);
     for (let ni = 0; ni < 12; ni++) {
       if (this.notes[ni] !== null) this.notes[ni] = Math.round((this.notes[ni] + shift) * 10) / 10;
     }
-    pitchA = newP;
-    savePrefs({ pitchA });
-    document.querySelectorAll('#pitch-input, #dt-pitch-input, #kb-pitch-input, #tuner-pitch-input').forEach(el => el.value = pitchA);
+    setPitchAGlobal(newP);   // actualiza pitchA global + todos los inputs
     this._renderKeyboard();
     this._updatePitchRow();
   },
@@ -3781,13 +3780,10 @@ const DT = {
         if (this.notes[9] !== null) this.notes[9] = 0;
         this._captureA = false;
         this._stableNi = -1; this._stableCount = 0;
+        this._statusLock = Date.now() + 3000;
         this._updateStatus(`✓ La: ${oldPitchA.toFixed(2)} → ${pitchA.toFixed(2)} Hz`);
-        setTimeout(() => {
-          document.querySelectorAll('#pitch-input,#dt-pitch-input,#kb-pitch-input,#tuner-pitch-input')
-            .forEach(el => el.value = pitchA.toFixed(2));
-          this._updatePitchRow();
-          this._renderKeyboard();
-        }, 0);
+        this._updatePitchRow();
+        this._renderKeyboard();
       }
       return;
     }
@@ -3832,20 +3828,14 @@ const DT = {
       if (sp) sp.style.display = this.measuredCount() > 0 ? 'flex' : 'none';
       // Manual: al medir A, fijar pitchA a la frecuencia real detectada (offset queda en 0)
       if (measureNi === 9 && this.mode === 'manual') {
-        // Normalizar _stableFreq a la octava de A4 (390–470 Hz)
         let aFreq = this._stableFreq;
         while (aFreq < 390) aFreq *= 2;
         while (aFreq > 470) aFreq /= 2;
         const oldPitchA = pitchA;
         this.setPitchA(aFreq);
-        this.notes[9] = 0;  // forzar 0 exacto
+        this.notes[9] = 0;
+        this._statusLock = Date.now() + 3000;  // bloquear loop 3s para que se vea el mensaje
         this._updateStatus(`✓ La: ${oldPitchA.toFixed(2)} → ${pitchA.toFixed(2)} Hz`);
-        // Sync DOM en próximo tick (por si _updatePitchRow interno no alcanzó a pintar)
-        setTimeout(() => {
-          document.querySelectorAll('#pitch-input,#dt-pitch-input,#kb-pitch-input,#tuner-pitch-input')
-            .forEach(el => el.value = pitchA.toFixed(2));
-          this._updatePitchRow();
-        }, 0);
       }
       this._renderKeyboard();
       this._updatePitchRow();
@@ -3854,6 +3844,7 @@ const DT = {
   },
 
   _updateStatus(txt, prog) {
+    if (this._statusLock && Date.now() < this._statusLock && prog === undefined) return;
     const el = document.getElementById('dt-status');
     if (el) el.textContent = txt;
     const bar = document.getElementById('dt-bar-fill');
