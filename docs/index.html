@@ -286,6 +286,7 @@
       <button class="src-tab sel" data-src="Todos">Todos</button>
       <button class="src-tab"     data-src="Scala">Scala</button>
       <button class="src-tab"     data-src="GrandOrgue">GrandOrgue</button>
+      <button class="src-tab"     data-src="Asselin">Asselin</button>
       <button class="src-tab"     data-src="Otros">Otros</button>
       <button class="src-tab"     data-src="Usuario">Mis</button>
     </div>
@@ -432,7 +433,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'fc98105 · 2026-04-05';// ── Service Worker ──
+const APP_VERSION = '638d9ae · 2026-04-05';// ── Service Worker ──
 if ('serviceWorker' in navigator) {
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1662,10 +1663,9 @@ function itemHtml(t) {
 function getFilteredList() {
   const q = document.getElementById('search').value.toLowerCase();
   let f = all.filter(t => !q || t.name.toLowerCase().includes(q) || t.source.toLowerCase().includes(q));
-  if (srcFilter === 'Scala')      f = f.filter(t => t.source === 'Scala');
-  else if (srcFilter === 'GrandOrgue') f = f.filter(t => t.source === 'GrandOrgue');
-  else if (srcFilter === 'Otros')   f = f.filter(t => t.source !== 'Scala' && t.source !== 'GrandOrgue' && t.source !== 'Usuario');
-  else if (srcFilter === 'Usuario') f = f.filter(t => t.source === 'Usuario');
+  const KNOWN_SRCS = ['Scala','GrandOrgue','Asselin','Usuario'];
+  if (srcFilter !== 'Todos' && srcFilter !== 'Otros') f = f.filter(t => t.source === srcFilter);
+  else if (srcFilter === 'Otros') f = f.filter(t => !KNOWN_SRCS.includes(t.source));
   if (showFavsOnly) f = f.filter(t => favs.has(t.name));
   return f;
 }
