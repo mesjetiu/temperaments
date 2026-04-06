@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Salinas — Tests de audio (browser)</title>
+  <style>
+    body { font-family: monospace; background: #111827; color: #e0e0e0; padding: 2rem; margin: 0; }
+    h1 { color: #60a5fa; font-size: 1.2rem; margin-bottom: 1.5rem; }
+    h2 { color: #9ca3af; font-size: 0.95rem; margin: 1.5rem 0 0.5rem; }
+    .suite { border-left: 2px solid #374151; padding-left: 1rem; margin-bottom: 1rem; }
+    .pass { color: #4ade80; }
+    .fail { color: #f87171; }
+    .info { color: #9ca3af; }
+    #summary { margin-top: 2rem; padding: 0.75rem 1rem; border-radius: 6px; font-weight: bold; }
+    .all-pass { background: #14532d; color: #4ade80; }
+    .has-fail  { background: #7f1d1d; color: #f87171; }
+    button { background: #1f2937; color: #60a5fa; border: 1px solid #374151;
+             padding: 0.4rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; }
+    button:hover { background: #374151; }
+    #controls { margin-bottom: 1.5rem; }
+    .note { color: #fbbf24; font-size: 0.85rem; margin-top: 0.3rem; }
+  </style>
+</head>
+<body>
+<h1>Salinas — Tests de audio (browser)</h1>
+<p class="info">Requiere interacción del usuario para iniciar AudioContext.<br>
+Pulsa <strong>Ejecutar tests</strong> y comprueba los resultados abajo.</p>
+<div class="note">⚠ Algunos tests reproducen audio brevemente (≈ 0.1 s) para verificar que el contexto funciona.</div>
+
+<div id="controls" style="margin-top:1rem">
+  <button id="btn-run">▶ Ejecutar tests</button>
+  <button id="btn-stop" disabled>■ Detener audio</button>
+</div>
+
+<div id="output"></div>
+<div id="summary"></div>
+
+<script type="module">
+import {
+  noteFreq, _computeHarmonics, NOTES, ET_FROM_A
+} from '../docs/core.js';
+
+// ── Mini framework de tests ──────────────────────────────────────────────────
+
+let passed = 0, failed = 0;
+const out = document.getElementById('output');
+
+function suite(name, fn) {
+  const div = document.createElement('div');
+  div.className = 'suite';
+  const h = document.createElement('h2');
+  h.textContent = name;
+  div.appendChild(h);
+  out.appendChild(div);
+  return { div, fn };
+}
+
+function log(div, ok, msg) {
+  const p = document.createElement('p');
+  p.className = ok ? 'pass' : 'fail';
+  p.textContent = (ok ? '✔ ' : '✖ ') + msg;
+  div.appendChild(p);
+  ok ? passed++ : failed++;
+}
+
+function assert(div, condition, msg) {
+  log(div, condition, msg);
+}
+
+function assertClose(div, a, b, tol = 0.01, msg = '') {
+  const ok = Math.abs(a - b) <= tol;
+  log(div, ok, msg || `|${a.toFixed(4)} - ${b.toFixed(4)}| ≤ ${tol}`);
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+let _ctx = null;
+let _activeNodes = [];
+
+function getCtx() {
+  if (!_ctx || _ctx.state === 'closed') {
+    _ctx = new AudioContext();
+  }
+  if (_ctx.state === 'suspended') _ctx.resume();
+  return _ctx;
+}
+
+/**
+ * Reproduce una frecuencia brevemente (dur ms) y resuelve cuando termina.
+ */
+function playBrief(freq, dur = 80) {
+  return new Promise(resolve => {
+    const ctx = getCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.05, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + dur / 1000);
+    osc.frequency.value = freq;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    _activeNodes.push(osc);
+    osc.start();
+    osc.stop(ctx.currentTime + dur / 1000 + 0.01);
+    osc.onended = () => {
+      _activeNodes = _activeNodes.filter(n => n !== osc);
+      resolve();
+    };
+  });
+}
+
+function stopAll() {
+  for (const n of _activeNodes) { try { n.stop(); } catch (_) {} }
+  _activeNodes = [];
+}
+
+// ── Suites de tests ──────────────────────────────────────────────────────────
+
+async function runAll() {
+  passed = 0; failed = 0;
+  out.innerHTML = '';
+
+  // ── 1. AudioContext se crea correctamente ──────────────────────────────────
+  const s1 = suite('AudioContext');
+  (() => {
+    const ctx = getCtx();
+    assert(s1.div, ctx instanceof AudioContext, 'se crea un AudioContext');
+    assert(s1.div, ctx.state === 'running', `estado = "${ctx.state}" (esperado "running")`);
+    assertClose(s1.div, ctx.sampleRate, 44100, 10000,
+      `sampleRate = ${ctx.sampleRate} Hz (rango válido 22050–96000)`);
+  })();
+
+  // ── 2. _makePeriodicWave via _computeHarmonics ────────────────────────────
+  const s2 = suite('PeriodicWave desde _computeHarmonics');
+  (() => {
+    const ctx = getCtx();
+    for (const type of ['sawtooth', 'square', 'triangle']) {
+      const N = 8;
+      const { real, imag } = _computeHarmonics(type, N);
+      let wave;
+      try {
+        wave = ctx.createPeriodicWave(real, imag, { disableNormalization: false });
+      } catch (e) {
+        assert(s2.div, false, `${type}: createPeriodicWave lanzó error — ${e.message}`);
+        continue;
+      }
+      assert(s2.div, wave instanceof PeriodicWave,
+        `${type}: createPeriodicWave devuelve PeriodicWave`);
+    }
+
+    // sine: _computeHarmonics no existe para sine (lo gestiona el oscilador directamente)
+    // Verificar que el oscilador acepta type='sine' sin PeriodicWave
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    assert(s2.div, osc.type === 'sine', 'oscilador acepta type="sine" sin PeriodicWave');
+    osc.disconnect();
+  })();
+
+  // ── 3. Oscilador reproduce la frecuencia correcta ─────────────────────────
+  const s3 = suite('Frecuencias de oscilador (noteFreq)');
+  const ET = new Array(12).fill(0);
+  for (const [ni, name, expected] of [
+    [9,  'A4',  440],
+    [0,  'C4',  261.626],
+    [7,  'G4',  391.995],
+  ]) {
+    const freq = noteFreq(ni, ET);
+    assertClose(s3.div, freq, expected, 0.01,
+      `noteFreq(${name}) = ${freq.toFixed(3)} Hz (esperado ${expected})`);
+
+    // Crear oscilador y comprobar que acepta la frecuencia sin error
+    (() => {
+      const ctx = getCtx();
+      const osc = ctx.createOscillator();
+      let ok = true;
+      try { osc.frequency.value = freq; } catch (e) { ok = false; }
+      assert(s3.div, ok && osc.frequency.value > 0,
+        `oscilador acepta frecuencia ${freq.toFixed(2)} Hz`);
+      osc.disconnect();
+    })();
+  }
+
+  // ── 4. Reproducción breve sin errores ─────────────────────────────────────
+  const s4 = suite('Reproducción breve (A4 = 440 Hz)');
+  try {
+    await playBrief(440, 80);
+    assert(s4.div, true, 'playBrief(440) completó sin errores');
+    assert(s4.div, _ctx.state === 'running', 'AudioContext sigue en estado "running" tras reproducción');
+  } catch (e) {
+    assert(s4.div, false, `playBrief lanzó error — ${e.message}`);
+  }
+
+  // ── 5. Caché de PeriodicWave (mismo objeto para mismos parámetros) ─────────
+  const s5 = suite('Caché de PeriodicWave');
+  (() => {
+    const ctx = getCtx();
+    const cache = new Map();
+    function getCached(type, N) {
+      const key = `${type}_${N}`;
+      if (!cache.has(key)) {
+        const { real, imag } = _computeHarmonics(type, N);
+        cache.set(key, ctx.createPeriodicWave(real, imag));
+      }
+      return cache.get(key);
+    }
+    const w1 = getCached('sawtooth', 8);
+    const w2 = getCached('sawtooth', 8);
+    assert(s5.div, w1 === w2, 'la misma clave devuelve el mismo objeto PeriodicWave');
+
+    const w3 = getCached('square', 8);
+    assert(s5.div, w1 !== w3, 'tipos diferentes producen objetos distintos');
+  })();
+
+  // ── Resumen ───────────────────────────────────────────────────────────────
+  const total = passed + failed;
+  const summary = document.getElementById('summary');
+  summary.className = failed === 0 ? 'all-pass' : 'has-fail';
+  summary.textContent = `${passed}/${total} tests pasados` +
+    (failed > 0 ? ` — ${failed} fallaron` : ' ✔');
+}
+
+// ── Botones ──────────────────────────────────────────────────────────────────
+
+document.getElementById('btn-run').addEventListener('click', async () => {
+  document.getElementById('btn-run').disabled = true;
+  document.getElementById('btn-stop').disabled = false;
+  await runAll();
+  document.getElementById('btn-run').disabled = false;
+  document.getElementById('btn-stop').disabled = true;
+});
+
+document.getElementById('btn-stop').addEventListener('click', () => {
+  stopAll();
+  document.getElementById('btn-stop').disabled = true;
+});
+</script>
+</body>
+</html>
