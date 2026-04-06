@@ -238,3 +238,15 @@ export function parseTempMarkdown(text) {
   }
   return temps;
 }
+
+// Exponer al scope global cuando se carga como módulo en el browser,
+// para que los scripts clásicos (app.js) puedan usar estas funciones.
+if (typeof window !== 'undefined') {
+  Object.assign(window, {
+    NOTES, FIFTH_IDX, FIFTH_LBL, ET_FROM_A,
+    PURE_FIFTH, PURE_MAJ3, PURE_MIN3,
+    noteFreq, getFifths, getMaj3, getMin3,
+    detectPitch, _refineFFT, findClosestNote,
+    parseTempMarkdown, _computeHarmonics,
+  });
+}
