@@ -216,6 +216,8 @@
     .panel-body { flex:1; min-height:0; overflow-y:auto; }
     .panel.panel-resizable .panel-drag-bar { display:flex; align-items:center; justify-content:center; height:18px; margin:6px -16px -16px; border-top:1px solid var(--border); cursor:ns-resize; touch-action:none; -webkit-tap-highlight-color:transparent; flex-shrink:0; }
     .panel.panel-resizable .panel-drag-bar::after { content:''; display:block; width:32px; height:3px; border-radius:2px; background:#2d3f55; }
+    /* En móvil el panel-drag-bar ya hace de asa; ocultar el handle interno del canvas */
+    .panel-resizable .chart-resize-handle { display:none; }
   }
   .empty-state { color: #4b5563; font-style: italic; padding: 60px; text-align: center; width: 100%; }
   .playable { cursor: crosshair; }
