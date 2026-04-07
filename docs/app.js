@@ -1,4 +1,4 @@
-const APP_VERSION = '1b9cd67 · 2026-04-07';
+const APP_VERSION = '3ea5801 · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -767,12 +767,19 @@ function bindChartAudio(canvasId, type, slotMap) {
         // Un solo temperamento: usar directamente
         els = [{ datasetIndex: 0, index: colIndex }];
       } else {
-        // Varios datasets: dividir el área del gráfico en zonas iguales por Y
-        const ca = chart.chartArea;
+        // Varios datasets: detectar por X en qué barra (columna extendida) cae el click
         const rect = canvas.getBoundingClientRect();
-        const relY = clientY - rect.top - ca.top;
-        const zoneH = (ca.bottom - ca.top) / nDatasets;
-        const bestDs = Math.max(0, Math.min(nDatasets - 1, Math.floor(relY / zoneH)));
+        const px = clientX - rect.left;
+        let bestDs = 0, bestDist = Infinity;
+        for (let di = 0; di < nDatasets; di++) {
+          const barEl = chart.getDatasetMeta(di).data[colIndex];
+          if (!barEl) continue;
+          const hw = (barEl.width ?? 0) / 2;
+          const barLeft = barEl.x - hw, barRight = barEl.x + hw;
+          if (px >= barLeft && px <= barRight) { bestDs = di; break; } // dentro de la columna
+          const dist = Math.min(Math.abs(px - barLeft), Math.abs(px - barRight));
+          if (dist < bestDist) { bestDist = dist; bestDs = di; }
+        }
         els = [{ datasetIndex: bestDs, index: colIndex }];
       }
     }
