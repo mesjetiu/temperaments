@@ -1,4 +1,4 @@
-const APP_VERSION = 'd96674b · 2026-04-07';
+const APP_VERSION = '00476f5 · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1971,15 +1971,14 @@ const JUST_IVLS = [
   { name:'M7', cents:1088.27, w:0.30 },
 ];
 
-function _consValue(cents) {
-  const s2 = 72; // sigma²=6² — ancho de Gaussiana en cents²
-  let best = 0;
+function _nearestJust(cents) {
+  // Devuelve { j, dev } con la entrada de JUST_IVLS más cercana y su desviación (con signo)
+  let best = JUST_IVLS[0], bestAbs = Infinity;
   for (const j of JUST_IVLS) {
-    const d = cents - j.cents;
-    const v = j.w * Math.exp(-(d * d) / (2 * s2));
-    if (v > best) best = v;
+    const a = Math.abs(cents - j.cents);
+    if (a < bestAbs) { bestAbs = a; best = j; }
   }
-  return best;
+  return { j: best, dev: cents - best.cents };
 }
 
 function viewConsonance(act) {
@@ -2005,7 +2004,11 @@ function viewConsonance(act) {
         ev.preventDefault();
         rh.setPointerCapture(ev.pointerId);
         const sy = ev.clientY, sh = cv.clientHeight || parseInt(cv.dataset.userH||'0',10) || Math.round(cv.clientWidth*0.5);
-        const onMove = e => { cv.style.height = Math.max(140, sh + e.clientY - sy) + 'px'; };
+        const onMove = e => {
+          const newH = Math.max(140, sh + e.clientY - sy);
+          cv.style.height = newH + 'px';
+          cv.dataset.userH = newH; // evita que _panelRO reinicie la altura durante el drag
+        };
         const onUp   = () => {
           rh.removeEventListener('pointermove', onMove);
           rh.removeEventListener('pointerup', onUp);
@@ -2037,52 +2040,57 @@ function _drawConsonance(canvas, act) {
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
 
-  const MX = 38, MY = 14, MR = 12, MB = 36;
+  const MX = 42, MY = 14, MR = 12, MB = 36;
   const PW = W - MX - MR, PH = H - MY - MB;
-  const toX = c => MX + (c / 1200) * PW;
-  const toY = v => MY + (1 - v) * PH;
+  const fSz = Math.max(8, Math.round(9 * W / 500));
+
+  // Pre-compute dots (necesitamos maxDev antes de dibujar los ejes)
+  const dots = [];
+  act.forEach(t => {
+    const ci = selected.indexOf(t);
+    for (let semi = 1; semi <= 11; semi++) {
+      for (let ni = 0; ni < 12; ni++) {
+        const nj = (ni + semi) % 12;
+        const cents = semi * 100 + t.offsets[nj] - t.offsets[ni];
+        const { j, dev } = _nearestJust(cents);
+        dots.push({ cents, dev, absDev: Math.abs(dev), ci, j,
+          fromNote: NOTES[ni], toNote: NOTES[nj], semi, ni, t });
+      }
+    }
+  });
+
+  // Escala Y: desviación absoluta del just más cercano — 0 = puro, arriba = impuro
+  const rawMax = dots.length ? Math.max(...dots.map(d => d.absDev)) : 20;
+  const maxDev = Math.max(5, Math.ceil(rawMax / 5) * 5); // redondear a múltiplo de 5
+  const toX = c  => MX + (c / 1200) * PW;
+  const toY = dv => MY + (dv / maxDev) * PH; // 0¢ arriba, maxDev abajo
 
   // Background
   ctx.fillStyle = '#0f172a';
   ctx.fillRect(0, 0, W, H);
 
-  // Y grid + labels
-  const fSz = Math.max(8, Math.round(9 * W / 500));
-  ctx.textAlign = 'right';
+  // Franja "zona pura" cerca del top
+  const pureZonePx = Math.max(4, PH * (2 / maxDev));
+  const grad = ctx.createLinearGradient(0, MY, 0, MY + pureZonePx * 3);
+  grad.addColorStop(0, 'rgba(74,222,128,0.10)');
+  grad.addColorStop(1, 'rgba(74,222,128,0.00)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(MX, MY, PW, PH);
+
+  // Y grid + etiquetas
   ctx.font = `${fSz}px monospace`;
-  for (let v = 0; v <= 1; v += 0.25) {
-    const y = toY(v);
+  ctx.textAlign = 'right';
+  const nTicks = 5;
+  for (let i = 0; i < nTicks; i++) {
+    const dv = (i / (nTicks - 1)) * maxDev;
+    const y  = toY(dv);
     ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1; ctx.setLineDash([]);
     ctx.beginPath(); ctx.moveTo(MX, y); ctx.lineTo(MX + PW, y); ctx.stroke();
-    ctx.fillStyle = '#475569';
-    ctx.fillText((v * 100).toFixed(0) + '%', MX - 4, y + 3);
+    ctx.fillStyle = i === 0 ? '#4ade80' : '#475569';
+    ctx.fillText(dv.toFixed(1) + '¢', MX - 4, y + 3);
   }
 
-  // Theoretical consonance curve — filled area
-  ctx.beginPath();
-  let first = true;
-  for (let px = 0; px <= PW; px++) {
-    const c0 = (px / PW) * 1200, v0 = _consValue(c0);
-    if (first) { ctx.moveTo(toX(c0), toY(v0)); first = false; }
-    else ctx.lineTo(toX(c0), toY(v0));
-  }
-  ctx.lineTo(MX + PW, MY + PH); ctx.lineTo(MX, MY + PH); ctx.closePath();
-  ctx.fillStyle = 'rgba(255,255,255,0.04)';
-  ctx.fill();
-
-  // Theoretical consonance curve — stroke
-  ctx.beginPath();
-  first = true;
-  for (let px = 0; px <= PW; px++) {
-    const c0 = (px / PW) * 1200, v0 = _consValue(c0);
-    if (first) { ctx.moveTo(toX(c0), toY(v0)); first = false; }
-    else ctx.lineTo(toX(c0), toY(v0));
-  }
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-  ctx.lineWidth = 1.5; ctx.setLineDash([]); ctx.stroke();
-
-  // Just ratio vertical lines + labels
-  ctx.font = `${fSz}px monospace`;
+  // Líneas verticales de los intervalos justos + etiquetas
   for (const j of JUST_IVLS) {
     const x = toX(j.cents);
     ctx.beginPath(); ctx.moveTo(x, MY); ctx.lineTo(x, MY + PH);
@@ -2090,12 +2098,13 @@ function _drawConsonance(canvas, act) {
     ctx.lineWidth = 1; ctx.setLineDash([3, 5]); ctx.stroke(); ctx.setLineDash([]);
     ctx.textAlign = 'center';
     ctx.fillStyle = `rgba(148,163,184,${(0.35 + j.w * 0.4).toFixed(2)})`;
+    ctx.font = `${fSz}px monospace`;
     ctx.fillText(j.name, x, MY + PH + 14);
     ctx.fillStyle = 'rgba(71,85,105,0.75)';
     ctx.fillText(Math.round(j.cents), x, MY + PH + 25);
   }
 
-  // 0¢ / 1200¢ ticks
+  // Ticks extremos 0¢ / 1200¢
   ctx.strokeStyle = '#334155'; ctx.lineWidth = 1;
   for (const c of [0, 1200]) {
     const x = toX(c);
@@ -2105,23 +2114,10 @@ function _drawConsonance(canvas, act) {
     ctx.fillText(c + '¢', x, MY + PH + 25);
   }
 
-  // Compute interval dots
-  const dots = [];
-  act.forEach((t, ti) => {
-    const ci = selected.indexOf(t);
-    for (let semi = 1; semi <= 11; semi++) {
-      for (let ni = 0; ni < 12; ni++) {
-        const nj = (ni + semi) % 12;
-        const actualCents = semi * 100 + t.offsets[nj] - t.offsets[ni];
-        const cons = _consValue(actualCents);
-        dots.push({ x: toX(actualCents), y: toY(cons), ci, cents: actualCents, cons,
-          fromNote: NOTES[ni], toNote: NOTES[nj], semi, ni, t });
-      }
-    }
-  });
-
-  // Draw dots
+  // Puntos — posición final ahora que tenemos toY
   for (const d of dots) {
+    d.x = toX(d.cents);
+    d.y = toY(d.absDev);
     ctx.beginPath();
     ctx.arc(d.x, d.y, 3, 0, Math.PI * 2);
     ctx.fillStyle = COLORS[d.ci];
@@ -2130,7 +2126,7 @@ function _drawConsonance(canvas, act) {
     ctx.globalAlpha = 1;
   }
 
-  // Legend (top right, stacked vertically)
+  // Leyenda (esquina superior derecha, apilada)
   ctx.font = '10px sans-serif';
   act.forEach((t, ti) => {
     const ci = selected.indexOf(t);
@@ -2142,19 +2138,19 @@ function _drawConsonance(canvas, act) {
     ctx.fillText(shortName(t, 26), MX + PW - 13, ly + 3);
   });
 
-  // Y axis title
+  // Título eje Y
   ctx.save();
   ctx.translate(11, MY + PH / 2);
   ctx.rotate(-Math.PI / 2);
   ctx.fillStyle = '#6b7280'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText('Pureza', 0, 0);
+  ctx.fillText('Desv. del just más cercano (¢)', 0, 0);
   ctx.restore();
 
-  // X axis title
+  // Título eje X
   ctx.fillStyle = '#6b7280'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
   ctx.fillText('Intervalo (¢)', MX + PW / 2, H - 2);
 
-  // Hover: show interval info
+  // Hover: muestra detalle del intervalo
   canvas.addEventListener('pointermove', e => {
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
@@ -2166,19 +2162,14 @@ function _drawConsonance(canvas, act) {
     const nfoEl = document.getElementById('cons-nfo');
     if (!nfoEl) return;
     if (nearest) {
-      let nearJ = JUST_IVLS[0], nearDev = Infinity;
-      for (const j of JUST_IVLS) {
-        const d = Math.abs(j.cents - nearest.cents);
-        if (d < nearDev) { nearDev = d; nearJ = j; }
-      }
-      const dev = nearest.cents - nearJ.cents;
-      nfoEl.textContent = `${nearest.fromNote} → ${nearest.toNote} · ${nearest.cents.toFixed(2)}¢ · ${nearJ.name} justo=${nearJ.cents.toFixed(2)}¢ (${dev >= 0 ? '+' : ''}${dev.toFixed(2)}¢)`;
+      const sign = nearest.dev >= 0 ? '+' : '';
+      nfoEl.textContent = `${nearest.fromNote} → ${nearest.toNote} · ${nearest.cents.toFixed(2)}¢ · ${nearest.j.name} justo=${nearest.j.cents.toFixed(2)}¢ (${sign}${nearest.dev.toFixed(2)}¢)`;
     } else {
-      nfoEl.textContent = 'Cada punto es un intervalo del temperamento · pulsa para oír';
+      nfoEl.textContent = 'Cada punto es un intervalo del temperamento · 0¢ = justo puro · pulsa para oír';
     }
   }, { signal: canvas._consAbort.signal });
 
-  // Click: play interval
+  // Click: reproduce el intervalo
   canvas.addEventListener('pointerdown', e => {
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
