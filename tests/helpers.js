@@ -62,3 +62,45 @@ export function makeFFTBuf(peakFreq, sampleRate, fftSize = 4096) {
 
 /** Array de 12 ceros (ET) como offsets de referencia */
 export const ET_OFFSETS = new Array(12).fill(0);
+
+/**
+ * Añade ruido blanco determinista (LCG) a una señal.
+ * El seed fijo garantiza reproducibilidad entre ejecuciones.
+ * @param {Float32Array} signal
+ * @param {number} noiseAmplitude
+ * @param {number} seed
+ * @returns {Float32Array}
+ */
+export function addNoise(signal, noiseAmplitude, seed = 12345) {
+  const buf = new Float32Array(signal.length);
+  let s = seed >>> 0;
+  for (let i = 0; i < signal.length; i++) {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    buf[i] = signal[i] + noiseAmplitude * (s / 0x80000000 - 1);
+  }
+  return buf;
+}
+
+/**
+ * Genera un tono complejo con armónicos decrecientes (más realista que una sinusoide).
+ * Simula un instrumento de cuerda/viento con espectro rico.
+ * @param {number} freq       - frecuencia fundamental en Hz
+ * @param {number} sampleRate
+ * @param {number} numSamples
+ * @param {number} amplitude
+ * @returns {Float32Array}
+ */
+export function makeRichTone(freq, sampleRate, numSamples, amplitude = 0.5) {
+  const weights = [1, 0.6, 0.3, 0.15, 0.08]; // armónicos con caída natural
+  const total = weights.reduce((a, b) => a + b, 0);
+  const buf = new Float32Array(numSamples);
+  for (let i = 0; i < numSamples; i++) {
+    let s = 0;
+    for (let h = 0; h < weights.length; h++) {
+      const f = freq * (h + 1);
+      if (f < sampleRate / 2) s += weights[h] * Math.sin(2 * Math.PI * f * i / sampleRate);
+    }
+    buf[i] = s * amplitude / total;
+  }
+  return buf;
+}
