@@ -1,4 +1,4 @@
-const APP_VERSION = '5fd2216 · 2026-04-07';
+const APP_VERSION = '20cad18 · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2089,9 +2089,9 @@ function _drawConsonance(canvas, cursorCanvas, act) {
     cursorCanvas.style.height = H + 'px';
   }
 
+  const fSz = Math.min(10, Math.max(8, Math.round(9 * W / 500)));
   const MX = 38, MY = 14, MR = 12, MB = 36;
   const PW = W - MX - MR, PH = H - MY - MB;
-  const fSz = Math.max(8, Math.round(9 * W / 500));
 
   // ── Zoom ──
   const zoomSpan   = canvas._zoomSpan   || 1200;
@@ -2135,17 +2135,24 @@ function _drawConsonance(canvas, cursorCanvas, act) {
   }
 
   // ── Líneas verticales just + etiquetas X ──
+  // Suprimir etiquetas demasiado próximas (< minGap px) respecto a la última dibujada
+  const minGap = fSz * 2.8;
+  let lastLabelX = -Infinity;
+  ctx.font = `${fSz}px monospace`;
   for (const j of JUST_IVLS) {
     if (j.cents < zMin || j.cents > zMax) continue;
     const x = toX(j.cents);
     ctx.beginPath(); ctx.moveTo(x, MY); ctx.lineTo(x, MY + PH);
     ctx.strokeStyle = `rgba(148,163,184,${(0.05 + j.w * 0.08).toFixed(2)})`;
     ctx.lineWidth = 1; ctx.setLineDash([3, 5]); ctx.stroke(); ctx.setLineDash([]);
-    ctx.textAlign = 'center'; ctx.font = `${fSz}px monospace`;
-    ctx.fillStyle = `rgba(148,163,184,${(0.35 + j.w * 0.4).toFixed(2)})`;
-    ctx.fillText(j.name, x, MY + PH + 14);
-    ctx.fillStyle = 'rgba(71,85,105,0.75)';
-    if (j.cents > zMin && j.cents < zMax) ctx.fillText(Math.round(j.cents), x, MY + PH + 25);
+    if (x - lastLabelX >= minGap) {
+      ctx.textAlign = 'center';
+      ctx.fillStyle = `rgba(148,163,184,${(0.35 + j.w * 0.4).toFixed(2)})`;
+      ctx.fillText(j.name, x, MY + PH + 14);
+      ctx.fillStyle = 'rgba(71,85,105,0.75)';
+      if (j.cents > zMin && j.cents < zMax) ctx.fillText(Math.round(j.cents), x, MY + PH + 25);
+      lastLabelX = x;
+    }
   }
 
   // ── Ticks extremos (rango visible) ──
