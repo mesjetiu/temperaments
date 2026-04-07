@@ -1,4 +1,4 @@
-const APP_VERSION = 'e45f91f · 2026-04-07';
+const APP_VERSION = '6e9fe62 · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -491,15 +491,23 @@ function togglePanelCollapse(panel) {
   }
   panel.classList.toggle('collapsed');
 }
-// Devuelve el alto disponible para un canvas dentro de su contenedor,
-// midiendo directamente los hermanos para ser independiente de la vista.
+// Devuelve el alto disponible para un canvas dentro de su panel.
+// Sube hasta .panel-body (o .panel), mide su clientHeight - padding,
+// y resta la altura de todos los hijos directos excepto el ancestro
+// directo del canvas (que es quien lo contiene).
 function _availCanvasH(canvas) {
   const body = canvas.closest('.panel-body') || canvas.closest('.panel');
   if (!body) return 0;
-  const cs  = getComputedStyle(body);
+  // Hijo directo de `body` que contiene el canvas (puede ser el canvas mismo o un wrapper)
+  let canvasContainer = canvas;
+  while (canvasContainer.parentElement !== body) {
+    if (!canvasContainer.parentElement) return 0;
+    canvasContainer = canvasContainer.parentElement;
+  }
+  const cs    = getComputedStyle(body);
   const bodyH = body.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   const siblH = Array.from(body.children)
-    .filter(el => el !== canvas)
+    .filter(el => el !== canvasContainer && getComputedStyle(el).position !== 'absolute')
     .reduce((sum, el) => {
       const m = getComputedStyle(el);
       return sum + el.offsetHeight + parseFloat(m.marginTop) + parseFloat(m.marginBottom);
@@ -509,20 +517,26 @@ function _availCanvasH(canvas) {
 
 function startPanelDragResize(e, panel) {
   e.preventDefault();
+  const bar = e.target.closest('.panel-drag-bar') || e.target;
+  bar.setPointerCapture(e.pointerId);
   panel.classList.add('panel-resized');
+  // Altura mínima = cabecera + barra de drag (sin contenido)
+  const hdr  = panel.querySelector('.panel-hdr');
+  const minH = (hdr ? hdr.offsetHeight : 40) + bar.offsetHeight + 8;
+  // Altura de partida: fijar inline la actual para poder restar/sumar desde ella
+  const startH = panel.clientHeight;
+  panel.style.height = startH + 'px';
   const startY = e.clientY;
-  const minH = panel.clientHeight; // natural height = minimum
-  panel.style.height = minH + 'px';
   function onMove(ev) {
-    const h = Math.max(minH, minH + ev.clientY - startY);
+    const h = Math.max(minH, startH + ev.clientY - startY);
     panel.style.height = h + 'px';
   }
   function onEnd() {
-    window.removeEventListener('pointermove', onMove);
-    window.removeEventListener('pointerup', onEnd);
+    bar.removeEventListener('pointermove', onMove);
+    bar.removeEventListener('pointerup', onEnd);
   }
-  window.addEventListener('pointermove', onMove, { passive: true });
-  window.addEventListener('pointerup', onEnd);
+  bar.addEventListener('pointermove', onMove, { passive: true });
+  bar.addEventListener('pointerup', onEnd);
 }
 // Zoom+pan+resize para tablas heatmap (intervalos, batidos).
 // Mismo patrón que el scatter: transform:scale en el contenido,
