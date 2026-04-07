@@ -1,4 +1,4 @@
-const APP_VERSION = 'f765cb2 · 2026-04-05';
+const APP_VERSION = '6f6a669 · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -675,49 +675,118 @@ function bindChartAudio(canvasId, type, slotMap) {
   if (!canvas) return;
   canvas.classList.add('playable');
 
+  // Estado del highlight actual
+  let _hlDataset = -1, _hlIndex = -1;
+
+  function setHighlight(chart, datasetIndex, colIndex) {
+    if (_hlDataset === datasetIndex && _hlIndex === colIndex) return;
+    clearHighlight(chart);
+    _hlDataset = datasetIndex; _hlIndex = colIndex;
+    if (datasetIndex < 0 || !chart) return;
+    const ds = chart.data.datasets[datasetIndex];
+    if (!ds) return;
+    // Guardar colores originales y aplicar borde luminoso
+    ds._origBorder = ds.borderColor;
+    ds._origBorderWidth = ds.borderWidth;
+    // Para barras: resaltar la barra concreta con borde blanco brillante
+    const origBg = Array.isArray(ds.backgroundColor) ? ds.backgroundColor : Array(ds.data.length).fill(ds.backgroundColor);
+    ds._origBg = ds.backgroundColor;
+    const newBg = origBg.map((c, i) => i === colIndex ? 'rgba(255,255,255,0.55)' : c);
+    ds.backgroundColor = newBg;
+    ds.borderColor = '#fff';
+    ds.borderWidth = 2;
+    chart.update('none');
+  }
+
+  function clearHighlight(chart) {
+    if (_hlDataset < 0 || !chart) { _hlDataset = -1; _hlIndex = -1; return; }
+    const ds = chart.data.datasets[_hlDataset];
+    if (ds) {
+      if (ds._origBg !== undefined) { ds.backgroundColor = ds._origBg; delete ds._origBg; }
+      if (ds._origBorder !== undefined) { ds.borderColor = ds._origBorder; delete ds._origBorder; }
+      if (ds._origBorderWidth !== undefined) { ds.borderWidth = ds._origBorderWidth; delete ds._origBorderWidth; }
+    }
+    _hlDataset = -1; _hlIndex = -1;
+    chart.update('none');
+  }
+
   function interact(clientX, clientY) {
     const chart = charts[canvasId];
     if (!chart) return;
     const meta = chartMeta[canvasId];
 
     if (meta.type === 'radar') {
-      // Detectar por ángulo desde el centro — funciona aunque no se pulse la bolita
       const rect = canvas.getBoundingClientRect();
-      const px = clientX - rect.left;
-      const py = clientY - rect.top;
+      const px = clientX - rect.left, py = clientY - rect.top;
       const ca = chart.chartArea;
-      const cx = (ca.left + ca.right) / 2;
-      const cy = (ca.top + ca.bottom) / 2;
+      const cx = (ca.left + ca.right) / 2, cy = (ca.top + ca.bottom) / 2;
       const n = chart.data.labels.length;
       const angle = Math.atan2(py - cy, px - cx);
       const norm = (angle + Math.PI / 2 + 2 * Math.PI) % (2 * Math.PI);
       const index = Math.round(norm / (2 * Math.PI / n)) % n;
-      const temp = selected[meta.slotMap[0]];
+      const slotIdx = 0;
+      const temp = selected[meta.slotMap[slotIdx]];
       if (!temp) return;
+      setHighlight(chart, slotIdx, index);
       playForType(meta.type, index, temp.offsets);
       return;
     }
 
-    // Bar / line: primero intento exacto; si falla (barra en 0 o muy pequeña),
-    // detecto por posición X — activa toda la columna aunque la barra no sea visible
+    // Bar / line: detectar columna y dataset
+    // 1) Intentar hit exacto sobre una barra
     let els = chart.getElementsAtEventForMode({ clientX, clientY }, 'nearest', { intersect: true }, false);
+
+    // 2) Si no hay hit exacto: detectar columna por X y dataset por Y
     if (!els.length) {
-      els = chart.getElementsAtEventForMode({ clientX, clientY }, 'index', { intersect: false }, false);
+      // Detectar índice de columna por posición X
+      const colEls = chart.getElementsAtEventForMode({ clientX, clientY }, 'index', { intersect: false }, false);
+      if (!colEls.length) return;
+      const colIndex = colEls[0].index;
+      const nDatasets = chart.data.datasets.length;
+
+      if (nDatasets === 1) {
+        // Un solo temperamento: usar directamente
+        els = [{ datasetIndex: 0, index: colIndex }];
+      } else {
+        // Varios datasets: detectar cuál le corresponde por posición Y
+        // Calcular el centro Y de cada barra en esa columna
+        const rect = canvas.getBoundingClientRect();
+        const py = clientY - rect.top;
+        let bestDs = 0, bestDist = Infinity;
+        for (let di = 0; di < nDatasets; di++) {
+          const dsMeta = chart.getDatasetMeta(di);
+          const barEl = dsMeta.data[colIndex];
+          if (!barEl) continue;
+          // Centro Y de la barra (barEl.y = top de la barra, barEl.base = línea cero)
+          const barCenterY = (barEl.y + barEl.base) / 2;
+          const dist = Math.abs(py - barCenterY);
+          if (dist < bestDist) { bestDist = dist; bestDs = di; }
+        }
+        els = [{ datasetIndex: bestDs, index: colIndex }];
+      }
     }
+
     if (!els.length) return;
     const { datasetIndex, index } = els[0];
     const temp = selected[meta.slotMap[datasetIndex]];
     if (!temp) return;
+    setHighlight(chart, datasetIndex, index);
     playForType(meta.type, index, temp.offsets);
+  }
+
+  function release() {
+    const chart = charts[canvasId];
+    clearHighlight(chart);
+    stopSound();
   }
 
   let pressing = false;
   // Mouse
   canvas.addEventListener('mousedown', e => { e.preventDefault(); pressing = true; interact(e.clientX, e.clientY); });
   canvas.addEventListener('mousemove', e => { if (pressing) interact(e.clientX, e.clientY); });
-  canvas.addEventListener('mouseup',    () => { pressing = false; stopSound(); });
-  canvas.addEventListener('mouseleave', () => { pressing = false; });
-  // Touch: pasivo para no bloquear scroll; cancelar si el dedo se mueve verticalmente
+  canvas.addEventListener('mouseup',    () => { pressing = false; release(); });
+  canvas.addEventListener('mouseleave', () => { if (pressing) { pressing = false; release(); } });
+  // Touch
   let _tx0 = 0, _ty0 = 0, _scrolling = false;
   canvas.addEventListener('touchstart', e => {
     const t = e.touches[0];
@@ -726,11 +795,11 @@ function bindChartAudio(canvasId, type, slotMap) {
   }, { passive: true });
   canvas.addEventListener('touchmove', e => {
     const t = e.touches[0];
-    if (!_scrolling && Math.abs(t.clientY - _ty0) > 8) { _scrolling = true; pressing = false; stopSound(); }
+    if (!_scrolling && Math.abs(t.clientY - _ty0) > 8) { _scrolling = true; pressing = false; release(); }
     if (pressing && !_scrolling) interact(t.clientX, t.clientY);
   }, { passive: true });
-  canvas.addEventListener('touchend',    () => { pressing = false; });
-  canvas.addEventListener('touchcancel', () => { pressing = false; stopSound(); });
+  canvas.addEventListener('touchend',    () => { pressing = false; release(); });
+  canvas.addEventListener('touchcancel', () => { pressing = false; release(); });
 }
 
 // ══════════════════════════════════════════════
@@ -740,17 +809,44 @@ function bindCircleAudio() {
   const wrap = document.getElementById('circle-wrap');
   if (!wrap) return;
   wrap.style.cursor = 'crosshair';
+  let _hlPath = null;
+
   function getPath(cx,cy) { return document.elementFromPoint(cx,cy)?.closest('[data-fi]'); }
+
+  function setHL(p) {
+    if (_hlPath === p) return;
+    clearHL();
+    _hlPath = p;
+    if (p) {
+      p._origStroke = p.style.stroke;
+      p._origStrokeW = p.style.strokeWidth;
+      p._origOpacity = p.style.opacity;
+      p.style.stroke = '#fff';
+      p.style.strokeWidth = '2';
+      p.style.opacity = '1';
+    }
+  }
+  function clearHL() {
+    if (!_hlPath) return;
+    _hlPath.style.stroke = _hlPath._origStroke ?? '';
+    _hlPath.style.strokeWidth = _hlPath._origStrokeW ?? '';
+    _hlPath.style.opacity = _hlPath._origOpacity ?? '';
+    _hlPath = null;
+  }
+
   function interact(cx,cy) {
     const p=getPath(cx,cy); if(!p) return;
     const temp=selected[+p.dataset.ti]; if(!temp) return;
+    setHL(p);
     playFifthAudio(+p.dataset.fi, temp.offsets);
   }
+  function release() { clearHL(); stopSound(); }
+
   let pressing=false;
   wrap.addEventListener('mousedown', e => { pressing=true; interact(e.clientX,e.clientY); });
   wrap.addEventListener('mousemove', e => { if(pressing) interact(e.clientX,e.clientY); });
-  wrap.addEventListener('mouseup',    () => { pressing=false; });
-  wrap.addEventListener('mouseleave', () => { pressing=false; });
+  wrap.addEventListener('mouseup',    () => { pressing=false; release(); });
+  wrap.addEventListener('mouseleave', () => { if(pressing){ pressing=false; release(); } });
   let _cy0 = 0, _cscrolling = false;
   wrap.addEventListener('touchstart', e => {
     const t = e.touches[0]; _cy0 = t.clientY; _cscrolling = false; pressing = true;
@@ -758,11 +854,11 @@ function bindCircleAudio() {
   }, { passive: true });
   wrap.addEventListener('touchmove', e => {
     const t = e.touches[0];
-    if (!_cscrolling && Math.abs(t.clientY - _cy0) > 8) { _cscrolling = true; pressing = false; }
+    if (!_cscrolling && Math.abs(t.clientY - _cy0) > 8) { _cscrolling = true; pressing = false; release(); }
     if (pressing && !_cscrolling) interact(t.clientX, t.clientY);
   }, { passive: true });
-  wrap.addEventListener('touchend',    () => { pressing = false; });
-  wrap.addEventListener('touchcancel', () => { pressing = false; });
+  wrap.addEventListener('touchend',    () => { pressing = false; release(); });
+  wrap.addEventListener('touchcancel', () => { pressing = false; release(); });
 }
 
 // ══════════════════════════════════════════════
@@ -1716,7 +1812,7 @@ function viewCompare(act) {
 function playHeatCell(ti, start, semi) {
   const off = selected.filter(Boolean)[ti]?.offsets;
   if (!off || semi === 0) return;
-  const f1 = noteFreq(start, off);
+  const f1 = noteFreq(start, off, pitchA, octaveShift);
   const end = (start + semi) % 12;
   const actual = semi * 100 + off[end] - off[start];
   playFreqs([f1, f1 * Math.pow(2, actual / 1200)]);
@@ -1798,7 +1894,7 @@ function viewBeats(act) {
     ).join('');
     let rows = '';
     for (let start = 0; start < 12; start++) {
-      const f1 = noteFreq(start, temp.offsets);
+      const f1 = noteFreq(start, temp.offsets, pitchA, octaveShift);
       let cells = `<td style="padding:2px 6px;font-size:9px;color:var(--muted);font-weight:600;white-space:nowrap">${NOTES[start]}</td>`;
       IVLS.forEach(iv => {
         const end = (start + iv.semi) % 12;
@@ -1981,7 +2077,7 @@ function _initTonnetz(canvas, nfoEl, temp, ti) {
     }
     const tr = tris.find(t => ptInTri(mx, my, t));
     if (tr) {
-      playFreqs(tr.ns.map(n => noteFreq(n, temp.offsets)));
+      playFreqs(tr.ns.map(n => noteFreq(n, temp.offsets, pitchA, octaveShift)));
       const rn = NOTES[tr.root], type = tr.isMaj ? 'mayor' : 'menor';
       const dt = (tr.isMaj ? devM3 : devm3)(tr.root), df = devP5(tr.root);
       const s = v => (v >= 0 ? '+' : '') + v.toFixed(1) + '¢';
