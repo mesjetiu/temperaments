@@ -1,4 +1,4 @@
-const APP_VERSION = '1c5918c · 2026-04-07';
+const APP_VERSION = '8de99d7 · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2036,7 +2036,7 @@ function viewConsonance(act) {
        </span>
      </div>
      <div style="position:relative">
-       <canvas id="c-cons" style="width:100%;display:block;cursor:crosshair"></canvas>
+       <canvas id="c-cons" style="width:100%;display:block;cursor:crosshair;touch-action:none"></canvas>
        <canvas id="c-cons-cur" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none"></canvas>
      </div>
      <div id="cons-resize" class="chart-resize-handle" title="Arrastra para cambiar altura"></div>`,
@@ -2280,6 +2280,25 @@ function _drawConsonance(canvas, cursorCanvas, act) {
   }
 
   // ── Eventos ──
+  // En móvil, touch-action:none ya está en el CSS del canvas.
+  // Capturamos el pointer en pointerdown para garantizar pointermove
+  // durante el arrastre aunque el dedo salga del canvas.
+  canvas.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    canvas.setPointerCapture(e.pointerId);
+    if (_swOn('cons-audio-sw')) return; // modo continuo: el sonido lo maneja pointermove
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    let nearest = null, minD = 14;
+    for (const d of dots) { const dist = Math.hypot(d.x - mx, d.y - my); if (dist < minD) { minD = dist; nearest = d; } }
+    if (!nearest) return;
+    const f1 = noteFreq(nearest.ni, nearest.t.offsets, pitchA, octaveShift);
+    playFreqs([f1, f1 * Math.pow(2, nearest.cents / 1200)]);
+    _clickCents = nearest.cents;
+    _clickNi    = nearest.ni;
+    _clickT     = nearest.t;
+  }, { signal: sig });
+
   canvas.addEventListener('pointermove', e => {
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
@@ -2306,32 +2325,32 @@ function _drawConsonance(canvas, cursorCanvas, act) {
     }
   }, { signal: sig });
 
-  canvas.addEventListener('pointerleave', () => {
+  canvas.addEventListener('pointerup', () => {
+    if (_swOn('cons-audio-sw')) {
+      stopSound(true);
+    } else {
+      _clickCents = null; _clickNi = null; _clickT = null;
+      stopSound(true);
+    }
     _animMx = null;
-    if (_swOn('cons-audio-sw')) stopSound(true);
     const nfoEl = document.getElementById('cons-nfo');
     if (nfoEl) nfoEl.textContent = 'Mueve el ratón sobre la gráfica · pulsa para oír un intervalo · rueda=zoom';
   }, { signal: sig });
 
-  canvas.addEventListener('pointerdown', e => {
-    if (_swOn('cons-audio-sw')) return;
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-    let nearest = null, minD = 14;
-    for (const d of dots) { const dist = Math.hypot(d.x - mx, d.y - my); if (dist < minD) { minD = dist; nearest = d; } }
-    if (!nearest) return;
-    const f1 = noteFreq(nearest.ni, nearest.t.offsets, pitchA, octaveShift);
-    playFreqs([f1, f1 * Math.pow(2, nearest.cents / 1200)]);
-    _clickCents = nearest.cents;
-    _clickNi    = nearest.ni;
-    _clickT     = nearest.t;
+  canvas.addEventListener('pointerleave', e => {
+    // En móvil con pointer capture, pointerleave no se dispara durante el arrastre.
+    // Solo limpiamos si el pointer ya no está capturado (p.ej. ratón saliendo).
+    if (e.pointerType === 'mouse') {
+      _animMx = null;
+      if (_swOn('cons-audio-sw')) stopSound(true);
+      const nfoEl = document.getElementById('cons-nfo');
+      if (nfoEl) nfoEl.textContent = 'Mueve el ratón sobre la gráfica · pulsa para oír un intervalo · rueda=zoom';
+    }
   }, { signal: sig });
 
-  window.addEventListener('pointerup', () => {
-    if (!_swOn('cons-audio-sw')) {
-      _clickCents = null; _clickNi = null; _clickT = null;
-      stopSound(true);
-    }
+  canvas.addEventListener('pointercancel', () => {
+    _animMx = null; _clickCents = null; _clickNi = null; _clickT = null;
+    stopSound(true);
   }, { signal: sig });
 
   // ── Zoom con rueda del ratón ──
