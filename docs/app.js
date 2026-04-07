@@ -1,4 +1,4 @@
-const APP_VERSION = 'c5408f5 · 2026-04-07';
+const APP_VERSION = '99adc4c · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1971,8 +1971,15 @@ const JUST_IVLS = [
   { name:'M7', cents:1088.27, w:0.30 },
 ];
 
+// Consonancia teórica: superposición de Gaussianas centradas en los intervalos justos
+function _consValue(c) {
+  const s2 = 72; // σ²=6² cents²
+  let v = 0;
+  for (const j of JUST_IVLS) { const d = c - j.cents; v = Math.max(v, j.w * Math.exp(-(d*d)/(2*s2))); }
+  return v;
+}
+
 function _nearestJust(cents) {
-  // Devuelve { j, dev } con la entrada de JUST_IVLS más cercana y su desviación (con signo)
   let best = JUST_IVLS[0], bestAbs = Infinity;
   for (const j of JUST_IVLS) {
     const a = Math.abs(cents - j.cents);
@@ -1982,21 +1989,31 @@ function _nearestJust(cents) {
 }
 
 function viewConsonance(act) {
-  document.getElementById('content').innerHTML =
-    panel(
-      'Curva de consonancia <small style="color:#4b5563;font-size:10px;font-weight:400">— firma espectral del temperamento</small>',
-      `<canvas id="c-cons" style="width:100%;display:block;cursor:default"></canvas>
-       <div id="cons-resize" class="chart-resize-handle" title="Arrastra para cambiar altura"></div>
-       <div id="cons-nfo" style="margin-top:6px;min-height:1.2em;font-size:10px;color:var(--muted);text-align:center">
-         Cada punto es un intervalo del temperamento · pulsa para oír
-       </div>`,
-      'width:100%'
-    );
+  document.getElementById('content').innerHTML = panel(
+    'Curva de consonancia <small style="color:#4b5563;font-size:10px;font-weight:400">— firma espectral del temperamento</small>',
+    `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;font-size:11px;color:#94a3b8">
+         <input type="checkbox" id="cons-audio-sw" style="accent-color:#60a5fa;cursor:pointer">
+         Audio continuo
+       </label>
+       <span id="cons-nfo" style="font-size:10px;color:var(--muted);flex:1;min-width:0">
+         Mueve el ratón sobre la gráfica · pulsa para oír un intervalo
+       </span>
+     </div>
+     <div style="position:relative">
+       <canvas id="c-cons" style="width:100%;display:block;cursor:crosshair"></canvas>
+       <canvas id="c-cons-cur" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none"></canvas>
+     </div>
+     <div id="cons-resize" class="chart-resize-handle" title="Arrastra para cambiar altura"></div>`,
+    'width:100%'
+  );
   requestAnimationFrame(() => {
     const cv = document.getElementById('c-cons');
+    const cvCur = document.getElementById('c-cons-cur');
     if (!cv) return;
-    _drawConsonance(cv, act);
-    cv._redraw = () => _drawConsonance(cv, act);
+    const redraw = () => _drawConsonance(cv, cvCur, act);
+    redraw();
+    cv._redraw = redraw;
     attachPanelResize(cv);
     const rh = document.getElementById('cons-resize');
     if (rh) {
@@ -2007,14 +2024,14 @@ function viewConsonance(act) {
         const onMove = e => {
           const newH = Math.max(140, sh + e.clientY - sy);
           cv.style.height = newH + 'px';
-          cv.dataset.userH = newH; // evita que _panelRO reinicie la altura durante el drag
+          cv.dataset.userH = newH;
         };
-        const onUp   = () => {
+        const onUp = () => {
           rh.removeEventListener('pointermove', onMove);
           rh.removeEventListener('pointerup', onUp);
           cv.dataset.userH = cv.clientHeight;
           cv.style.height = '';
-          _drawConsonance(cv, act);
+          redraw();
         };
         rh.addEventListener('pointermove', onMove, { passive: true });
         rh.addEventListener('pointerup', onUp);
@@ -2023,9 +2040,10 @@ function viewConsonance(act) {
   });
 }
 
-function _drawConsonance(canvas, act) {
+function _drawConsonance(canvas, cursorCanvas, act) {
   if (canvas._consAbort) canvas._consAbort.abort();
   canvas._consAbort = new AbortController();
+  const sig = canvas._consAbort.signal;
 
   const dpr     = window.devicePixelRatio || 1;
   const W       = canvas.clientWidth || 560;
@@ -2040,11 +2058,78 @@ function _drawConsonance(canvas, act) {
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
 
-  const MX = 42, MY = 14, MR = 12, MB = 36;
+  // Sincronizar canvas del cursor
+  if (cursorCanvas) {
+    cursorCanvas.width  = canvas.width;
+    cursorCanvas.height = canvas.height;
+    cursorCanvas.style.height = H + 'px';
+  }
+
+  const MX = 38, MY = 14, MR = 12, MB = 36;
   const PW = W - MX - MR, PH = H - MY - MB;
   const fSz = Math.max(8, Math.round(9 * W / 500));
+  const toX = c => MX + (c / 1200) * PW;
+  const toY = v => MY + (1 - v) * PH; // v=0 → base, v=1 → techo
 
-  // Pre-computar dots para conocer maxDev antes de dibujar los ejes
+  // ── Fondo ──
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Curva teórica de consonancia (Gaussianas) — área rellena ──
+  ctx.beginPath();
+  let first = true;
+  for (let px = 0; px <= PW; px++) {
+    const c0 = (px / PW) * 1200, v0 = _consValue(c0);
+    if (first) { ctx.moveTo(toX(c0), toY(v0)); first = false; }
+    else ctx.lineTo(toX(c0), toY(v0));
+  }
+  ctx.lineTo(MX + PW, MY + PH); ctx.lineTo(MX, MY + PH); ctx.closePath();
+  ctx.fillStyle = 'rgba(96,165,250,0.07)';
+  ctx.fill();
+
+  // ── Curva teórica — trazo ──
+  ctx.beginPath(); first = true;
+  for (let px = 0; px <= PW; px++) {
+    const c0 = (px / PW) * 1200, v0 = _consValue(c0);
+    if (first) { ctx.moveTo(toX(c0), toY(v0)); first = false; }
+    else ctx.lineTo(toX(c0), toY(v0));
+  }
+  ctx.strokeStyle = 'rgba(96,165,250,0.30)';
+  ctx.lineWidth = 1.5; ctx.setLineDash([]); ctx.stroke();
+
+  // ── Y grid + etiquetas ──
+  ctx.font = `${fSz}px monospace`; ctx.textAlign = 'right';
+  for (let i = 0; i <= 4; i++) {
+    const v = i / 4, y = toY(v);
+    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(MX, y); ctx.lineTo(MX + PW, y); ctx.stroke();
+    ctx.fillStyle = i === 4 ? '#4ade80' : '#475569';
+    ctx.fillText(v.toFixed(2), MX - 4, y + 3);
+  }
+
+  // ── Líneas verticales de intervalos justos + etiquetas X ──
+  for (const j of JUST_IVLS) {
+    const x = toX(j.cents);
+    ctx.beginPath(); ctx.moveTo(x, MY); ctx.lineTo(x, MY + PH);
+    ctx.strokeStyle = `rgba(148,163,184,${(0.05 + j.w * 0.08).toFixed(2)})`;
+    ctx.lineWidth = 1; ctx.setLineDash([3, 5]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.textAlign = 'center'; ctx.font = `${fSz}px monospace`;
+    ctx.fillStyle = `rgba(148,163,184,${(0.35 + j.w * 0.4).toFixed(2)})`;
+    ctx.fillText(j.name, x, MY + PH + 14);
+    ctx.fillStyle = 'rgba(71,85,105,0.75)';
+    ctx.fillText(Math.round(j.cents), x, MY + PH + 25);
+  }
+
+  // ── Ticks 0¢ / 1200¢ ──
+  ctx.strokeStyle = '#334155'; ctx.lineWidth = 1;
+  for (const c of [0, 1200]) {
+    const x = toX(c);
+    ctx.beginPath(); ctx.moveTo(x, MY + PH); ctx.lineTo(x, MY + PH + 4); ctx.stroke();
+    ctx.fillStyle = '#334155'; ctx.textAlign = 'center'; ctx.font = `${fSz}px monospace`;
+    ctx.fillText(c + '¢', x, MY + PH + 25);
+  }
+
+  // ── Puntos de los temperamentos ──
   const dots = [];
   act.forEach(t => {
     const ci = selected.indexOf(t);
@@ -2052,139 +2137,97 @@ function _drawConsonance(canvas, act) {
       for (let ni = 0; ni < 12; ni++) {
         const nj = (ni + semi) % 12;
         const cents = semi * 100 + t.offsets[nj] - t.offsets[ni];
+        const cons  = _consValue(cents);
         const { j, dev } = _nearestJust(cents);
-        dots.push({ cents, dev, absDev: Math.abs(dev), ci, j,
-          fromNote: NOTES[ni], toNote: NOTES[nj], semi, ni, t });
+        const d = { cents, cons, ci, j, dev,
+          fromNote: NOTES[ni], toNote: NOTES[nj], semi, ni, t };
+        d.x = toX(cents); d.y = toY(cons);
+        dots.push(d);
+        ctx.beginPath(); ctx.arc(d.x, d.y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = COLORS[ci]; ctx.globalAlpha = 0.70; ctx.fill(); ctx.globalAlpha = 1;
       }
     }
   });
 
-  // Escala Y: 0¢ en la parte INFERIOR (puro), maxDev en la parte superior (impuro)
-  const rawMax = dots.length ? Math.max(...dots.map(d => d.absDev)) : 20;
-  const maxDev = Math.max(5, Math.ceil(rawMax / 5) * 5);
-  // toY: dv=0 → fondo (MY+PH), dv=maxDev → techo (MY)
-  const toX = c  => MX + (c / 1200) * PW;
-  const toY = dv => MY + PH - (dv / maxDev) * PH;
-
-  // Fondo
-  ctx.fillStyle = '#0f172a';
-  ctx.fillRect(0, 0, W, H);
-
-  // Franja verde en la zona pura (parte inferior)
-  const pureGrad = ctx.createLinearGradient(0, MY + PH, 0, MY);
-  pureGrad.addColorStop(0,    'rgba(74,222,128,0.10)');
-  pureGrad.addColorStop(0.15, 'rgba(74,222,128,0.03)');
-  pureGrad.addColorStop(1,    'rgba(74,222,128,0.00)');
-  ctx.fillStyle = pureGrad;
-  ctx.fillRect(MX, MY, PW, PH);
-
-  // Bandas verticales en los intervalos justos (substituto visual de la curva Gaussiana)
-  for (const j of JUST_IVLS) {
-    const x = toX(j.cents);
-    const hw = Math.max(3, j.w * 8); // semianchura proporcional al peso armónico
-    const bandGrad = ctx.createLinearGradient(x - hw, 0, x + hw, 0);
-    const alpha = (0.05 + j.w * 0.10).toFixed(2);
-    bandGrad.addColorStop(0,   'rgba(74,222,128,0)');
-    bandGrad.addColorStop(0.5, `rgba(74,222,128,${alpha})`);
-    bandGrad.addColorStop(1,   'rgba(74,222,128,0)');
-    ctx.fillStyle = bandGrad;
-    ctx.fillRect(x - hw, MY, hw * 2, PH);
-  }
-
-  // Y grid + etiquetas (de abajo hacia arriba: 0¢ → maxDev)
-  ctx.font = `${fSz}px monospace`;
-  ctx.textAlign = 'right';
-  const nTicks = 5;
-  for (let i = 0; i < nTicks; i++) {
-    const dv = (i / (nTicks - 1)) * maxDev;
-    const y  = toY(dv);
-    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1; ctx.setLineDash([]);
-    ctx.beginPath(); ctx.moveTo(MX, y); ctx.lineTo(MX + PW, y); ctx.stroke();
-    ctx.fillStyle = i === 0 ? '#4ade80' : '#475569';
-    ctx.fillText(dv.toFixed(1) + '¢', MX - 4, y + 3);
-  }
-
-  // Líneas verticales de intervalos justos + etiquetas eje X
-  for (const j of JUST_IVLS) {
-    const x = toX(j.cents);
-    ctx.beginPath(); ctx.moveTo(x, MY); ctx.lineTo(x, MY + PH);
-    ctx.strokeStyle = `rgba(148,163,184,${(0.06 + j.w * 0.10).toFixed(2)})`;
-    ctx.lineWidth = 1; ctx.setLineDash([3, 5]); ctx.stroke(); ctx.setLineDash([]);
-    ctx.textAlign = 'center';
-    ctx.fillStyle = `rgba(148,163,184,${(0.35 + j.w * 0.4).toFixed(2)})`;
-    ctx.font = `${fSz}px monospace`;
-    ctx.fillText(j.name, x, MY + PH + 14);
-    ctx.fillStyle = 'rgba(71,85,105,0.75)';
-    ctx.fillText(Math.round(j.cents), x, MY + PH + 25);
-  }
-
-  // Ticks extremos 0¢ / 1200¢
-  ctx.strokeStyle = '#334155'; ctx.lineWidth = 1;
-  for (const c of [0, 1200]) {
-    const x = toX(c);
-    ctx.beginPath(); ctx.moveTo(x, MY + PH); ctx.lineTo(x, MY + PH + 4); ctx.stroke();
-    ctx.fillStyle = '#334155'; ctx.textAlign = 'center';
-    ctx.font = `${fSz}px monospace`;
-    ctx.fillText(c + '¢', x, MY + PH + 25);
-  }
-
-  // Dibujar puntos
-  for (const d of dots) {
-    d.x = toX(d.cents);
-    d.y = toY(d.absDev);
-    ctx.beginPath();
-    ctx.arc(d.x, d.y, 3, 0, Math.PI * 2);
-    ctx.fillStyle = COLORS[d.ci];
-    ctx.globalAlpha = 0.70;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
-
-  // Leyenda (esquina superior derecha)
+  // ── Leyenda ──
   ctx.font = '10px sans-serif';
   act.forEach((t, ti) => {
     const ci = selected.indexOf(t);
     const ly = MY + 8 + ti * 16;
-    ctx.beginPath();
-    ctx.arc(MX + PW - 6, ly, 4, 0, Math.PI * 2);
+    ctx.beginPath(); ctx.arc(MX + PW - 6, ly, 4, 0, Math.PI * 2);
     ctx.fillStyle = COLORS[ci]; ctx.globalAlpha = 0.9; ctx.fill(); ctx.globalAlpha = 1;
     ctx.fillStyle = '#cbd5e1'; ctx.textAlign = 'right';
     ctx.fillText(shortName(t, 26), MX + PW - 13, ly + 3);
   });
 
-  // Título eje Y
+  // ── Títulos de ejes ──
   ctx.save();
-  ctx.translate(11, MY + PH / 2);
-  ctx.rotate(-Math.PI / 2);
+  ctx.translate(10, MY + PH / 2); ctx.rotate(-Math.PI / 2);
   ctx.fillStyle = '#6b7280'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText('Desv. del just más cercano (¢)', 0, 0);
+  ctx.fillText('Consonancia', 0, 0);
   ctx.restore();
-
-  // Título eje X
   ctx.fillStyle = '#6b7280'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
   ctx.fillText('Intervalo (¢)', MX + PW / 2, H - 2);
 
-  // Hover: muestra detalle del intervalo
+  // ── Función para dibujar cursor ──
+  function drawCursor(mx) {
+    if (!cursorCanvas) return;
+    const cc = cursorCanvas.getContext('2d');
+    cc.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
+    if (mx === null) return;
+    cc.save(); cc.scale(dpr, dpr);
+    cc.beginPath(); cc.moveTo(mx, MY); cc.lineTo(mx, MY + PH);
+    cc.strokeStyle = 'rgba(255,255,255,0.55)';
+    cc.lineWidth = 1; cc.setLineDash([4, 4]); cc.stroke(); cc.setLineDash([]);
+    cc.restore();
+  }
+
+  // ── Eventos ──
+  // Audio de referencia para el continuo (C en el temperamento activo)
+  const refOffsets = act[0]?.offsets ?? new Array(12).fill(0);
+  const f0 = noteFreq(0, refOffsets, pitchA, octaveShift);
+
   canvas.addEventListener('pointermove', e => {
     const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-    let nearest = null, minD = 14;
-    for (const d of dots) {
-      const dist = Math.hypot(d.x - mx, d.y - my);
-      if (dist < minD) { minD = dist; nearest = d; }
-    }
-    const nfoEl = document.getElementById('cons-nfo');
-    if (!nfoEl) return;
-    if (nearest) {
-      const sign = nearest.dev >= 0 ? '+' : '';
-      nfoEl.textContent = `${nearest.fromNote} → ${nearest.toNote} · ${nearest.cents.toFixed(2)}¢ · ${nearest.j.name} justo=${nearest.j.cents.toFixed(2)}¢ (${sign}${nearest.dev.toFixed(2)}¢)`;
-    } else {
-      nfoEl.textContent = 'Cada punto es un intervalo del temperamento · 0¢ = justo puro · pulsa para oír';
-    }
-  }, { signal: canvas._consAbort.signal });
+    const mx = e.clientX - rect.left;
+    const inPlot = mx >= MX && mx <= MX + PW;
+    drawCursor(inPlot ? mx : null);
 
-  // Click: reproduce el intervalo
+    // Actualizar info y audio
+    const cents = Math.max(0, Math.min(1200, (mx - MX) / PW * 1200));
+    const { j, dev } = _nearestJust(cents);
+    const sign = dev >= 0 ? '+' : '';
+    const nfoEl = document.getElementById('cons-nfo');
+    if (nfoEl) {
+      // Mostrar también si hay un punto cercano
+      let nearPt = null, minD = 10;
+      const my = e.clientY - rect.top;
+      for (const d of dots) { const dist = Math.hypot(d.x - mx, d.y - my); if (dist < minD) { minD = dist; nearPt = d; } }
+      if (nearPt) {
+        const s2 = nearPt.dev >= 0 ? '+' : '';
+        nfoEl.textContent = `${nearPt.fromNote}→${nearPt.toNote}  ${nearPt.cents.toFixed(2)}¢  [${nearPt.j.name}: ${s2}${nearPt.dev.toFixed(2)}¢]`;
+      } else if (inPlot) {
+        nfoEl.textContent = `${cents.toFixed(1)}¢  —  ${j.name} justo=${j.cents.toFixed(2)}¢  (${sign}${dev.toFixed(1)}¢)`;
+      }
+    }
+
+    const sw = document.getElementById('cons-audio-sw');
+    if (sw?.checked && inPlot) {
+      playFreqs([f0, f0 * Math.pow(2, cents / 1200)]);
+    }
+  }, { signal: sig });
+
+  canvas.addEventListener('pointerleave', () => {
+    drawCursor(null);
+    const sw = document.getElementById('cons-audio-sw');
+    if (sw?.checked) stopSound(true);
+    const nfoEl = document.getElementById('cons-nfo');
+    if (nfoEl) nfoEl.textContent = 'Mueve el ratón sobre la gráfica · pulsa para oír un intervalo';
+  }, { signal: sig });
+
   canvas.addEventListener('pointerdown', e => {
+    const sw = document.getElementById('cons-audio-sw');
+    if (sw?.checked) return; // en modo continuo el audio ya sigue al ratón
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     let nearest = null, minD = 14;
@@ -2195,7 +2238,7 @@ function _drawConsonance(canvas, act) {
     if (!nearest) return;
     const f1 = noteFreq(nearest.ni, nearest.t.offsets, pitchA, octaveShift);
     playFreqs([f1, f1 * Math.pow(2, nearest.cents / 1200)]);
-  }, { signal: canvas._consAbort.signal });
+  }, { signal: sig });
 }
 
 // ─── TONNETZ ───
