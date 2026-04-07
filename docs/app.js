@@ -1,4 +1,4 @@
-const APP_VERSION = '2cddd92 · 2026-04-07';
+const APP_VERSION = '9509241 · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2520,12 +2520,12 @@ function viewKeyboard() {
 // AFINADOR — DETECCIÓN DE PITCH (MPM — McLeod Pitch Method)
 // detectPitch, _refineFFT → vienen de core.js
 
-// findClosestNote en core.js tiene firma (freq, pitchA, offsets).
-// Este wrapper local usa los globales del contexto de la app.
-function findClosestNote(freq) {
+// Wrapper de findClosestNote (core.js) que inyecta el estado global de la app.
+// Usar const (no function) para no sobrescribir window.findClosestNote con recursión infinita.
+const _appFindNote = (freq) => {
   const off = (lastSelected ?? selected.find(Boolean))?.offsets ?? new Array(12).fill(0);
   return window.findClosestNote(freq, pitchA, off);
-}
+};
 
 // ══════════════════════════════════════════════
 // AFINADOR — TUNER OBJECT
@@ -2730,7 +2730,7 @@ const TUNER = {
 
         if (this.mode === 'auto') {
           // Detección de nota: usar freq cruda para que los cambios reales de octava puedan acumularse
-          const c = findClosestNote(p.freq);
+          const c = _appFindNote(p.freq);
           const OCT_HOLD_MS = 200;
           if (c.ni !== this.targetNi) {
             // Cambio de nota: aceptar inmediatamente
@@ -3476,7 +3476,7 @@ const DT = {
     // Refinar frecuencia con interpolación parabólica sobre FFT nativa
     res.freq = _refineFFT(res.freq, this._freqBuf, this.analyser.context.sampleRate);
     const { freq } = res;
-    const { ni } = findClosestNote(freq);
+    const { ni } = _appFindNote(freq);
 
     // ── captureA mode: tomar cualquier pitch estable como nueva referencia La ──
     if (this._captureA) {
@@ -3521,7 +3521,7 @@ const DT = {
     const measureNi = (this.mode === 'manual') ? this._targetNi : ni;
 
     // Calcular offset en cents vs ET puro de la nota objetivo
-    const { oct } = findClosestNote(freq);
+    const { oct } = _appFindNote(freq);
     const etFreq = pitchA * Math.pow(2, (ET_FROM_A[measureNi] + (oct - 4) * 1200) / 1200);
     const cents  = 1200 * Math.log2(freq / etFreq);
 
