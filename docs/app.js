@@ -1,4 +1,4 @@
-const APP_VERSION = '3ba04bb · 2026-04-07';
+const APP_VERSION = '22cba0a · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2107,14 +2107,21 @@ function _drawConsonance(canvas, cursorCanvas, act) {
   const MX = 38, MY = 14, MR = 12, MB = 36;
   const PW = W - MX - MR, PH = H - MY - MB;
 
-  // ── Zoom ──
-  const zoomSpan   = canvas._zoomSpan   || 1200;
-  const zoomCenter = canvas._zoomCenter !== undefined ? canvas._zoomCenter : 600;
-  const zMin = Math.max(0, Math.min(1200 - zoomSpan, zoomCenter - zoomSpan / 2));
-  const zMax = zMin + zoomSpan;
-  const toX     = c  => MX + ((c - zMin) / zoomSpan) * PW;
-  const toCents = mx => zMin + ((mx - MX) / PW) * zoomSpan;
+  // Helpers de coordenadas — leen el zoom actual del canvas en cada llamada
+  function getZoom() {
+    const zoomSpan   = canvas._zoomSpan   || 1200;
+    const zoomCenter = canvas._zoomCenter !== undefined ? canvas._zoomCenter : 600;
+    const zMin = Math.max(0, Math.min(1200 - zoomSpan, zoomCenter - zoomSpan / 2));
+    return { zoomSpan, zMin, zMax: zMin + zoomSpan };
+  }
+  const toX     = c  => { const z = getZoom(); return MX + ((c - z.zMin) / z.zoomSpan) * PW; };
+  const toCents = mx => { const z = getZoom(); return z.zMin + ((mx - MX) / PW) * z.zoomSpan; };
   const toY     = v  => MY + (1 - v) * PH;
+
+  // ── Función de pintado puro (no toca listeners) ──
+  // Lee _zoomSpan/_zoomCenter del canvas en cada llamada para reflejar el zoom actual.
+  canvas._paint = function() {
+  const { zoomSpan, zMin, zMax } = getZoom();
 
   // ── Fondo ──
   ctx.fillStyle = '#0f172a';
@@ -2224,6 +2231,9 @@ function _drawConsonance(canvas, cursorCanvas, act) {
   ctx.fillStyle = '#6b7280'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
   ctx.fillText('Intervalo (¢)', MX + PW / 2, H - 2);
 
+  }; // fin canvas._paint
+  canvas._paint();
+
   // ── Estado compartido entre eventos y RAF ──
   // _animMx    : posición X del cursor en px (para la línea vertical) — sigue al ratón siempre
   // _clickCents: cents de la nota clicada (modo discreto, solo para batimentos)
@@ -2312,6 +2322,7 @@ function _drawConsonance(canvas, cursorCanvas, act) {
   }
 
   // ── Zoom helper ──
+  // Llama _paint (solo redibuja pixels) para no destruir los listeners del pinch en curso.
   function applyZoom(pivotCents, factor) {
     const curSpan   = canvas._zoomSpan   || 1200;
     const curCenter = canvas._zoomCenter !== undefined ? canvas._zoomCenter : 600;
@@ -2320,7 +2331,7 @@ function _drawConsonance(canvas, cursorCanvas, act) {
     const newMin    = Math.max(0, Math.min(1200 - newSpan, pivotCents - (pivotCents - curMin) * (newSpan / curSpan)));
     canvas._zoomSpan   = newSpan;
     canvas._zoomCenter = newMin + newSpan / 2;
-    canvas._redraw();
+    canvas._paint();   // solo pinta — no rehace listeners
   }
 
   // ── Eventos de interacción: audio (1 dedo/ratón) + pinch zoom (2 dedos) ──
