@@ -1,4 +1,4 @@
-const APP_VERSION = '8de99d7 · 2026-04-07';
+const APP_VERSION = '5fd2216 · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2243,9 +2243,20 @@ function _drawConsonance(canvas, cursorCanvas, act) {
       if (beatOn && beatCents !== null && f0 !== null) {
         const { j } = _nearestJust(beatCents);
         if (j.cents >= zMin && j.cents <= zMax) {
-          const hz     = _beatHz(j, beatCents, f0);
-          const animHz = Math.min(hz, 20);
-          const pulse  = 0.5 + 0.5 * Math.cos(2 * Math.PI * animHz * t);
+          const hz = _beatHz(j, beatCents, f0);
+          // Superposición de batimentos de pares de armónicos superiores (k=1..4,
+          // peso 1/k). Solo los que caen en rango perceptible (< 25 Hz). Si todos
+          // lo superan → brillo estacionario (aspereza sin batimentos discretos).
+          const MAX_BEAT = 25;
+          let pSum = 0, wSum = 0;
+          for (let k = 1; k <= 4; k++) {
+            const hzK = k * hz;
+            if (hzK > MAX_BEAT) break;
+            const w = 1 / k;
+            pSum += w * Math.cos(2 * Math.PI * hzK * t);
+            wSum += w;
+          }
+          const pulse = wSum > 0 ? 0.5 + 0.5 * (pSum / wSum) : 0.5;
           const color  = _beatColor(hz);
           const lo = Math.max(zMin, j.cents - 55), hi = Math.min(zMax, j.cents + 55);
           cc.beginPath();
