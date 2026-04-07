@@ -1,4 +1,4 @@
-const APP_VERSION = '972b52f · 2026-04-07';
+const APP_VERSION = '1b9cd67 · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -767,20 +767,12 @@ function bindChartAudio(canvasId, type, slotMap) {
         // Un solo temperamento: usar directamente
         els = [{ datasetIndex: 0, index: colIndex }];
       } else {
-        // Varios datasets: detectar cuál le corresponde por posición Y
-        // Calcular el centro Y de cada barra en esa columna
+        // Varios datasets: dividir el área del gráfico en zonas iguales por Y
+        const ca = chart.chartArea;
         const rect = canvas.getBoundingClientRect();
-        const py = clientY - rect.top;
-        let bestDs = 0, bestDist = Infinity;
-        for (let di = 0; di < nDatasets; di++) {
-          const dsMeta = chart.getDatasetMeta(di);
-          const barEl = dsMeta.data[colIndex];
-          if (!barEl) continue;
-          // Centro Y de la barra (barEl.y = top de la barra, barEl.base = línea cero)
-          const barCenterY = (barEl.y + barEl.base) / 2;
-          const dist = Math.abs(py - barCenterY);
-          if (dist < bestDist) { bestDist = dist; bestDs = di; }
-        }
+        const relY = clientY - rect.top - ca.top;
+        const zoneH = (ca.bottom - ca.top) / nDatasets;
+        const bestDs = Math.max(0, Math.min(nDatasets - 1, Math.floor(relY / zoneH)));
         els = [{ datasetIndex: bestDs, index: colIndex }];
       }
     }
