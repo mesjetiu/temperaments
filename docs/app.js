@@ -1,4 +1,4 @@
-const APP_VERSION = 'a324356 · 2026-04-07';
+const APP_VERSION = '1c5918c · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2092,8 +2092,15 @@ function _drawConsonance(canvas, cursorCanvas, act) {
   const MX = 38, MY = 14, MR = 12, MB = 36;
   const PW = W - MX - MR, PH = H - MY - MB;
   const fSz = Math.max(8, Math.round(9 * W / 500));
-  const toX = c => MX + (c / 1200) * PW;
-  const toY = v => MY + (1 - v) * PH;
+
+  // ── Zoom ──
+  const zoomSpan   = canvas._zoomSpan   || 1200;
+  const zoomCenter = canvas._zoomCenter !== undefined ? canvas._zoomCenter : 600;
+  const zMin = Math.max(0, Math.min(1200 - zoomSpan, zoomCenter - zoomSpan / 2));
+  const zMax = zMin + zoomSpan;
+  const toX     = c  => MX + ((c - zMin) / zoomSpan) * PW;
+  const toCents = mx => zMin + ((mx - MX) / PW) * zoomSpan;
+  const toY     = v  => MY + (1 - v) * PH;
 
   // ── Fondo ──
   ctx.fillStyle = '#0f172a';
@@ -2103,7 +2110,7 @@ function _drawConsonance(canvas, cursorCanvas, act) {
   ctx.beginPath();
   let first = true;
   for (let px = 0; px <= PW; px++) {
-    const c0 = (px / PW) * 1200, v0 = _consValue(c0);
+    const c0 = zMin + (px / PW) * zoomSpan, v0 = _consValue(c0);
     if (first) { ctx.moveTo(toX(c0), toY(v0)); first = false; } else ctx.lineTo(toX(c0), toY(v0));
   }
   ctx.lineTo(MX + PW, MY + PH); ctx.lineTo(MX, MY + PH); ctx.closePath();
@@ -2112,7 +2119,7 @@ function _drawConsonance(canvas, cursorCanvas, act) {
   // ── Curva teórica — trazo ──
   ctx.beginPath(); first = true;
   for (let px = 0; px <= PW; px++) {
-    const c0 = (px / PW) * 1200, v0 = _consValue(c0);
+    const c0 = zMin + (px / PW) * zoomSpan, v0 = _consValue(c0);
     if (first) { ctx.moveTo(toX(c0), toY(v0)); first = false; } else ctx.lineTo(toX(c0), toY(v0));
   }
   ctx.strokeStyle = 'rgba(96,165,250,0.30)'; ctx.lineWidth = 1.5; ctx.setLineDash([]); ctx.stroke();
@@ -2129,6 +2136,7 @@ function _drawConsonance(canvas, cursorCanvas, act) {
 
   // ── Líneas verticales just + etiquetas X ──
   for (const j of JUST_IVLS) {
+    if (j.cents < zMin || j.cents > zMax) continue;
     const x = toX(j.cents);
     ctx.beginPath(); ctx.moveTo(x, MY); ctx.lineTo(x, MY + PH);
     ctx.strokeStyle = `rgba(148,163,184,${(0.05 + j.w * 0.08).toFixed(2)})`;
@@ -2137,16 +2145,22 @@ function _drawConsonance(canvas, cursorCanvas, act) {
     ctx.fillStyle = `rgba(148,163,184,${(0.35 + j.w * 0.4).toFixed(2)})`;
     ctx.fillText(j.name, x, MY + PH + 14);
     ctx.fillStyle = 'rgba(71,85,105,0.75)';
-    if (j.cents > 0 && j.cents < 1200) ctx.fillText(Math.round(j.cents), x, MY + PH + 25);
+    if (j.cents > zMin && j.cents < zMax) ctx.fillText(Math.round(j.cents), x, MY + PH + 25);
   }
 
-  // ── Ticks extremos ──
+  // ── Ticks extremos (rango visible) ──
   ctx.strokeStyle = '#334155'; ctx.lineWidth = 1;
-  for (const c of [0, 1200]) {
+  [[zMin, 'left'], [zMax, 'right']].forEach(([c, align]) => {
     const x = toX(c);
     ctx.beginPath(); ctx.moveTo(x, MY + PH); ctx.lineTo(x, MY + PH + 4); ctx.stroke();
-    ctx.fillStyle = '#334155'; ctx.textAlign = 'center'; ctx.font = `${fSz}px monospace`;
-    ctx.fillText(c + '¢', x, MY + PH + 25);
+    ctx.fillStyle = '#475569'; ctx.textAlign = align; ctx.font = `${fSz}px monospace`;
+    ctx.fillText(Math.round(c) + '¢', x, MY + PH + 25);
+  });
+
+  // ── Zoom indicator ──
+  if (zoomSpan < 1200) {
+    ctx.fillStyle = 'rgba(96,165,250,0.55)'; ctx.font = '9px monospace'; ctx.textAlign = 'left';
+    ctx.fillText(`×${(1200 / zoomSpan).toFixed(1)}  [${Math.round(zMin)}–${Math.round(zMax)}¢]  · rueda=zoom  · doble clic=reset`, MX + 2, MY + 10);
   }
 
   // ── Puntos de los temperamentos ──
@@ -2157,6 +2171,7 @@ function _drawConsonance(canvas, cursorCanvas, act) {
       for (let ni = 0; ni < 12; ni++) {
         const nj = (ni + semi) % 12;
         const cents = semi * 100 + t.offsets[nj] - t.offsets[ni];
+        if (cents < zMin || cents > zMax) continue;
         const cons  = _consValue(cents);
         const { j, dev } = _nearestJust(cents);
         const d = { cents, cons, ci, j, dev, fromNote: NOTES[ni], toNote: NOTES[nj], semi, ni, t };
@@ -2188,11 +2203,12 @@ function _drawConsonance(canvas, cursorCanvas, act) {
   ctx.fillStyle = '#6b7280'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
   ctx.fillText('Intervalo (¢)', MX + PW / 2, H - 2);
 
-  // ── Frecuencia de referencia para batimentos y audio continuo ──
-  const f0 = noteFreq(0, act[0]?.offsets ?? new Array(12).fill(0), pitchA, octaveShift);
-
   // ── Estado compartido entre eventos y RAF ──
-  let _animMx = null, _animPlayCents = null;
+  // _animMx    : posición X del cursor en px (para la línea vertical) — sigue al ratón siempre
+  // _clickCents: cents de la nota clicada (modo discreto, solo para batimentos)
+  // _clickNi   : índice de nota clicada (para calcular f0 exacto)
+  // _clickT    : temperamento de la nota clicada
+  let _animMx = null, _clickCents = null, _clickNi = null, _clickT = null;
 
   // ── Loop de animación (RAF) ──
   function startAnim() {
@@ -2209,34 +2225,39 @@ function _drawConsonance(canvas, cursorCanvas, act) {
       const contOn = _swOn('cons-audio-sw');
       const t = now / 1000;
 
-      // Gaussianas animadas por batimento
-      if (beatOn && _animPlayCents !== null) {
-        // Modo continuo: todas las curvas; modo click: solo la más cercana
-        let onlyJ = null;
-        if (!contOn) {
-          let minD = Infinity;
-          for (const j of JUST_IVLS) { const d = Math.abs(_animPlayCents - j.cents); if (d < minD) { minD = d; onlyJ = j; } }
-        }
-        for (const j of JUST_IVLS) {
-          if (onlyJ && j !== onlyJ) continue;
-          const hz     = _beatHz(j, _animPlayCents, f0);
+      // f0 leído en cada frame: respeta cambios de octava y pitchA en tiempo real
+      const f0 = contOn
+        ? noteFreq(0, act[0]?.offsets ?? new Array(12).fill(0), pitchA, octaveShift)
+        : (_clickNi !== null
+            ? noteFreq(_clickNi, _clickT?.offsets ?? act[0]?.offsets ?? new Array(12).fill(0), pitchA, octaveShift)
+            : null);
+
+      // cents a usar para calcular batimentos:
+      // - continuo: posición del cursor en cents
+      // - discreto: cents de la nota temperada clicada (no el cursor)
+      const beatCents = contOn
+        ? (_animMx !== null ? toCents(_animMx) : null)
+        : _clickCents;
+
+      // Siempre: solo el intervalo justo más cercano a beatCents
+      if (beatOn && beatCents !== null && f0 !== null) {
+        const { j } = _nearestJust(beatCents);
+        if (j.cents >= zMin && j.cents <= zMax) {
+          const hz     = _beatHz(j, beatCents, f0);
           const animHz = Math.min(hz, 20);
           const pulse  = 0.5 + 0.5 * Math.cos(2 * Math.PI * animHz * t);
           const color  = _beatColor(hz);
-          const lo = Math.max(0, j.cents - 55), hi = Math.min(1200, j.cents + 55);
-          const pxLo = Math.round((lo / 1200) * PW), pxHi = Math.round((hi / 1200) * PW);
+          const lo = Math.max(zMin, j.cents - 55), hi = Math.min(zMax, j.cents + 55);
           cc.beginPath();
           let fst = true;
-          for (let px = pxLo; px <= pxHi; px++) {
-            const c0 = (px / PW) * 1200, d = c0 - j.cents;
+          for (let px = Math.round(((lo - zMin) / zoomSpan) * PW); px <= Math.round(((hi - zMin) / zoomSpan) * PW); px++) {
+            const c0 = zMin + (px / PW) * zoomSpan, d = c0 - j.cents;
             const v  = j.w * Math.exp(-(d * d) / (2 * s2));
             if (fst) { cc.moveTo(toX(c0), toY(v)); fst = false; } else cc.lineTo(toX(c0), toY(v));
           }
           cc.lineTo(toX(hi), toY(0)); cc.lineTo(toX(lo), toY(0)); cc.closePath();
           cc.globalAlpha = 0.15 + pulse * 0.55; cc.fillStyle = color; cc.fill();
           cc.globalAlpha = 0.40 + pulse * 0.60; cc.strokeStyle = color; cc.lineWidth = 1.5; cc.stroke();
-
-          // Hz label sobre el pico
           if (hz < 99) {
             cc.globalAlpha = 0.40 + pulse * 0.60;
             cc.fillStyle = color; cc.font = `${fSz}px monospace`; cc.textAlign = 'center';
@@ -2263,10 +2284,9 @@ function _drawConsonance(canvas, cursorCanvas, act) {
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     const inPlot = mx >= MX && mx <= MX + PW;
-    const cents  = Math.max(0, Math.min(1200, (mx - MX) / PW * 1200));
+    const cents  = Math.max(zMin, Math.min(zMax, toCents(mx)));
 
     _animMx = inPlot ? mx : null;
-    _animPlayCents = inPlot ? cents : null;
 
     const nfoEl = document.getElementById('cons-nfo');
     if (nfoEl && inPlot) {
@@ -2280,14 +2300,17 @@ function _drawConsonance(canvas, cursorCanvas, act) {
         nfoEl.textContent = `${cents.toFixed(1)}¢  —  ${j.name} justo=${j.cents.toFixed(2)}¢  (${dev >= 0 ? '+' : ''}${dev.toFixed(1)}¢)`;
       }
     }
-    if (_swOn('cons-audio-sw') && inPlot) playFreqs([f0, f0 * Math.pow(2, cents / 1200)]);
+    if (_swOn('cons-audio-sw') && inPlot) {
+      const fRef = noteFreq(0, act[0]?.offsets ?? new Array(12).fill(0), pitchA, octaveShift);
+      playFreqs([fRef, fRef * Math.pow(2, cents / 1200)]);
+    }
   }, { signal: sig });
 
   canvas.addEventListener('pointerleave', () => {
-    _animMx = null; _animPlayCents = null;
+    _animMx = null;
     if (_swOn('cons-audio-sw')) stopSound(true);
     const nfoEl = document.getElementById('cons-nfo');
-    if (nfoEl) nfoEl.textContent = 'Mueve el ratón sobre la gráfica · pulsa para oír un intervalo';
+    if (nfoEl) nfoEl.textContent = 'Mueve el ratón sobre la gráfica · pulsa para oír un intervalo · rueda=zoom';
   }, { signal: sig });
 
   canvas.addEventListener('pointerdown', e => {
@@ -2299,12 +2322,37 @@ function _drawConsonance(canvas, cursorCanvas, act) {
     if (!nearest) return;
     const f1 = noteFreq(nearest.ni, nearest.t.offsets, pitchA, octaveShift);
     playFreqs([f1, f1 * Math.pow(2, nearest.cents / 1200)]);
-    _animMx = nearest.x; _animPlayCents = nearest.cents;
+    _clickCents = nearest.cents;
+    _clickNi    = nearest.ni;
+    _clickT     = nearest.t;
   }, { signal: sig });
 
-  // Al soltar el ratón en modo discreto, limpiar el canvas de cursor
   window.addEventListener('pointerup', () => {
-    if (!_swOn('cons-audio-sw')) { _animMx = null; _animPlayCents = null; }
+    if (!_swOn('cons-audio-sw')) {
+      _clickCents = null; _clickNi = null; _clickT = null;
+      stopSound(true);
+    }
+  }, { signal: sig });
+
+  // ── Zoom con rueda del ratón ──
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const mx   = Math.max(MX, Math.min(MX + PW, e.clientX - rect.left));
+    const pivot = toCents(mx);
+    const factor = e.deltaY > 0 ? 1.25 : 0.8;
+    const newSpan = Math.min(1200, Math.max(30, zoomSpan * factor));
+    const newMin  = Math.max(0, Math.min(1200 - newSpan, pivot - (pivot - zMin) * (newSpan / zoomSpan)));
+    canvas._zoomSpan   = newSpan;
+    canvas._zoomCenter = newMin + newSpan / 2;
+    canvas._redraw();
+  }, { signal: sig, passive: false });
+
+  // ── Doble clic: reset zoom ──
+  canvas.addEventListener('dblclick', () => {
+    canvas._zoomSpan   = 1200;
+    canvas._zoomCenter = 600;
+    canvas._redraw();
   }, { signal: sig });
 
   startAnim();
