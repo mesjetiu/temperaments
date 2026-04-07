@@ -1,4 +1,4 @@
-const APP_VERSION = 'cce7319 · 2026-04-07';
+const APP_VERSION = 'b07643f · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2322,11 +2322,6 @@ function _drawConsonance(canvas, cursorCanvas, act) {
     canvas._zoomCenter = newMin + newSpan / 2;
     canvas._redraw();
   }
-
-  // ── Pointer events: audio + pinch zoom con pointer API ──
-  // Usamos un Map de pointers activos para detectar pinch sin mezclar touch events.
-  const _active = new Map(); // pointerId → clientX
-  let _pinchX = null;        // distancia horizontal entre los dos pointers al frame anterior
 
   // ── Eventos de interacción: audio (1 dedo/ratón) + pinch zoom (2 dedos) ──
   // Usamos touch events para el pinch (fiables en móvil, no interfieren con pointer capture)
