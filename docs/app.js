@@ -1,4 +1,4 @@
-const APP_VERSION = '3ea5801 · 2026-04-07';
+const APP_VERSION = '8fdd6e7 · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1493,14 +1493,26 @@ function drawCircle(selTemps) {
     svg+=`<text x="${cx+(R+18)*Math.cos(a)}" y="${cy+(R+18)*Math.sin(a)}" text-anchor="middle" dominant-baseline="middle"
       font-size="11" fill="#d1d5db" font-family="sans-serif" font-weight="500">${lbl}</text>`;
   });
-  const act=selTemps.filter(Boolean);
-  if(act.length>1) act.forEach((t,i)=>{
-    const ro2=R-i*19,ri2=ro2-17;
-    svg+=`<circle cx="${cx-78}" cy="${cy+28+i*15}" r="5" fill="${COLORS[i]}"/>`;
-    svg+=`<text x="${cx-70}" y="${cy+32+i*15}" font-size="7.5" fill="#9ca3af" font-family="sans-serif">${shortName(t,18)}</text>`;
-  });
   svg+='</svg>';
   return svg;
+}
+
+// Leyenda HTML de identidad de temperamentos (fuera del SVG del círculo)
+function circleHtml(selTemps) {
+  const act = selTemps.filter(Boolean);
+  const legend = act.length > 1
+    ? `<div style="display:flex;gap:14px;justify-content:center;margin-top:6px;font-size:11px;flex-wrap:wrap">`
+      + act.map(t => { const ci=selTemps.indexOf(t); return `<span style="color:${COLORS[ci]}">● ${shortName(t,22)}</span>`; }).join('')
+      + `</div>`
+    : '';
+  return `<div id="circle-wrap">${drawCircle(selTemps)}</div>${legend}`;
+}
+
+// Etiquetas de identidad para gráficas cuyo color de barra es de pureza, no de temperamento
+function tempIdentityHtml(act) {
+  return `<div style="display:flex;gap:14px;justify-content:center;margin-bottom:4px;font-size:11px;flex-wrap:wrap">`
+    + act.map(t => { const ci=selected.indexOf(t); return `<span style="color:${COLORS[ci]}">■ ${shortName(t,24)}</span>`; }).join('')
+    + `</div>`;
 }
 
 // ══════════════════════════════════════════════
@@ -1625,11 +1637,11 @@ function _wrapCanvas(c) {
   });
 }
 
-function mkBar(id, labels, datasets, yLabel, tipFmt, audioType) {
+function mkBar(id, labels, datasets, yLabel, tipFmt, audioType, noLegend=false) {
   const c=document.getElementById(id); if(!c) return;
   _wrapCanvas(c);
   charts[id]=new Chart(c,{type:'bar',data:{labels,datasets},options:{...baseOpts,
-    plugins:{...baseOpts.plugins,tooltip:{callbacks:{label:tipFmt}}},
+    plugins:{...baseOpts.plugins,legend:noLegend?{display:false}:baseOpts.plugins.legend,tooltip:{callbacks:{label:tipFmt}}},
     datasets:{bar:{minBarLength:4}},
     scales:{x:{ticks:{color:tickColor,font:{size:9},maxRotation:40},grid:{color:gridColor}},
             y:{ticks:{color:tickColor,callback:v=>`${v>=0?'+':''}${v}¢`},grid:{color:gridColor},
@@ -1747,7 +1759,7 @@ function viewOverview(act) {
       // ── CIRCLE + OFFSETS ──
       + panel('Círculo de quintas <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un sector</small>',
           `<div class="grad-bar"><span>−8¢</span><div class="grad-strip"></div><span>+4¢</span><span style="color:#4b5563">● pura=701.955¢</span></div>
-           <div id="circle-wrap">${drawCircle(selected)}</div>`,
+           ${circleHtml(selected)}`,
           mob?'':'width:290px')
       + panel('Radar — offsets <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un punto</small>',
           `<canvas id="c-radar" ${mob?'height="200"':'height="240"'}></canvas>`,
@@ -1763,7 +1775,7 @@ function viewOverview(act) {
   document.getElementById('content').innerHTML =
     panel('Círculo de quintas <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un sector</small>',
       `<div class="grad-bar"><span>−8¢</span><div class="grad-strip"></div><span>+4¢</span><span style="color:#4b5563">● pura=701.955¢</span></div>
-       <div id="circle-wrap">${drawCircle(selected)}</div>`,
+       ${circleHtml(selected)}`,
       mob?'':'width:290px')
     + panel('Radar — offsets <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un punto</small>',
       `<canvas id="c-radar" ${mob?'height="200"':'height="240"'}></canvas>`,
@@ -1781,13 +1793,13 @@ function viewFifths(act) {
       `<canvas id="c-fifths" ${mob?'height="160"':'height="110"'}></canvas>`, 'width:100%')
     + panel('Círculo de quintas',
       `<div class="grad-bar"><span>−8¢</span><div class="grad-strip"></div><span>+4¢</span></div>
-       <div id="circle-wrap">${drawCircle(selected)}</div>`,
+       ${circleHtml(selected)}`,
       mob?'':'width:290px')
     + act.map(t=>{const ci=selected.indexOf(t);
       return panel(`<span style="color:${COLORS[ci]}">${shortName(t,40)}</span>`, fifthsTable(t),
         mob?'':'flex:1;min-width:190px');}).join('');
   mkBar('c-fifths',fl,selected.map((t,i)=>!t?null:dsFifth(t,i,getFifths(t.offsets).map(f=>f.dev))).filter(Boolean),
-    'Desv. de quinta pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(3)}¢  (${(PURE_FIFTH+ctx.parsed.y).toFixed(2)}¢)`,'fifths');
+    'Desv. de quinta pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(3)}¢  (${(PURE_FIFTH+ctx.parsed.y).toFixed(2)}¢)`,'fifths',true);
   bindCircleAudio();
 }
 
@@ -1803,9 +1815,9 @@ function viewThirds(act) {
       return panel(`<span style="color:${COLORS[ci]}">${shortName(t,40)}</span>`, thirdsTableFn(t),
         mob?'':'flex:1;min-width:190px');}).join('');
   mkBar('c-maj3',NOTES,selected.map((t,i)=>!t?null:dsMaj3(t,i,getMaj3(t.offsets).map(x=>x.dev))).filter(Boolean),
-    'Desv. de 3ª mayor pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢  (${(PURE_MAJ3+ctx.parsed.y).toFixed(2)}¢)`,'maj3');
+    'Desv. de 3ª mayor pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢  (${(PURE_MAJ3+ctx.parsed.y).toFixed(2)}¢)`,'maj3',true);
   mkBar('c-min3',NOTES,selected.map((t,i)=>!t?null:dsMaj3(t,i,getMin3(t.offsets).map(x=>x.dev))).filter(Boolean),
-    'Desv. de 3ª menor pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢  (${(PURE_MIN3+ctx.parsed.y).toFixed(2)}¢)`,'min3');
+    'Desv. de 3ª menor pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢  (${(PURE_MIN3+ctx.parsed.y).toFixed(2)}¢)`,'min3',true);
 }
 
 // ─── COMPARAR ───
@@ -1815,15 +1827,15 @@ function viewCompare(act) {
     panel('Offsets de las 12 notas <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un punto</small>',
       `<canvas id="c-off" ${mob?'height="180"':'height="100"'}></canvas>`, 'width:100%')
     + panel('Quintas — desviación de pura <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
-      `<canvas id="c-fif" ${mob?'height="180"':'height="100"'}></canvas>`, 'width:100%')
+      (act.length>1?tempIdentityHtml(act):'')+`<canvas id="c-fif" ${mob?'height="180"':'height="100"'}></canvas>`, 'width:100%')
     + panel('Terceras mayores — desviación de pura <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
-      `<canvas id="c-3rd" ${mob?'height="180"':'height="100"'}></canvas>`, 'width:100%');
+      (act.length>1?tempIdentityHtml(act):'')+`<canvas id="c-3rd" ${mob?'height="180"':'height="100"'}></canvas>`, 'width:100%');
   mkLine('c-off',NOTES,selected.map((t,i)=>!t?null:({...ds(t,i,t.offsets,{pointRadius:5,tension:0.3,fill:i===0})})).filter(Boolean),
     'Desviación del ET (¢)',ctx=>`${ctx.dataset.label}: ${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(3)}¢`,'offsets');
   mkBar('c-fif',fl,selected.map((t,i)=>!t?null:dsFifth(t,i,getFifths(t.offsets).map(f=>f.dev))).filter(Boolean),
-    'Desv. de quinta pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(3)}¢`,'fifths');
+    'Desv. de quinta pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(3)}¢`,'fifths',true);
   mkBar('c-3rd',NOTES,selected.map((t,i)=>!t?null:dsMaj3(t,i,getMaj3(t.offsets).map(x=>x.dev))).filter(Boolean),
-    'Desv. de 3ª mayor pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢`,'maj3');
+    'Desv. de 3ª mayor pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢`,'maj3',true);
 }
 
 // ─── INTERVALOS (heatmap 12×12) ───
