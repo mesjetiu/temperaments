@@ -1,4 +1,4 @@
-const APP_VERSION = '1dcadda · 2026-04-07';
+const APP_VERSION = 'cce7319 · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2328,48 +2328,83 @@ function _drawConsonance(canvas, cursorCanvas, act) {
   const _active = new Map(); // pointerId → clientX
   let _pinchX = null;        // distancia horizontal entre los dos pointers al frame anterior
 
-  canvas.addEventListener('pointerdown', e => {
-    e.preventDefault();
-    _active.set(e.pointerId, e.clientX);
-    if (_active.size === 1) {
-      // Un solo dedo/ratón: capturar para seguir recibiendo eventos fuera del canvas
-      canvas.setPointerCapture(e.pointerId);
-      if (_swOn('cons-audio-sw')) return;
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-      let nearest = null, minD = 14;
-      for (const d of dots) { const dist = Math.hypot(d.x - mx, d.y - my); if (dist < minD) { minD = dist; nearest = d; } }
-      if (!nearest) return;
-      playFreqs([noteFreq(nearest.ni, nearest.t.offsets, pitchA, octaveShift),
-                 noteFreq(nearest.ni, nearest.t.offsets, pitchA, octaveShift) * Math.pow(2, nearest.cents / 1200)]);
-      _clickCents = nearest.cents; _clickNi = nearest.ni; _clickT = nearest.t;
-    } else if (_active.size === 2) {
-      // Segundo dedo: cancelar audio y arrancar pinch
-      stopSound(true); _clickCents = null; _clickNi = null; _clickT = null; _animMx = null;
-      const [xa, xb] = [..._active.values()];
-      _pinchX = Math.abs(xa - xb);
-    }
-  }, { signal: sig });
+  // ── Eventos de interacción: audio (1 dedo/ratón) + pinch zoom (2 dedos) ──
+  // Usamos touch events para el pinch (fiables en móvil, no interfieren con pointer capture)
+  // y pointer events solo para el audio/cursor con un dedo.
 
-  canvas.addEventListener('pointermove', e => {
-    _active.set(e.pointerId, e.clientX);
-    if (_active.size >= 2) {
-      // Pinch: zoom horizontal
-      const ids = [..._active.keys()];
-      const [xa, xb] = [_active.get(ids[0]), _active.get(ids[1])];
+  // ── Touch: pinch zoom con 2 dedos ──
+  let _touches = {}; // identifier → clientX
+  let _pinchX  = null;
+
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    Array.from(e.changedTouches).forEach(t => { _touches[t.identifier] = t.clientX; });
+    const ids = Object.keys(_touches);
+    if (ids.length === 2) {
+      _pinchX = Math.abs(_touches[ids[0]] - _touches[ids[1]]);
+    }
+  }, { signal: sig, passive: false });
+
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    Array.from(e.changedTouches).forEach(t => { _touches[t.identifier] = t.clientX; });
+    const ids = Object.keys(_touches);
+    if (ids.length >= 2 && _pinchX !== null) {
+      const xa = _touches[ids[0]], xb = _touches[ids[1]];
       const dist = Math.abs(xa - xb);
-      if (_pinchX && dist > 1) {
-        const rect  = canvas.getBoundingClientRect();
-        const midX  = Math.max(MX, Math.min(MX + PW, (xa + xb) / 2 - rect.left));
+      if (dist > 0.5) {
+        const rect = canvas.getBoundingClientRect();
+        const midX = Math.max(MX, Math.min(MX + PW, (xa + xb) / 2 - rect.left));
         const cSpan = canvas._zoomSpan   || 1200;
         const cCtr  = canvas._zoomCenter !== undefined ? canvas._zoomCenter : 600;
         const cMin  = Math.max(0, Math.min(1200 - cSpan, cCtr - cSpan / 2));
         applyZoom(cMin + (midX - MX) / PW * cSpan, _pinchX / dist);
         _pinchX = dist;
       }
-      return;
     }
-    // Un solo pointer: cursor y audio
+  }, { signal: sig, passive: false });
+
+  canvas.addEventListener('touchend', e => {
+    Array.from(e.changedTouches).forEach(t => { delete _touches[t.identifier]; });
+    if (Object.keys(_touches).length < 2) _pinchX = null;
+  }, { signal: sig, passive: false });
+
+  canvas.addEventListener('touchcancel', e => {
+    Array.from(e.changedTouches).forEach(t => { delete _touches[t.identifier]; });
+    _pinchX = null;
+  }, { signal: sig, passive: false });
+
+  // Doble toque: reset zoom
+  let _lastTap = 0;
+  canvas.addEventListener('touchend', e => {
+    if (e.changedTouches.length === 1 && Object.keys(_touches).length === 0) {
+      const now = Date.now();
+      if (now - _lastTap < 300) { canvas._zoomSpan = 1200; canvas._zoomCenter = 600; canvas._redraw(); }
+      _lastTap = now;
+    }
+  }, { signal: sig, passive: false });
+
+  // ── Pointer events: audio y cursor (1 dedo o ratón) ──
+  // Solo capturamos en móvil si hay exactamente 1 toque activo, para no
+  // interferir con el segundo dedo del pinch.
+  canvas.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    const nTouches = Object.keys(_touches).length;
+    if (nTouches >= 2) return; // pinch en curso, ignorar
+    if (e.pointerType !== 'mouse') canvas.setPointerCapture(e.pointerId);
+    if (_swOn('cons-audio-sw')) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    let nearest = null, minD = 14;
+    for (const d of dots) { const dist = Math.hypot(d.x - mx, d.y - my); if (dist < minD) { minD = dist; nearest = d; } }
+    if (!nearest) return;
+    playFreqs([noteFreq(nearest.ni, nearest.t.offsets, pitchA, octaveShift),
+               noteFreq(nearest.ni, nearest.t.offsets, pitchA, octaveShift) * Math.pow(2, nearest.cents / 1200)]);
+    _clickCents = nearest.cents; _clickNi = nearest.ni; _clickT = nearest.t;
+  }, { signal: sig });
+
+  canvas.addEventListener('pointermove', e => {
+    if (Object.keys(_touches).length >= 2) return; // pinch en curso
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     const inPlot = mx >= MX && mx <= MX + PW;
@@ -2393,16 +2428,12 @@ function _drawConsonance(canvas, cursorCanvas, act) {
     }
   }, { signal: sig });
 
-  function _consPointerEnd(e) {
-    _active.delete(e.pointerId);
-    if (_active.size < 2) _pinchX = null;
-    if (_active.size === 0) {
-      if (_swOn('cons-audio-sw')) stopSound(true);
-      else { _clickCents = null; _clickNi = null; _clickT = null; stopSound(true); }
-      _animMx = null;
-      const nfoEl = document.getElementById('cons-nfo');
-      if (nfoEl) nfoEl.textContent = 'Mueve el ratón sobre la gráfica · pulsa para oír un intervalo · rueda/pinch=zoom';
-    }
+  function _consPointerEnd() {
+    if (_swOn('cons-audio-sw')) stopSound(true);
+    else { _clickCents = null; _clickNi = null; _clickT = null; stopSound(true); }
+    _animMx = null;
+    const nfoEl = document.getElementById('cons-nfo');
+    if (nfoEl) nfoEl.textContent = 'Mueve el ratón sobre la gráfica · pulsa para oír un intervalo · rueda/pinch=zoom';
   }
   canvas.addEventListener('pointerup',     _consPointerEnd, { signal: sig });
   canvas.addEventListener('pointercancel', _consPointerEnd, { signal: sig });
@@ -2424,15 +2455,7 @@ function _drawConsonance(canvas, cursorCanvas, act) {
     applyZoom(toCents(mx), e.deltaY > 0 ? 1.25 : 0.8);
   }, { signal: sig, passive: false });
 
-  // ── Doble toque (móvil) y doble clic (desktop): reset zoom ──
-  let _lastTap = 0;
-  canvas.addEventListener('pointerup', e => {
-    if (e.pointerType !== 'mouse' && _active.size === 0) {
-      const now = Date.now();
-      if (now - _lastTap < 300) { canvas._zoomSpan = 1200; canvas._zoomCenter = 600; canvas._redraw(); }
-      _lastTap = now;
-    }
-  }, { signal: sig });
+  // ── Doble clic (desktop): reset zoom ──
   canvas.addEventListener('dblclick', () => {
     canvas._zoomSpan = 1200; canvas._zoomCenter = 600; canvas._redraw();
   }, { signal: sig });
