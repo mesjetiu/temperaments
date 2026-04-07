@@ -1,4 +1,4 @@
-const APP_VERSION = '6f6a669 · 2026-04-07';
+const APP_VERSION = '972b52f · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -685,16 +685,33 @@ function bindChartAudio(canvasId, type, slotMap) {
     if (datasetIndex < 0 || !chart) return;
     const ds = chart.data.datasets[datasetIndex];
     if (!ds) return;
-    // Guardar colores originales y aplicar borde luminoso
-    ds._origBorder = ds.borderColor;
-    ds._origBorderWidth = ds.borderWidth;
-    // Para barras: resaltar la barra concreta con borde blanco brillante
-    const origBg = Array.isArray(ds.backgroundColor) ? ds.backgroundColor : Array(ds.data.length).fill(ds.backgroundColor);
+    const n = ds.data.length;
+
+    // backgroundColor — solo la columna/punto activo se ilumina
+    const origBg = Array.isArray(ds.backgroundColor) ? [...ds.backgroundColor] : Array(n).fill(ds.backgroundColor);
     ds._origBg = ds.backgroundColor;
-    const newBg = origBg.map((c, i) => i === colIndex ? 'rgba(255,255,255,0.55)' : c);
-    ds.backgroundColor = newBg;
-    ds.borderColor = '#fff';
-    ds.borderWidth = 2;
+    ds.backgroundColor = origBg.map((c, i) => i === colIndex ? 'rgba(255,255,255,0.55)' : c);
+
+    // borderColor — array: solo la columna activa en blanco
+    const origBorderColor = Array.isArray(ds.borderColor) ? [...ds.borderColor] : Array(n).fill(ds.borderColor ?? 'transparent');
+    ds._origBorder = ds.borderColor;
+    ds.borderColor = origBorderColor.map((c, i) => i === colIndex ? '#fff' : c);
+
+    // borderWidth — array: solo la columna activa con borde grueso
+    const origBorderWidth = Array.isArray(ds.borderWidth) ? [...ds.borderWidth] : Array(n).fill(ds.borderWidth ?? 1);
+    ds._origBorderWidth = ds.borderWidth;
+    ds.borderWidth = origBorderWidth.map((w, i) => i === colIndex ? 2 : w);
+
+    // Radar: resaltar el punto concreto con pointBackgroundColor y pointRadius
+    if (chart.config.type === 'radar') {
+      const origPtBg = Array.isArray(ds.pointBackgroundColor) ? [...ds.pointBackgroundColor] : Array(n).fill(ds.pointBackgroundColor ?? ds.borderColor[colIndex] ?? '#fff');
+      ds._origPtBg = ds.pointBackgroundColor;
+      ds.pointBackgroundColor = origPtBg.map((c, i) => i === colIndex ? '#fff' : c);
+      const origPtR = Array.isArray(ds.pointRadius) ? [...ds.pointRadius] : Array(n).fill(ds.pointRadius ?? 3);
+      ds._origPtR = ds.pointRadius;
+      ds.pointRadius = origPtR.map((r, i) => i === colIndex ? 7 : r);
+    }
+
     chart.update('none');
   }
 
@@ -702,9 +719,11 @@ function bindChartAudio(canvasId, type, slotMap) {
     if (_hlDataset < 0 || !chart) { _hlDataset = -1; _hlIndex = -1; return; }
     const ds = chart.data.datasets[_hlDataset];
     if (ds) {
-      if (ds._origBg !== undefined) { ds.backgroundColor = ds._origBg; delete ds._origBg; }
-      if (ds._origBorder !== undefined) { ds.borderColor = ds._origBorder; delete ds._origBorder; }
-      if (ds._origBorderWidth !== undefined) { ds.borderWidth = ds._origBorderWidth; delete ds._origBorderWidth; }
+      if (ds._origBg !== undefined)          { ds.backgroundColor    = ds._origBg;          delete ds._origBg; }
+      if (ds._origBorder !== undefined)       { ds.borderColor        = ds._origBorder;       delete ds._origBorder; }
+      if (ds._origBorderWidth !== undefined)  { ds.borderWidth        = ds._origBorderWidth;  delete ds._origBorderWidth; }
+      if (ds._origPtBg !== undefined)         { ds.pointBackgroundColor = ds._origPtBg;       delete ds._origPtBg; }
+      if (ds._origPtR !== undefined)          { ds.pointRadius        = ds._origPtR;          delete ds._origPtR; }
     }
     _hlDataset = -1; _hlIndex = -1;
     chart.update('none');
