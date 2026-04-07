@@ -1,4 +1,4 @@
-const APP_VERSION = 'a2afccd · 2026-04-07';
+const APP_VERSION = 'd96674b · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1437,7 +1437,7 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
 // SWIPE HORIZONTAL EN CONTENT PARA CAMBIAR PESTAÑA (móvil)
 // ══════════════════════════════════════════════
 (function() {
-  const TABS_ORDER = ['overview','fifths','thirds','compare','intervals','beats','tonnetz','scatter','keyboard','medidor'];
+  const TABS_ORDER = ['overview','fifths','thirds','compare','intervals','beats','consonance','tonnetz','scatter','keyboard','medidor'];
   let sx = 0, sy = 0, swiping = false;
   document.getElementById('content').addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
@@ -1700,7 +1700,7 @@ function renderContent() {
   if (activeTab !== 'keyboard' && activeTab !== 'tuner' && activeTab !== 'scatter' && activeTab !== 'medidor' && !act.length) {
     el.innerHTML='<div class="empty-state">Selecciona un temperamento de la lista para empezar.</div>'; return;
   }
-  ({overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,intervals:viewIntervals,beats:viewBeats,tonnetz:viewTonnetz,scatter:viewScatter,keyboard:viewKeyboard,medidor:viewMedidor,tuner:viewTuner}[activeTab])?.(act);
+  ({overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,intervals:viewIntervals,beats:viewBeats,consonance:viewConsonance,tonnetz:viewTonnetz,scatter:viewScatter,keyboard:viewKeyboard,medidor:viewMedidor,tuner:viewTuner}[activeTab])?.(act);
 }
 
 // ─── VISTA GENERAL ───
@@ -1954,6 +1954,243 @@ function viewBeats(act) {
   });
   document.getElementById('content').innerHTML = html;
   document.querySelectorAll('#content .table-zoom-wrap').forEach(_initZoomTable);
+}
+
+// ─── CONSONANCIA ───
+const JUST_IVLS = [
+  { name:'m2', cents:111.73,  w:0.30 },
+  { name:'M2', cents:203.91,  w:0.45 },
+  { name:'m3', cents:315.64,  w:0.70 },
+  { name:'M3', cents:386.31,  w:0.85 },
+  { name:'P4', cents:498.04,  w:0.90 },
+  { name:'TT', cents:590.22,  w:0.20 },
+  { name:'P5', cents:701.96,  w:1.00 },
+  { name:'m6', cents:813.69,  w:0.70 },
+  { name:'M6', cents:884.36,  w:0.75 },
+  { name:'m7', cents:996.09,  w:0.40 },
+  { name:'M7', cents:1088.27, w:0.30 },
+];
+
+function _consValue(cents) {
+  const s2 = 72; // sigma²=6² — ancho de Gaussiana en cents²
+  let best = 0;
+  for (const j of JUST_IVLS) {
+    const d = cents - j.cents;
+    const v = j.w * Math.exp(-(d * d) / (2 * s2));
+    if (v > best) best = v;
+  }
+  return best;
+}
+
+function viewConsonance(act) {
+  document.getElementById('content').innerHTML =
+    panel(
+      'Curva de consonancia <small style="color:#4b5563;font-size:10px;font-weight:400">— firma espectral del temperamento</small>',
+      `<canvas id="c-cons" style="width:100%;display:block;cursor:default"></canvas>
+       <div id="cons-resize" class="chart-resize-handle" title="Arrastra para cambiar altura"></div>
+       <div id="cons-nfo" style="margin-top:6px;min-height:1.2em;font-size:10px;color:var(--muted);text-align:center">
+         Cada punto es un intervalo del temperamento · pulsa para oír
+       </div>`,
+      'width:100%'
+    );
+  requestAnimationFrame(() => {
+    const cv = document.getElementById('c-cons');
+    if (!cv) return;
+    _drawConsonance(cv, act);
+    cv._redraw = () => _drawConsonance(cv, act);
+    attachPanelResize(cv);
+    const rh = document.getElementById('cons-resize');
+    if (rh) {
+      rh.addEventListener('pointerdown', ev => {
+        ev.preventDefault();
+        rh.setPointerCapture(ev.pointerId);
+        const sy = ev.clientY, sh = cv.clientHeight || parseInt(cv.dataset.userH||'0',10) || Math.round(cv.clientWidth*0.5);
+        const onMove = e => { cv.style.height = Math.max(140, sh + e.clientY - sy) + 'px'; };
+        const onUp   = () => {
+          rh.removeEventListener('pointermove', onMove);
+          rh.removeEventListener('pointerup', onUp);
+          cv.dataset.userH = cv.clientHeight;
+          cv.style.height = '';
+          _drawConsonance(cv, act);
+        };
+        rh.addEventListener('pointermove', onMove, { passive: true });
+        rh.addEventListener('pointerup', onUp);
+      });
+    }
+  });
+}
+
+function _drawConsonance(canvas, act) {
+  if (canvas._consAbort) canvas._consAbort.abort();
+  canvas._consAbort = new AbortController();
+
+  const dpr     = window.devicePixelRatio || 1;
+  const W       = canvas.clientWidth || 560;
+  const panelEl = canvas.closest('.panel');
+  const availH  = panelEl?.style.height ? _availCanvasH(canvas) : 0;
+  const exH     = canvas.dataset.userH ? parseInt(canvas.dataset.userH, 10) : 0;
+  const H = availH > 80 ? Math.round(availH) : exH > 80 ? exH : Math.round(Math.min(W * 0.5, 300));
+
+  canvas.width  = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const MX = 38, MY = 14, MR = 12, MB = 36;
+  const PW = W - MX - MR, PH = H - MY - MB;
+  const toX = c => MX + (c / 1200) * PW;
+  const toY = v => MY + (1 - v) * PH;
+
+  // Background
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(0, 0, W, H);
+
+  // Y grid + labels
+  const fSz = Math.max(8, Math.round(9 * W / 500));
+  ctx.textAlign = 'right';
+  ctx.font = `${fSz}px monospace`;
+  for (let v = 0; v <= 1; v += 0.25) {
+    const y = toY(v);
+    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(MX, y); ctx.lineTo(MX + PW, y); ctx.stroke();
+    ctx.fillStyle = '#475569';
+    ctx.fillText((v * 100).toFixed(0) + '%', MX - 4, y + 3);
+  }
+
+  // Theoretical consonance curve — filled area
+  ctx.beginPath();
+  let first = true;
+  for (let px = 0; px <= PW; px++) {
+    const c0 = (px / PW) * 1200, v0 = _consValue(c0);
+    if (first) { ctx.moveTo(toX(c0), toY(v0)); first = false; }
+    else ctx.lineTo(toX(c0), toY(v0));
+  }
+  ctx.lineTo(MX + PW, MY + PH); ctx.lineTo(MX, MY + PH); ctx.closePath();
+  ctx.fillStyle = 'rgba(255,255,255,0.04)';
+  ctx.fill();
+
+  // Theoretical consonance curve — stroke
+  ctx.beginPath();
+  first = true;
+  for (let px = 0; px <= PW; px++) {
+    const c0 = (px / PW) * 1200, v0 = _consValue(c0);
+    if (first) { ctx.moveTo(toX(c0), toY(v0)); first = false; }
+    else ctx.lineTo(toX(c0), toY(v0));
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1.5; ctx.setLineDash([]); ctx.stroke();
+
+  // Just ratio vertical lines + labels
+  ctx.font = `${fSz}px monospace`;
+  for (const j of JUST_IVLS) {
+    const x = toX(j.cents);
+    ctx.beginPath(); ctx.moveTo(x, MY); ctx.lineTo(x, MY + PH);
+    ctx.strokeStyle = `rgba(148,163,184,${(0.05 + j.w * 0.08).toFixed(2)})`;
+    ctx.lineWidth = 1; ctx.setLineDash([3, 5]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = `rgba(148,163,184,${(0.35 + j.w * 0.4).toFixed(2)})`;
+    ctx.fillText(j.name, x, MY + PH + 14);
+    ctx.fillStyle = 'rgba(71,85,105,0.75)';
+    ctx.fillText(Math.round(j.cents), x, MY + PH + 25);
+  }
+
+  // 0¢ / 1200¢ ticks
+  ctx.strokeStyle = '#334155'; ctx.lineWidth = 1;
+  for (const c of [0, 1200]) {
+    const x = toX(c);
+    ctx.beginPath(); ctx.moveTo(x, MY + PH); ctx.lineTo(x, MY + PH + 4); ctx.stroke();
+    ctx.fillStyle = '#334155'; ctx.textAlign = 'center';
+    ctx.font = `${fSz}px monospace`;
+    ctx.fillText(c + '¢', x, MY + PH + 25);
+  }
+
+  // Compute interval dots
+  const dots = [];
+  act.forEach((t, ti) => {
+    const ci = selected.indexOf(t);
+    for (let semi = 1; semi <= 11; semi++) {
+      for (let ni = 0; ni < 12; ni++) {
+        const nj = (ni + semi) % 12;
+        const actualCents = semi * 100 + t.offsets[nj] - t.offsets[ni];
+        const cons = _consValue(actualCents);
+        dots.push({ x: toX(actualCents), y: toY(cons), ci, cents: actualCents, cons,
+          fromNote: NOTES[ni], toNote: NOTES[nj], semi, ni, t });
+      }
+    }
+  });
+
+  // Draw dots
+  for (const d of dots) {
+    ctx.beginPath();
+    ctx.arc(d.x, d.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = COLORS[d.ci];
+    ctx.globalAlpha = 0.65;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // Legend (top right, stacked vertically)
+  ctx.font = '10px sans-serif';
+  act.forEach((t, ti) => {
+    const ci = selected.indexOf(t);
+    const ly = MY + 8 + ti * 16;
+    ctx.beginPath();
+    ctx.arc(MX + PW - 6, ly, 4, 0, Math.PI * 2);
+    ctx.fillStyle = COLORS[ci]; ctx.globalAlpha = 0.9; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.fillStyle = '#cbd5e1'; ctx.textAlign = 'right';
+    ctx.fillText(shortName(t, 26), MX + PW - 13, ly + 3);
+  });
+
+  // Y axis title
+  ctx.save();
+  ctx.translate(11, MY + PH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle = '#6b7280'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('Pureza', 0, 0);
+  ctx.restore();
+
+  // X axis title
+  ctx.fillStyle = '#6b7280'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('Intervalo (¢)', MX + PW / 2, H - 2);
+
+  // Hover: show interval info
+  canvas.addEventListener('pointermove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    let nearest = null, minD = 14;
+    for (const d of dots) {
+      const dist = Math.hypot(d.x - mx, d.y - my);
+      if (dist < minD) { minD = dist; nearest = d; }
+    }
+    const nfoEl = document.getElementById('cons-nfo');
+    if (!nfoEl) return;
+    if (nearest) {
+      let nearJ = JUST_IVLS[0], nearDev = Infinity;
+      for (const j of JUST_IVLS) {
+        const d = Math.abs(j.cents - nearest.cents);
+        if (d < nearDev) { nearDev = d; nearJ = j; }
+      }
+      const dev = nearest.cents - nearJ.cents;
+      nfoEl.textContent = `${nearest.fromNote} → ${nearest.toNote} · ${nearest.cents.toFixed(2)}¢ · ${nearJ.name} justo=${nearJ.cents.toFixed(2)}¢ (${dev >= 0 ? '+' : ''}${dev.toFixed(2)}¢)`;
+    } else {
+      nfoEl.textContent = 'Cada punto es un intervalo del temperamento · pulsa para oír';
+    }
+  }, { signal: canvas._consAbort.signal });
+
+  // Click: play interval
+  canvas.addEventListener('pointerdown', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    let nearest = null, minD = 14;
+    for (const d of dots) {
+      const dist = Math.hypot(d.x - mx, d.y - my);
+      if (dist < minD) { minD = dist; nearest = d; }
+    }
+    if (!nearest) return;
+    const f1 = noteFreq(nearest.ni, nearest.t.offsets, pitchA, octaveShift);
+    playFreqs([f1, f1 * Math.pow(2, nearest.cents / 1200)]);
+  }, { signal: canvas._consAbort.signal });
 }
 
 // ─── TONNETZ ───
