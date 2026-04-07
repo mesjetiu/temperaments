@@ -1,4 +1,4 @@
-const APP_VERSION = '835e540 · 2026-04-07';
+const APP_VERSION = '130bc40 · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2046,7 +2046,7 @@ function viewConsonance(act) {
        ${_swHtml('cons-audio-sw', 'Audio continuo', false)}
        ${_swHtml('cons-beat-sw',  'Ver batimentos', false)}
        <span id="cons-nfo" style="font-size:10px;color:var(--muted);flex:1;min-width:0">
-         Mueve el ratón sobre la gráfica · pulsa para oír un intervalo
+         Mueve el ratón sobre la gráfica · pulsa para oír un intervalo · rueda/pinch=zoom
        </span>
      </div>
      <div style="position:relative">
@@ -2181,7 +2181,7 @@ function _drawConsonance(canvas, cursorCanvas, act) {
   // ── Zoom indicator ──
   if (zoomSpan < 1200) {
     ctx.fillStyle = 'rgba(96,165,250,0.55)'; ctx.font = '9px monospace'; ctx.textAlign = 'left';
-    ctx.fillText(`×${(1200 / zoomSpan).toFixed(1)}  [${Math.round(zMin)}–${Math.round(zMax)}¢]  · rueda=zoom  · doble clic=reset`, MX + 2, MY + 10);
+    ctx.fillText(`×${(1200 / zoomSpan).toFixed(1)}  [${Math.round(zMin)}–${Math.round(zMax)}¢]  · rueda/pinch=zoom  · doble toque=reset`, MX + 2, MY + 10);
   }
 
   // ── Puntos de los temperamentos ──
@@ -2366,7 +2366,7 @@ function _drawConsonance(canvas, cursorCanvas, act) {
     }
     _animMx = null;
     const nfoEl = document.getElementById('cons-nfo');
-    if (nfoEl) nfoEl.textContent = 'Mueve el ratón sobre la gráfica · pulsa para oír un intervalo · rueda=zoom';
+    if (nfoEl) nfoEl.textContent = 'Mueve el ratón sobre la gráfica · pulsa para oír un intervalo · rueda/pinch=zoom';
   }, { signal: sig });
 
   canvas.addEventListener('pointerleave', e => {
@@ -2376,7 +2376,7 @@ function _drawConsonance(canvas, cursorCanvas, act) {
       _animMx = null;
       if (_swOn('cons-audio-sw')) stopSound(true);
       const nfoEl = document.getElementById('cons-nfo');
-      if (nfoEl) nfoEl.textContent = 'Mueve el ratón sobre la gráfica · pulsa para oír un intervalo · rueda=zoom';
+      if (nfoEl) nfoEl.textContent = 'Mueve el ratón sobre la gráfica · pulsa para oír un intervalo · rueda/pinch=zoom';
     }
   }, { signal: sig });
 
@@ -2385,18 +2385,71 @@ function _drawConsonance(canvas, cursorCanvas, act) {
     stopSound(true);
   }, { signal: sig });
 
+  // ── Zoom helper ──
+  function applyZoom(pivotCents, factor) {
+    const curSpan   = canvas._zoomSpan   || 1200;
+    const curCenter = canvas._zoomCenter !== undefined ? canvas._zoomCenter : 600;
+    const curMin    = Math.max(0, Math.min(1200 - curSpan, curCenter - curSpan / 2));
+    const newSpan   = Math.min(1200, Math.max(30, curSpan * factor));
+    const newMin    = Math.max(0, Math.min(1200 - newSpan, pivotCents - (pivotCents - curMin) * (newSpan / curSpan)));
+    canvas._zoomSpan   = newSpan;
+    canvas._zoomCenter = newMin + newSpan / 2;
+    canvas._redraw();
+  }
+
   // ── Zoom con rueda del ratón ──
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const mx   = Math.max(MX, Math.min(MX + PW, e.clientX - rect.left));
-    const pivot = toCents(mx);
-    const factor = e.deltaY > 0 ? 1.25 : 0.8;
-    const newSpan = Math.min(1200, Math.max(30, zoomSpan * factor));
-    const newMin  = Math.max(0, Math.min(1200 - newSpan, pivot - (pivot - zMin) * (newSpan / zoomSpan)));
-    canvas._zoomSpan   = newSpan;
-    canvas._zoomCenter = newMin + newSpan / 2;
-    canvas._redraw();
+    applyZoom(toCents(mx), e.deltaY > 0 ? 1.25 : 0.8);
+  }, { signal: sig, passive: false });
+
+  // ── Pinch zoom táctil (horizontal) ──
+  let _pt = {};   // touches activos { id: clientX }
+  let _pinchX = null; // distancia horizontal entre dedos al inicio del pinch
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    Array.from(e.changedTouches).forEach(t => { _pt[t.identifier] = t.clientX; });
+    const ids = Object.keys(_pt);
+    if (ids.length === 2) {
+      _pinchX = Math.abs(_pt[ids[0]] - _pt[ids[1]]);
+    }
+  }, { signal: sig, passive: false });
+
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    Array.from(e.changedTouches).forEach(t => { _pt[t.identifier] = t.clientX; });
+    const ids = Object.keys(_pt);
+    if (ids.length >= 2 && _pinchX) {
+      const [xa, xb] = ids.slice(0, 2).map(id => _pt[id]);
+      const dist = Math.abs(xa - xb);
+      if (dist > 1) {
+        const rect     = canvas.getBoundingClientRect();
+        const midX     = Math.max(MX, Math.min(MX + PW, (xa + xb) / 2 - rect.left));
+        const curSpan  = canvas._zoomSpan   || 1200;
+        const curCenter= canvas._zoomCenter !== undefined ? canvas._zoomCenter : 600;
+        const curMin   = Math.max(0, Math.min(1200 - curSpan, curCenter - curSpan / 2));
+        const pivotC   = curMin + (midX - MX) / PW * curSpan;
+        applyZoom(pivotC, _pinchX / dist);
+        _pinchX = dist;
+      }
+    }
+  }, { signal: sig, passive: false });
+
+  canvas.addEventListener('touchend', e => {
+    Array.from(e.changedTouches).forEach(t => { delete _pt[t.identifier]; });
+    if (Object.keys(_pt).length < 2) _pinchX = null;
+  }, { signal: sig, passive: false });
+
+  // ── Doble toque / doble clic: reset zoom ──
+  let _lastTap = 0;
+  canvas.addEventListener('touchend', e => {
+    if (e.changedTouches.length === 1 && Object.keys(_pt).length === 0) {
+      const now = Date.now();
+      if (now - _lastTap < 300) { canvas._zoomSpan = 1200; canvas._zoomCenter = 600; canvas._redraw(); }
+      _lastTap = now;
+    }
   }, { signal: sig, passive: false });
 
   // ── Doble clic: reset zoom ──
