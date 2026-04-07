@@ -1,4 +1,4 @@
-const APP_VERSION = 'c5d4244 · 2026-04-07';
+const APP_VERSION = 'aa9028c · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1971,6 +1971,7 @@ const JUST_IVLS = [
   { name:'M6', cents:884.36,  w:0.75, a:5,  b:3  },
   { name:'m7', cents:996.09,  w:0.40, a:7,  b:4  },
   { name:'M7', cents:1088.27, w:0.30, a:15, b:8  },
+  { name:'8va', cents:1200,   w:1.00, a:2,  b:1  },
 ];
 
 // Consonancia teórica: superposición de Gaussianas centradas en los intervalos justos
@@ -2190,57 +2191,71 @@ function _drawConsonance(canvas, cursorCanvas, act) {
   // ── Frecuencia de referencia para batimentos y audio continuo ──
   const f0 = noteFreq(0, act[0]?.offsets ?? new Array(12).fill(0), pitchA, octaveShift);
 
-  // ── Función para redibujar el canvas de cursor ──
-  function drawCursorCanvas(mx, playCents) {
+  // ── Estado compartido entre eventos y RAF ──
+  let _animMx = null, _animPlayCents = null;
+
+  // ── Loop de animación (RAF) ──
+  function startAnim() {
     if (!cursorCanvas) return;
     const cc = cursorCanvas.getContext('2d');
-    cc.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
-    cc.save(); cc.scale(dpr, dpr);
+    const s2 = 72;
 
-    const beatOn = _swOn('cons-beat-sw');
-    const contOn = _swOn('cons-audio-sw');
+    function frame(now) {
+      if (sig.aborted) return;
+      cc.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
+      cc.save(); cc.scale(dpr, dpr);
 
-    // Gaussianas coloreadas por batimento
-    if (beatOn && playCents !== null) {
-      const s2 = 72;
-      // Modo continuo: todas las curvas; modo click: solo la más cercana
-      let onlyJ = null;
-      if (!contOn) {
-        let minD = Infinity;
-        for (const j of JUST_IVLS) { const d = Math.abs(playCents - j.cents); if (d < minD) { minD = d; onlyJ = j; } }
-      }
-      for (const j of JUST_IVLS) {
-        if (onlyJ && j !== onlyJ) continue;
-        const hz    = _beatHz(j, playCents, f0);
-        const color = _beatColor(hz);
-        const lo = Math.max(0, j.cents - 55), hi = Math.min(1200, j.cents + 55);
-        const pxLo = Math.round((lo / 1200) * PW), pxHi = Math.round((hi / 1200) * PW);
-        cc.beginPath();
-        let fst = true;
-        for (let px = pxLo; px <= pxHi; px++) {
-          const c0 = (px / PW) * 1200, d = c0 - j.cents;
-          const v  = j.w * Math.exp(-(d * d) / (2 * s2));
-          if (fst) { cc.moveTo(toX(c0), toY(v)); fst = false; } else cc.lineTo(toX(c0), toY(v));
+      const beatOn = _swOn('cons-beat-sw');
+      const contOn = _swOn('cons-audio-sw');
+      const t = now / 1000;
+
+      // Gaussianas animadas por batimento
+      if (beatOn && _animPlayCents !== null) {
+        // Modo continuo: todas las curvas; modo click: solo la más cercana
+        let onlyJ = null;
+        if (!contOn) {
+          let minD = Infinity;
+          for (const j of JUST_IVLS) { const d = Math.abs(_animPlayCents - j.cents); if (d < minD) { minD = d; onlyJ = j; } }
         }
-        cc.lineTo(toX(hi), toY(0)); cc.lineTo(toX(lo), toY(0)); cc.closePath();
-        cc.globalAlpha = 0.35; cc.fillStyle = color; cc.fill();
-        cc.globalAlpha = 1;    cc.strokeStyle = color; cc.lineWidth = 1.5; cc.stroke();
+        for (const j of JUST_IVLS) {
+          if (onlyJ && j !== onlyJ) continue;
+          const hz     = _beatHz(j, _animPlayCents, f0);
+          const animHz = Math.min(hz, 20);
+          const pulse  = 0.5 + 0.5 * Math.cos(2 * Math.PI * animHz * t);
+          const color  = _beatColor(hz);
+          const lo = Math.max(0, j.cents - 55), hi = Math.min(1200, j.cents + 55);
+          const pxLo = Math.round((lo / 1200) * PW), pxHi = Math.round((hi / 1200) * PW);
+          cc.beginPath();
+          let fst = true;
+          for (let px = pxLo; px <= pxHi; px++) {
+            const c0 = (px / PW) * 1200, d = c0 - j.cents;
+            const v  = j.w * Math.exp(-(d * d) / (2 * s2));
+            if (fst) { cc.moveTo(toX(c0), toY(v)); fst = false; } else cc.lineTo(toX(c0), toY(v));
+          }
+          cc.lineTo(toX(hi), toY(0)); cc.lineTo(toX(lo), toY(0)); cc.closePath();
+          cc.globalAlpha = 0.15 + pulse * 0.55; cc.fillStyle = color; cc.fill();
+          cc.globalAlpha = 0.40 + pulse * 0.60; cc.strokeStyle = color; cc.lineWidth = 1.5; cc.stroke();
 
-        // Hz label sobre el pico
-        if (hz < 99) {
-          cc.fillStyle = color; cc.font = `${fSz}px monospace`; cc.textAlign = 'center';
-          cc.fillText(hz.toFixed(1) + ' Hz', toX(j.cents), toY(j.w) - 4);
+          // Hz label sobre el pico
+          if (hz < 99) {
+            cc.globalAlpha = 0.40 + pulse * 0.60;
+            cc.fillStyle = color; cc.font = `${fSz}px monospace`; cc.textAlign = 'center';
+            cc.fillText(hz.toFixed(1) + ' Hz', toX(j.cents), toY(j.w) - 4);
+          }
         }
       }
-    }
 
-    // Línea vertical del cursor
-    if (mx !== null) {
-      cc.beginPath(); cc.moveTo(mx, MY); cc.lineTo(mx, MY + PH);
-      cc.strokeStyle = 'rgba(255,255,255,0.55)';
-      cc.lineWidth = 1; cc.setLineDash([4, 4]); cc.stroke(); cc.setLineDash([]);
+      // Línea vertical del cursor
+      if (_animMx !== null) {
+        cc.globalAlpha = 1;
+        cc.beginPath(); cc.moveTo(_animMx, MY); cc.lineTo(_animMx, MY + PH);
+        cc.strokeStyle = 'rgba(255,255,255,0.55)';
+        cc.lineWidth = 1; cc.setLineDash([4, 4]); cc.stroke(); cc.setLineDash([]);
+      }
+      cc.restore();
+      requestAnimationFrame(frame);
     }
-    cc.restore();
+    requestAnimationFrame(frame);
   }
 
   // ── Eventos ──
@@ -2250,7 +2265,8 @@ function _drawConsonance(canvas, cursorCanvas, act) {
     const inPlot = mx >= MX && mx <= MX + PW;
     const cents  = Math.max(0, Math.min(1200, (mx - MX) / PW * 1200));
 
-    drawCursorCanvas(inPlot ? mx : null, inPlot ? cents : null);
+    _animMx = inPlot ? mx : null;
+    _animPlayCents = inPlot ? cents : null;
 
     const nfoEl = document.getElementById('cons-nfo');
     if (nfoEl && inPlot) {
@@ -2268,7 +2284,7 @@ function _drawConsonance(canvas, cursorCanvas, act) {
   }, { signal: sig });
 
   canvas.addEventListener('pointerleave', () => {
-    drawCursorCanvas(null, null);
+    _animMx = null; _animPlayCents = null;
     if (_swOn('cons-audio-sw')) stopSound(true);
     const nfoEl = document.getElementById('cons-nfo');
     if (nfoEl) nfoEl.textContent = 'Mueve el ratón sobre la gráfica · pulsa para oír un intervalo';
@@ -2283,13 +2299,15 @@ function _drawConsonance(canvas, cursorCanvas, act) {
     if (!nearest) return;
     const f1 = noteFreq(nearest.ni, nearest.t.offsets, pitchA, octaveShift);
     playFreqs([f1, f1 * Math.pow(2, nearest.cents / 1200)]);
-    drawCursorCanvas(nearest.x, nearest.cents);
+    _animMx = nearest.x; _animPlayCents = nearest.cents;
   }, { signal: sig });
 
   // Al soltar el ratón en modo discreto, limpiar el canvas de cursor
   window.addEventListener('pointerup', () => {
-    if (!_swOn('cons-audio-sw')) drawCursorCanvas(null, null);
+    if (!_swOn('cons-audio-sw')) { _animMx = null; _animPlayCents = null; }
   }, { signal: sig });
+
+  startAnim();
 }
 
 // ─── TONNETZ ───
