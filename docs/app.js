@@ -1,4 +1,4 @@
-const APP_VERSION = '00476f5 · 2026-04-07';
+const APP_VERSION = 'c5408f5 · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2044,7 +2044,7 @@ function _drawConsonance(canvas, act) {
   const PW = W - MX - MR, PH = H - MY - MB;
   const fSz = Math.max(8, Math.round(9 * W / 500));
 
-  // Pre-compute dots (necesitamos maxDev antes de dibujar los ejes)
+  // Pre-computar dots para conocer maxDev antes de dibujar los ejes
   const dots = [];
   act.forEach(t => {
     const ci = selected.indexOf(t);
@@ -2059,25 +2059,39 @@ function _drawConsonance(canvas, act) {
     }
   });
 
-  // Escala Y: desviación absoluta del just más cercano — 0 = puro, arriba = impuro
+  // Escala Y: 0¢ en la parte INFERIOR (puro), maxDev en la parte superior (impuro)
   const rawMax = dots.length ? Math.max(...dots.map(d => d.absDev)) : 20;
-  const maxDev = Math.max(5, Math.ceil(rawMax / 5) * 5); // redondear a múltiplo de 5
+  const maxDev = Math.max(5, Math.ceil(rawMax / 5) * 5);
+  // toY: dv=0 → fondo (MY+PH), dv=maxDev → techo (MY)
   const toX = c  => MX + (c / 1200) * PW;
-  const toY = dv => MY + (dv / maxDev) * PH; // 0¢ arriba, maxDev abajo
+  const toY = dv => MY + PH - (dv / maxDev) * PH;
 
-  // Background
+  // Fondo
   ctx.fillStyle = '#0f172a';
   ctx.fillRect(0, 0, W, H);
 
-  // Franja "zona pura" cerca del top
-  const pureZonePx = Math.max(4, PH * (2 / maxDev));
-  const grad = ctx.createLinearGradient(0, MY, 0, MY + pureZonePx * 3);
-  grad.addColorStop(0, 'rgba(74,222,128,0.10)');
-  grad.addColorStop(1, 'rgba(74,222,128,0.00)');
-  ctx.fillStyle = grad;
+  // Franja verde en la zona pura (parte inferior)
+  const pureGrad = ctx.createLinearGradient(0, MY + PH, 0, MY);
+  pureGrad.addColorStop(0,    'rgba(74,222,128,0.10)');
+  pureGrad.addColorStop(0.15, 'rgba(74,222,128,0.03)');
+  pureGrad.addColorStop(1,    'rgba(74,222,128,0.00)');
+  ctx.fillStyle = pureGrad;
   ctx.fillRect(MX, MY, PW, PH);
 
-  // Y grid + etiquetas
+  // Bandas verticales en los intervalos justos (substituto visual de la curva Gaussiana)
+  for (const j of JUST_IVLS) {
+    const x = toX(j.cents);
+    const hw = Math.max(3, j.w * 8); // semianchura proporcional al peso armónico
+    const bandGrad = ctx.createLinearGradient(x - hw, 0, x + hw, 0);
+    const alpha = (0.05 + j.w * 0.10).toFixed(2);
+    bandGrad.addColorStop(0,   'rgba(74,222,128,0)');
+    bandGrad.addColorStop(0.5, `rgba(74,222,128,${alpha})`);
+    bandGrad.addColorStop(1,   'rgba(74,222,128,0)');
+    ctx.fillStyle = bandGrad;
+    ctx.fillRect(x - hw, MY, hw * 2, PH);
+  }
+
+  // Y grid + etiquetas (de abajo hacia arriba: 0¢ → maxDev)
   ctx.font = `${fSz}px monospace`;
   ctx.textAlign = 'right';
   const nTicks = 5;
@@ -2090,11 +2104,11 @@ function _drawConsonance(canvas, act) {
     ctx.fillText(dv.toFixed(1) + '¢', MX - 4, y + 3);
   }
 
-  // Líneas verticales de los intervalos justos + etiquetas
+  // Líneas verticales de intervalos justos + etiquetas eje X
   for (const j of JUST_IVLS) {
     const x = toX(j.cents);
     ctx.beginPath(); ctx.moveTo(x, MY); ctx.lineTo(x, MY + PH);
-    ctx.strokeStyle = `rgba(148,163,184,${(0.05 + j.w * 0.08).toFixed(2)})`;
+    ctx.strokeStyle = `rgba(148,163,184,${(0.06 + j.w * 0.10).toFixed(2)})`;
     ctx.lineWidth = 1; ctx.setLineDash([3, 5]); ctx.stroke(); ctx.setLineDash([]);
     ctx.textAlign = 'center';
     ctx.fillStyle = `rgba(148,163,184,${(0.35 + j.w * 0.4).toFixed(2)})`;
@@ -2114,19 +2128,19 @@ function _drawConsonance(canvas, act) {
     ctx.fillText(c + '¢', x, MY + PH + 25);
   }
 
-  // Puntos — posición final ahora que tenemos toY
+  // Dibujar puntos
   for (const d of dots) {
     d.x = toX(d.cents);
     d.y = toY(d.absDev);
     ctx.beginPath();
     ctx.arc(d.x, d.y, 3, 0, Math.PI * 2);
     ctx.fillStyle = COLORS[d.ci];
-    ctx.globalAlpha = 0.65;
+    ctx.globalAlpha = 0.70;
     ctx.fill();
     ctx.globalAlpha = 1;
   }
 
-  // Leyenda (esquina superior derecha, apilada)
+  // Leyenda (esquina superior derecha)
   ctx.font = '10px sans-serif';
   act.forEach((t, ti) => {
     const ci = selected.indexOf(t);
