@@ -1,4 +1,4 @@
-const APP_VERSION = '8fdd6e7 · 2026-04-07';
+const APP_VERSION = '2cddd92 · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2654,6 +2654,7 @@ const TUNER = {
   },
   async startMic() {
     try {
+      getCtx(); // Crear/reanudar AudioContext durante el gesto de usuario (antes del await)
       const stream = await navigator.mediaDevices.getUserMedia(
         { audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
       this.micStream = stream;
@@ -3409,6 +3410,7 @@ const DT = {
   async toggleMic() { this.micOn ? this.stopMic() : await this.startMic(); },
   async startMic() {
     try {
+      getCtx(); // Crear/reanudar AudioContext durante el gesto de usuario (antes del await)
       const stream = await navigator.mediaDevices.getUserMedia(
         { audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false } });
       this.micStream = stream;
