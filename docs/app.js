@@ -1,4 +1,4 @@
-const APP_VERSION = '22cba0a · 2026-04-07';
+const APP_VERSION = '7d8546b · 2026-04-07';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2107,6 +2107,9 @@ function _drawConsonance(canvas, cursorCanvas, act) {
   const MX = 38, MY = 14, MR = 12, MB = 36;
   const PW = W - MX - MR, PH = H - MY - MB;
 
+  // dots: compartido entre _paint (lo rellena) y los event listeners (lo leen)
+  const dots = [];
+
   // Helpers de coordenadas — leen el zoom actual del canvas en cada llamada
   function getZoom() {
     const zoomSpan   = canvas._zoomSpan   || 1200;
@@ -2192,7 +2195,7 @@ function _drawConsonance(canvas, cursorCanvas, act) {
   }
 
   // ── Puntos de los temperamentos ──
-  const dots = [];
+  dots.length = 0;
   act.forEach(t => {
     const ci = selected.indexOf(t);
     for (let semi = 1; semi <= 11; semi++) {
@@ -2232,6 +2235,7 @@ function _drawConsonance(canvas, cursorCanvas, act) {
   ctx.fillText('Intervalo (¢)', MX + PW / 2, H - 2);
 
   }; // fin canvas._paint
+
   canvas._paint();
 
   // ── Estado compartido entre eventos y RAF ──
