@@ -1,4 +1,4 @@
-const APP_VERSION = 'b710a95 · 2026-04-08';
+const APP_VERSION = '8771fa6 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -5424,9 +5424,32 @@ const DT = {
       this._updateStatus('Pulsa una tecla para seleccionar nota');
       return;
     }
-    // captureA en modo auto: solo medir si la nota detectada es La (ni=9)
-    if (this._captureA && ni !== 9) {
-      this._updateStatus('Toca La en tu instrumento…');
+    // captureA: escuchar cualquier pitch estable y usarlo directamente como nuevo pitchA
+    if (this._captureA) {
+      if (ni === this._stableNi) {
+        const ratio = freq / this._stableFreq;
+        if (ratio < 0.97 || ratio > 1.03) {
+          this._stableNi = ni; this._stableCount = 1; this._stableFreq = freq;
+        } else {
+          this._stableCount++;
+          this._stableFreq = this._stableFreq * 0.75 + freq * 0.25;
+        }
+      } else {
+        this._stableNi = ni; this._stableCount = 1; this._stableFreq = freq;
+      }
+      const prog = Math.min(1, this._stableCount / this.STABLE_FRAMES);
+      this._updateStatus(`🎤 ${this._stableFreq.toFixed(2)} Hz`, prog);
+      if (this._stableCount >= this.STABLE_FRAMES) {
+        const oldPitchA = pitchA;
+        setPitchAGlobal(this._stableFreq);
+        if (this.notes[9] !== null) this.notes[9] = 0;
+        this._captureA = false;
+        this._stableNi = -1; this._stableCount = 0;
+        this._updateStatus(`✓ La: ${oldPitchA.toFixed(2)} → ${pitchA.toFixed(2)} Hz`);
+        this._statusLock = Date.now() + 3000;
+        this._updatePitchRow();
+        this._renderKeyboard();
+      }
       return;
     }
     const measureNi = (this.mode === 'manual') ? this._targetNi : ni;
@@ -5461,15 +5484,11 @@ const DT = {
       if (cnt) cnt.textContent = this.measuredCount() + '/12';
       const sp = document.getElementById('dt-save-row');
       if (sp) sp.style.display = this.measuredCount() > 0 ? 'flex' : 'none';
-      // Al medir La (modo manual o captureA en auto): fijar pitchA a la frecuencia real
-      if (measureNi === 9 && (this.mode === 'manual' || this._captureA)) {
-        let aFreq = this._stableFreq;
-        while (aFreq < 390) aFreq *= 2;
-        while (aFreq > 470) aFreq /= 2;
+      // Manual: al medir La, la frecuencia real detectada pasa a ser pitchA
+      if (measureNi === 9 && this.mode === 'manual') {
         const oldPitchA = pitchA;
-        this.setPitchA(aFreq);
+        setPitchAGlobal(this._stableFreq);
         this.notes[9] = 0;
-        this._captureA = false;
         this._updateStatus(`✓ La: ${oldPitchA.toFixed(2)} → ${pitchA.toFixed(2)} Hz`);
         this._statusLock = Date.now() + 3000;
         this._updatePitchRow();
