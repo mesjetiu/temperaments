@@ -292,7 +292,30 @@ const WS = {
          </div>`
       ).join('');
     }
-    this._popover(html, event, anchorEl);
+    // El botón es fixed al fondo → siempre abrir hacia arriba
+    this._popoverAbove(html, anchorEl || event.currentTarget || event.target);
+  },
+
+  // Abre un popover siempre por encima del elemento ancla
+  _popoverAbove(html, anchorEl) {
+    this._closePopovers();
+    const div = document.createElement('div');
+    div.className = 'ws-popover';
+    div.innerHTML = html;
+    document.body.appendChild(div);
+    const r = anchorEl.getBoundingClientRect();
+    const maxH = Math.min(Math.round(window.innerHeight * 0.8), 520);
+    div.style.maxHeight = maxH + 'px';
+    div.style.top  = Math.max(4, r.top - maxH - 4) + 'px';
+    div.style.left = Math.max(4, Math.min(r.left, window.innerWidth - 224)) + 'px';
+    div.style.right = '4px';  // que se extienda hasta el borde derecho en móvil
+    div.style.minWidth = 'unset';
+    setTimeout(() => {
+      document.addEventListener('click', function h(e) {
+        if (!div.contains(e.target)) { div.remove(); document.removeEventListener('click', h); }
+      });
+    }, 0);
+    return div;
   },
 
   openMoveCardMenu(cardId, event) {
