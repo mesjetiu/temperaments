@@ -1,4 +1,4 @@
-const APP_VERSION = '4de982d · 2026-04-08';
+const APP_VERSION = '9e0587a · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1875,7 +1875,9 @@ function _panel_lattice(act, el) {
       const mx = e.clientX - r.left, my = e.clientY - r.top;
       const node = _nodeAtPoint(mx, my);
       const edge = node ? null : _edgeAtPoint(mx, my);
-      if (node !== cv._hoverNode || edge !== cv._hoverEdge) {
+      const sameNode = node?.ni === cv._hoverNode?.ni && node?.col === cv._hoverNode?.col;
+      const sameEdge = edge?.ni === cv._hoverEdge?.ni && edge?.nj === cv._hoverEdge?.nj;
+      if (!sameNode || !sameEdge) {
         cv._hoverNode = node; cv._hoverEdge = edge; redraw();
       }
     });
@@ -3322,14 +3324,16 @@ function _drawConsonance(canvas, cursorCanvas, act) {
 // ══════════════════════════════════════════════
 // LATTICE DE EULER (red de quintas × terceras)
 // ══════════════════════════════════════════════
-// Grid 4×3: columnas = quintas, filas = terceras mayores
-// Row 0: Ab Eb Bb F  (índices 8,3,10,5)
-// Row 1: C  G  D  A  (índices 0,7,2,9)
-// Row 2: E  B  F# C# (índices 4,11,6,1)
+// Grid 5×3: columnas = quintas, filas = terceras mayores
+// Columna extra a la derecha repite la nota siguiente en el ciclo
+// para que cada nodo tenga sus 4 vecinos completos (sin aristas colgantes)
+// Row 0: Ab Eb Bb F  C   (índices 8,3,10,5,0)
+// Row 1: C  G  D  A  E   (índices 0,7,2,9,4)
+// Row 2: E  B  F# C# G#  (índices 4,11,6,1,8)
 const LATTICE_GRID = [
-  [8, 3, 10, 5],   // row 0 (bottom): Ab Eb Bb F
-  [0, 7,  2, 9],   // row 1 (mid):    C  G  D  A
-  [4,11,  6, 1],   // row 2 (top):    E  B  F# C#
+  [8,  3, 10, 5, 0],   // row 0 (bottom): Ab Eb Bb F  C
+  [0,  7,  2, 9, 4],   // row 1 (mid):    C  G  D  A  E
+  [4, 11,  6, 1, 8],   // row 2 (top):    E  B  F# C# G#
 ];
 
 function viewLattice(act) {
@@ -3474,40 +3478,43 @@ function _drawLattice(canvas, act) {
   // ── Nodos ──
   const nodeInfo = [];
   const fSz = Math.min(11, Math.max(9, Math.round(R * 0.65)));
+  const LAST_COL = COLS - 1; // columna de nodos repetidos
   for (let row = 0; row < ROWS; row++) {
     for (let col = 0; col < COLS; col++) {
       const ni = LATTICE_GRID[row][col];
       const {x, y} = nodeXY(row, col);
-      const isHover = canvas._hoverNode && canvas._hoverNode.ni === ni;
+      const isRepeat = col === LAST_COL; // nodo repetido (continuación)
+      const isHover = canvas._hoverNode && canvas._hoverNode.ni === ni && canvas._hoverNode.col === col;
       const col0 = deviationColor(ni);
 
       // Sombra en hover
-      if (isHover) {
-        ctx.shadowColor = col0; ctx.shadowBlur = 12;
-      }
+      if (isHover) { ctx.shadowColor = col0; ctx.shadowBlur = 12; }
 
-      // Círculo relleno
+      // Círculo: repetidos con relleno más tenue y borde discontinuo
       ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2);
-      ctx.fillStyle = isHover ? col0 : (t0 ? col0 + '33' : '#1e293b');
+      ctx.fillStyle = isHover ? col0 : (t0 ? col0 + (isRepeat ? '1a' : '33') : '#1e293b');
       ctx.fill();
-      ctx.strokeStyle = col0; ctx.lineWidth = isHover ? 2.5 : 1.5;
+      ctx.setLineDash(isRepeat ? [3, 3] : []);
+      ctx.strokeStyle = isHover ? col0 : (isRepeat ? col0 + '88' : col0);
+      ctx.lineWidth = isHover ? 2.5 : 1.5;
       ctx.stroke();
+      ctx.setLineDash([]);
       ctx.shadowBlur = 0;
 
       // Etiqueta de nota
-      ctx.fillStyle = isHover ? '#0f172a' : '#e2e8f0';
+      ctx.fillStyle = isHover ? '#0f172a' : (isRepeat ? '#6b7280' : '#e2e8f0');
       ctx.font = `${isHover ? 'bold ' : ''}${fSz}px monospace`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(NOTES[ni], x, y);
 
-      // Offset en cents debajo del nodo (solo si hay temperamento)
-      if (t0) {
+      // Offset en cents debajo del nodo (solo si hay temperamento, no en repetidos)
+      if (t0 && !isRepeat) {
         const off = t0.offsets[ni];
         ctx.fillStyle = '#6b7280'; ctx.font = `${fSz - 2}px monospace`;
         ctx.fillText(`${off >= 0 ? '+' : ''}${off.toFixed(1)}`, x, y + R + 8);
       }
 
-      nodeInfo.push({ ni, px: x, py: y });
+      nodeInfo.push({ ni, col, px: x, py: y });
     }
   }
   canvas._nodeInfo = nodeInfo;
