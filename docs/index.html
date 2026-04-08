@@ -221,6 +221,10 @@
   /* ── Add-card button ── */
   #add-card-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px; color: #4b5563; font-size: 13px; cursor: pointer; border-top: 1px solid var(--border); background: var(--surface); transition: color 0.15s; box-sizing: border-box; flex-shrink: 0; }
   #add-card-btn:hover { color: #9ca3af; background: #1e293b; }
+  #tuner-fab { position: fixed; bottom: 24px; right: 20px; z-index: 800; background: #1d4ed8; border: none; border-radius: 50px; padding: 14px 22px; color: #fff; font-size: 15px; font-weight: 600; cursor: grab; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 20px rgba(29,78,216,0.5); white-space: nowrap; touch-action: none; user-select: none; -webkit-user-select: none; }
+  #tuner-fab:active { cursor: grabbing; }
+  #tuner-fab.fab-dragging { box-shadow: 0 8px 32px rgba(29,78,216,0.7); opacity: 0.92; }
+  #tools-fab-menu { display: none; position: fixed; z-index: 801; background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
   .tools-fab-item { padding: 9px 16px; font-size: 13px; color: #cbd5e1; cursor: pointer; border-radius: 7px; white-space: nowrap; }
   .tools-fab-item:hover { background: #334155; }
 
@@ -404,11 +408,8 @@
 
     <div id="tabs"></div>
     <!-- FAB flotante: Afinador + Medidor -->
-    <button id="tuner-fab" title="Afinador / Medidor"
-      style="position:fixed;bottom:24px;right:20px;z-index:800;background:#1d4ed8;border:none;border-radius:50px;padding:14px 22px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(29,78,216,0.5);white-space:nowrap">
-      🎤 Escuchar
-    </button>
-    <div id="tools-fab-menu" style="display:none;position:fixed;z-index:801;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:4px;box-shadow:0 8px 24px rgba(0,0,0,0.5)">
+    <button id="tuner-fab" title="Afinador / Medidor">🎤 Escuchar</button>
+    <div id="tools-fab-menu">
       <div class="tools-fab-item" onclick="openTuner()">🎵 Afinador</div>
       <div class="tools-fab-item" onclick="openMedidor()">🎤 Medidor</div>
     </div>

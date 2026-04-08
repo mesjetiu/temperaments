@@ -1,4 +1,4 @@
-const APP_VERSION = '4cf2e2c · 2026-04-08';
+const APP_VERSION = '777b3c5 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -5843,21 +5843,89 @@ document.getElementById('hamburger').addEventListener('click', openSidebar);
 document.getElementById('content-fullscreen-close').addEventListener('click', toggleContentFullscreen);
 document.getElementById('kb-fs-close').addEventListener('click', toggleKbFullscreen);
 document.getElementById('desk-fullscreen-btn').addEventListener('click', toggleContentFullscreen);
-document.getElementById('tuner-fab').addEventListener('click', e => {
-  e.stopPropagation();
+// ── FAB drag-to-move ─────────────────────────────────────────────────────────
+(function() {
+  const fab = document.getElementById('tuner-fab');
   const menu = document.getElementById('tools-fab-menu');
-  const fab  = document.getElementById('tuner-fab');
-  const rect = fab.getBoundingClientRect();
-  menu.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
-  menu.style.right  = (window.innerWidth - rect.right) + 'px';
-  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-  if (menu.style.display === 'block') {
-    document.addEventListener('click', function h() {
-      menu.style.display = 'none';
-      document.removeEventListener('click', h);
-    });
+  const STORE_KEY = 'fabPos';
+
+  // Restaurar posición guardada
+  function applyPos(pos) {
+    fab.style.left   = pos.x + 'px';
+    fab.style.top    = pos.y + 'px';
+    fab.style.right  = 'auto';
+    fab.style.bottom = 'auto';
   }
-});
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY));
+    if (saved) applyPos(saved);
+  } catch(e) {}
+
+  let dragStartX, dragStartY, fabStartX, fabStartY, dragged = false;
+
+  fab.addEventListener('pointerdown', e => {
+    if (e.button !== undefined && e.button !== 0) return;
+    dragged = false;
+    const r = fab.getBoundingClientRect();
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    fabStartX  = r.left;
+    fabStartY  = r.top;
+    fab.setPointerCapture(e.pointerId);
+    fab.classList.add('fab-dragging');
+    menu.style.display = 'none';
+  });
+
+  fab.addEventListener('pointermove', e => {
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    if (!dragged && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+    dragged = true;
+    const newX = Math.max(0, Math.min(window.innerWidth  - fab.offsetWidth,  fabStartX + dx));
+    const newY = Math.max(0, Math.min(window.innerHeight - fab.offsetHeight, fabStartY + dy));
+    fab.style.left   = newX + 'px';
+    fab.style.top    = newY + 'px';
+    fab.style.right  = 'auto';
+    fab.style.bottom = 'auto';
+  });
+
+  fab.addEventListener('pointerup', e => {
+    fab.classList.remove('fab-dragging');
+    fab.releasePointerCapture(e.pointerId);
+    if (dragged) {
+      // Guardar posición
+      localStorage.setItem(STORE_KEY, JSON.stringify({ x: fab.offsetLeft, y: fab.offsetTop }));
+      return; // no abrir menú si fue drag
+    }
+    // Click: abrir/cerrar menú
+    e.stopPropagation();
+    const r = fab.getBoundingClientRect();
+    // Posicionar menú encima o debajo según espacio
+    if (r.top > window.innerHeight / 2) {
+      menu.style.bottom = (window.innerHeight - r.top + 8) + 'px';
+      menu.style.top    = 'auto';
+    } else {
+      menu.style.top    = (r.bottom + 8) + 'px';
+      menu.style.bottom = 'auto';
+    }
+    menu.style.left  = r.left + 'px';
+    menu.style.right = 'auto';
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    if (menu.style.display === 'block') {
+      setTimeout(() => {
+        document.addEventListener('click', function h() {
+          menu.style.display = 'none';
+          document.removeEventListener('click', h);
+        });
+      }, 0);
+    }
+  });
+
+  fab.addEventListener('pointercancel', () => {
+    fab.classList.remove('fab-dragging');
+    dragged = false;
+  });
+})();
 
 function openTuner() {
   document.getElementById('tools-fab-menu').style.display = 'none';
