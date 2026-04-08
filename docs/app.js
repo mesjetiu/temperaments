@@ -1,4 +1,4 @@
-const APP_VERSION = 'e3ee715 · 2026-04-08';
+const APP_VERSION = '0599c6e · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -5424,25 +5424,20 @@ const DT = {
       this._updateStatus('Pulsa una tecla para seleccionar nota');
       return;
     }
-    // captureA: escuchar cualquier pitch estable y usarlo directamente como nuevo pitchA
+    // captureA: acumular EMA de frecuencia sin filtros — al completar → nuevo pitchA
     if (this._captureA) {
-      if (ni === this._stableNi) {
-        const ratio = freq / this._stableFreq;
-        if (ratio < 0.97 || ratio > 1.03) {
-          this._stableNi = ni; this._stableCount = 1; this._stableFreq = freq;
-        } else {
-          this._stableCount++;
-          this._stableFreq = this._stableFreq * 0.75 + freq * 0.25;
-        }
+      if (this._stableCount === 0) {
+        this._stableFreq = freq;
       } else {
-        this._stableNi = ni; this._stableCount = 1; this._stableFreq = freq;
+        this._stableFreq = this._stableFreq * 0.75 + freq * 0.25;
       }
+      this._stableCount++;
       const prog = Math.min(1, this._stableCount / this.STABLE_FRAMES);
       this._updateStatus(`🎤 ${this._stableFreq.toFixed(2)} Hz`, prog);
       if (this._stableCount >= this.STABLE_FRAMES) {
         const oldPitchA = pitchA;
         setPitchAGlobal(this._stableFreq);
-        alert(`captureA: stableFreq=${this._stableFreq.toFixed(3)}  oldPitchA=${oldPitchA.toFixed(3)}  pitchA después=${pitchA.toFixed(3)}`);
+        alert(`captureA OK: ${this._stableFreq.toFixed(2)} Hz → pitchA=${pitchA.toFixed(2)}`);
         if (this.notes[9] !== null) this.notes[9] = 0;
         this._captureA = false;
         this._stableNi = -1; this._stableCount = 0;
