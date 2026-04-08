@@ -1,4 +1,4 @@
-const APP_VERSION = '16868bb · 2026-04-08';
+const APP_VERSION = '941aa33 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -5403,7 +5403,7 @@ const DT = {
     const rms = Math.sqrt(rmsSum / Math.min(1024, bufLen));
     const res = detectPitch(this._buf, this.analyser.context.sampleRate);
     if (!res || res.clarity < 0.15) {
-      if (this._stableNi !== -1) { this._stableNi = -1; this._stableCount = 0; this._renderKeyboard(); }
+      if (this._stableNi !== -1 && !this._captureA) { this._stableNi = -1; this._stableCount = 0; this._renderKeyboard(); }
       // En manual sin nota seleccionada: mostrar instrucción, no "escuchando"
       if (this.mode === 'manual' && this._targetNi < 0) {
         this._updateStatus('Pulsa una tecla para seleccionar nota');
