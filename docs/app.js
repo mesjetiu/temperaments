@@ -1,4 +1,4 @@
-const APP_VERSION = '8d40667 · 2026-04-08';
+const APP_VERSION = '5af3b2c · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -447,7 +447,7 @@ function toggleKbFullscreen() {
   if (activeTab === 'keyboard') KB.render();
 }
 
-// ── Pantalla completa de gráfica ──
+// ── Pantalla completa de gráfica (legacy, mantenido para desk-btn) ──
 function toggleContentFullscreen() {
   const content = document.getElementById('content');
   const closeBtn = document.getElementById('content-fullscreen-close');
@@ -457,6 +457,31 @@ function toggleContentFullscreen() {
     const b = document.getElementById(id); if (b) b.innerHTML = isFs ? ICON_COLLAPSE : ICON_EXPAND;
   });
   renderContent();
+}
+
+// ── Fullscreen API por panel individual ──
+function togglePanelFullscreen(btn) {
+  const panel = btn.closest('.panel');
+  if (!panel) return;
+  if (document.fullscreenElement === panel || document.webkitFullscreenElement === panel) {
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  } else {
+    const req = panel.requestFullscreen || panel.webkitRequestFullscreen;
+    if (req) req.call(panel);
+  }
+}
+
+document.addEventListener('fullscreenchange', _onPanelFullscreenChange);
+document.addEventListener('webkitfullscreenchange', _onPanelFullscreenChange);
+function _onPanelFullscreenChange() {
+  const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+  // Actualizar icono de todos los botones de zoom de paneles
+  document.querySelectorAll('.panel-zoom-btn').forEach(btn => {
+    const panel = btn.closest('.panel');
+    btn.innerHTML = (panel && panel === fsEl) ? ICON_COLLAPSE : ICON_EXPAND;
+  });
+  // Redibujar para que canvas/chart adapte su tamaño
+  setTimeout(renderContent, 50);
 }
 
 // ── ResizeObserver para canvas custom (scatter, tonnetz) y tablas ──
@@ -1690,11 +1715,12 @@ function mkRadar(id, datasets) {
 // En móvil genera un panel con header clicable que colapsa el contenido.
 // En desktop devuelve el HTML tal cual (sin wrapper extra).
 function panel(title, bodyHtml, style = '') {
-  const zoomBtn = `<button class="panel-zoom-btn" onclick="toggleContentFullscreen()" title="Pantalla completa">${ICON_EXPAND}</button>`;
+  const closeBtn = `<button class="panel-fs-close" onclick="togglePanelFullscreen(this)" title="Salir de pantalla completa">✕</button>`;
+  const zoomBtn  = `<button class="panel-zoom-btn" onclick="togglePanelFullscreen(this)" title="Pantalla completa">${ICON_EXPAND}</button>`;
   if (!isMobile()) {
-    return `<div class="panel" style="${style}"><div class="panel-h3-row"><h3>${title}</h3>${zoomBtn}</div>${bodyHtml}</div>`;
+    return `<div class="panel" style="${style}">${closeBtn}<div class="panel-h3-row"><h3>${title}</h3>${zoomBtn}</div>${bodyHtml}</div>`;
   }
-  return `<div class="panel" style="width:100%;box-sizing:border-box">
+  return `<div class="panel" style="width:100%;box-sizing:border-box">${closeBtn}
     <div class="panel-hdr" onclick="togglePanelCollapse(this.closest('.panel'))">
       <h3>${title}</h3><span style="display:flex;gap:6px;align-items:center">${zoomBtn}<span class="panel-chevron">▼</span></span>
     </div>
