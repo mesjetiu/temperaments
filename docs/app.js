@@ -1,4 +1,4 @@
-const APP_VERSION = '5ec7ab5 · 2026-04-08';
+const APP_VERSION = '8d40667 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2301,6 +2301,7 @@ function _drawConsonance(canvas, cursorCanvas, act) {
       cc.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
       cc.save(); cc.scale(dpr, dpr);
 
+      const { zoomSpan, zMin, zMax } = getZoom();
       const beatOn = _swOn('cons-beat-sw');
       const contOn = _swOn('cons-audio-sw');
       const t = now / 1000;
@@ -2463,7 +2464,7 @@ function _drawConsonance(canvas, cursorCanvas, act) {
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     const inPlot = mx >= MX && mx <= MX + PW;
-    const cents  = Math.max(zMin, Math.min(zMax, toCents(mx)));
+    const cents  = toCents(mx);
     _animMx = inPlot ? mx : null;
     const nfoEl = document.getElementById('cons-nfo');
     if (nfoEl && inPlot) {
