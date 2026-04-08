@@ -1,4 +1,4 @@
-const APP_VERSION = '37b0270 · 2026-04-08';
+const APP_VERSION = '09cd632 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2098,35 +2098,6 @@ function _panel_offsets_line(act, el) {
     'offsets');
 }
 
-function _panel_compare_fifths(act, el) {
-  const mob = isMobile();
-  const fl = FIFTH_LBL.map((n,i) => `${n}→${FIFTH_LBL[(i+1)%12]}`);
-  el.innerHTML = panel(
-    'Quintas — desviación de pura <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
-    (act.length > 1 ? tempIdentityHtml(act) : '') + `<canvas id="c-fif" ${mob?'height="180"':'height="100"'}></canvas>`,
-    'width:100%'
-  );
-  mkBar('c-fif', fl,
-    selected.map((t,i) => !t ? null : dsFifth(t, i, getFifths(t.offsets).map(f => f.dev))).filter(Boolean),
-    'Desv. de quinta pura (¢)',
-    ctx => `${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(3)}¢`,
-    'fifths', true);
-}
-
-function _panel_compare_thirds(act, el) {
-  const mob = isMobile();
-  el.innerHTML = panel(
-    'Terceras mayores — desviación de pura <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
-    (act.length > 1 ? tempIdentityHtml(act) : '') + `<canvas id="c-3rd" ${mob?'height="180"':'height="100"'}></canvas>`,
-    'width:100%'
-  );
-  mkBar('c-3rd', NOTES,
-    selected.map((t,i) => !t ? null : dsMaj3(t, i, getMaj3(t.offsets).map(x => x.dev))).filter(Boolean),
-    'Desv. de 3ª mayor pura (¢)',
-    ctx => `${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢`,
-    'maj3', true);
-}
-
 // ── Grupo 3: paneles con tabla por temperamento ──────────────────────────────
 
 function _panel_intervals(act, el) {
@@ -2308,8 +2279,6 @@ Object.assign(_PANEL_FN, {
   maj3_bar:        _panel_maj3_bar,
   min3_bar:        _panel_min3_bar,
   offsets_line:    _panel_offsets_line,
-  compare_fifths:  _panel_compare_fifths,
-  compare_thirds:  _panel_compare_thirds,
   // Grupo 3
   intervals:       _panel_intervals,
   beats:           _panel_beats,
