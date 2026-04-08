@@ -1,4 +1,4 @@
-const APP_VERSION = '0c53810 · 2026-04-08';
+const APP_VERSION = '7032f26 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -5435,8 +5435,7 @@ const DT = {
       this._updateStatus(`🎤 ${this._stableFreq.toFixed(2)} Hz`, prog);
       if (this._stableCount >= this.STABLE_FRAMES) {
         const oldPitchA = pitchA;
-        setPitchAGlobal(this._stableFreq);
-        alert(`captureA OK: ${this._stableFreq.toFixed(2)} Hz → pitchA=${pitchA.toFixed(2)}`);
+        setPitchAGlobal(Math.round(this._stableFreq * 100) / 100);
         if (this.notes[9] !== null) this.notes[9] = 0;
         this._captureA = false;
         this._stableNi = -1; this._stableCount = 0;
