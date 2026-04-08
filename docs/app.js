@@ -1,4 +1,4 @@
-const APP_VERSION = '52e3385 · 2026-04-08';
+const APP_VERSION = '531c5e4 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1719,17 +1719,27 @@ function renderContent() {
     el.appendChild(wrap);
 
     if (desc.needsSelection && !act.length) {
-      wrap.innerHTML = '<div class="empty-state" style="width:100%;margin:8px 0">Selecciona un temperamento de la lista para empezar.</div>';
+      // Panel vacío con toolbar para poder cerrarlo sin seleccionar temperatura
+      const toolbar = WS.makeCardToolbar(card);
+      const hdrHtml = isMobile()
+        ? `<div class="panel-hdr" style="cursor:default"></div>`
+        : `<div class="panel-h3-row"><h3>${desc.label}</h3></div>`;
+      wrap.innerHTML = `<div class="panel" style="width:100%;box-sizing:border-box">${hdrHtml}<div class="empty-state" style="padding:12px 0">Selecciona un temperamento de la lista para empezar.</div></div>`;
+      const hdrRow = wrap.querySelector('.panel-h3-row');
+      const hdrMob = wrap.querySelector('.panel-hdr');
+      if (hdrRow) hdrRow.insertBefore(toolbar, hdrRow.querySelector('.panel-zoom-btn') || null);
+      else if (hdrMob) hdrMob.appendChild(toolbar);
     } else {
       _PANEL_FN[card.type]?.(act, wrap);
-    }
-
-    // Inyectar toolbar en el header del primer panel
-    const hdr = wrap.querySelector('.panel-h3-row') || wrap.querySelector('.panel-hdr');
-    if (hdr) {
-      // Insertar antes del zoom-btn (último elemento del header) para no tapar nada
-      const zoomBtn = hdr.querySelector('.panel-zoom-btn');
-      hdr.insertBefore(WS.makeCardToolbar(card), zoomBtn || null);
+      // Inyectar toolbar en el header del panel
+      const hdrRow = wrap.querySelector('.panel-h3-row'); // desktop
+      const hdrMob = wrap.querySelector('.panel-hdr');    // móvil
+      if (hdrRow) {
+        const zoomBtn = hdrRow.querySelector('.panel-zoom-btn');
+        hdrRow.insertBefore(WS.makeCardToolbar(card), zoomBtn || null);
+      } else if (hdrMob) {
+        hdrMob.insertBefore(WS.makeCardToolbar(card), hdrMob.lastElementChild);
+      }
     }
   }
 }
