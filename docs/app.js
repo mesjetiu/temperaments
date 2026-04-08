@@ -1,4 +1,4 @@
-const APP_VERSION = '414a790 · 2026-04-08';
+const APP_VERSION = 'da93c53 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -715,6 +715,11 @@ function playNote(ni, off)       { playFreqs([noteFreq(ni, off, pitchA, octaveSh
 function playFifthAudio(fi, off) { const f=getFifths(off)[fi]; const r=noteFreq(FIFTH_IDX[fi],off,pitchA,octaveShift); playFreqs([r, r*Math.pow(2,f.size/1200)]); }
 function playMaj3Audio(ni, off)  { const t=getMaj3(off)[ni]; const r=noteFreq(ni,off,pitchA,octaveShift); playFreqs([r, r*Math.pow(2,t.size/1200)]); }
 function playMin3Audio(ni, off)  { const t=getMin3(off)[ni]; const r=noteFreq(ni,off,pitchA,octaveShift); playFreqs([r, r*Math.pow(2,t.size/1200)]); }
+function playTriad(triad, temp)  {
+  const off = temp.offsets;
+  const r = noteFreq(triad.root, off, pitchA, octaveShift);
+  playFreqs([r, r * Math.pow(2, triad.cents3 / 1200), r * Math.pow(2, triad.cents5 / 1200)]);
+}
 
 function playForType(type, idx, off) {
   ({ fifths:playFifthAudio, maj3:playMaj3Audio, min3:playMin3Audio,
@@ -1857,7 +1862,7 @@ function _panel_lattice(act, el) {
     cv.addEventListener('pointerdown', e => {
       const r = cv.getBoundingClientRect();
       const node = _nodeAtPoint(e.clientX - r.left, e.clientY - r.top);
-      if (node) playNote(node.ni, act[0]);
+      if (node) playNote(node.ni, act[0].offsets);
     });
   });
 }
