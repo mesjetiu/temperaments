@@ -1,4 +1,4 @@
-const APP_VERSION = '1a084dc · 2026-04-08';
+const APP_VERSION = '756f432 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -5435,10 +5435,13 @@ const DT = {
       const prog = Math.min(1, this._stableCount / this.STABLE_FRAMES);
       this._updateStatus(`🎤 ${this._stableFreq.toFixed(2)} Hz`, prog);
       if (this._stableCount >= this.STABLE_FRAMES) {
-        // Normalizar a la octava de A4 (390–470 Hz)
-        let aFreq = this._stableFreq;
-        while (aFreq < 390) aFreq *= 2;
-        while (aFreq > 470) aFreq /= 2;
+        // Calcular a qué La4 (390–470 Hz) corresponde el pitch detectado.
+        // En lugar de doblar/dividir (que falla si ninguna octava cae en el rango),
+        // calculamos cuántos semitonos ET separan el pitch del pitchA actual,
+        // extraemos cuántas octavas completas lo alejan, y ajustamos.
+        const stableF = this._stableFreq;
+        const octavesFromA4 = Math.round(Math.log2(stableF / pitchA));
+        const aFreq = stableF / Math.pow(2, octavesFromA4);
         const oldPitchA = pitchA;
         this.setPitchA(aFreq);
         if (this.notes[9] !== null) this.notes[9] = 0;
