@@ -1,4 +1,4 @@
-const APP_VERSION = 'ff963e9 · 2026-04-08';
+const APP_VERSION = '84ae069 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1477,7 +1477,7 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
 // SWIPE HORIZONTAL EN CONTENT PARA CAMBIAR PESTAÑA (móvil)
 // ══════════════════════════════════════════════
 (function() {
-  const TABS_ORDER = ['overview','fifths','thirds','compare','intervals','beats','consonance','tonnetz','scatter','keyboard','medidor'];
+  const TABS_ORDER = ['overview','fifths','thirds','compare','intervals','beats','consonance','histogram','tonnetz','scatter','keyboard','medidor'];
   let sx = 0, sy = 0, swiping = false;
   document.getElementById('content').addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
@@ -1741,7 +1741,7 @@ function renderContent() {
   if (activeTab !== 'keyboard' && activeTab !== 'tuner' && activeTab !== 'scatter' && activeTab !== 'medidor' && !act.length) {
     el.innerHTML='<div class="empty-state">Selecciona un temperamento de la lista para empezar.</div>'; return;
   }
-  ({overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,intervals:viewIntervals,beats:viewBeats,consonance:viewConsonance,tonnetz:viewTonnetz,scatter:viewScatter,keyboard:viewKeyboard,medidor:viewMedidor,tuner:viewTuner}[activeTab])?.(act);
+  ({overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,intervals:viewIntervals,beats:viewBeats,consonance:viewConsonance,histogram:viewHistogram,tonnetz:viewTonnetz,scatter:viewScatter,keyboard:viewKeyboard,medidor:viewMedidor,tuner:viewTuner}[activeTab])?.(act);
 }
 
 // ─── VISTA GENERAL ───
@@ -2147,6 +2147,169 @@ function viewConsonance(act) {
       });
     }
   });
+}
+
+// ══════════════════════════════════════════════
+// HISTOGRAMA DE CONSONANCIA
+// ══════════════════════════════════════════════
+function viewHistogram(act) {
+  document.getElementById('content').innerHTML = panel(
+    'Histograma de consonancia <small style="color:#4b5563;font-size:10px;font-weight:400">— distribución de los 132 intervalos por consonancia teórica</small>',
+    `<canvas id="c-hist" style="width:100%;display:block"></canvas>
+     <div id="hist-resize" class="chart-resize-handle" title="Arrastra para cambiar altura"></div>`,
+    'width:100%'
+  );
+  requestAnimationFrame(() => {
+    const cv = document.getElementById('c-hist');
+    if (!cv) return;
+    const redraw = () => _drawHistogram(cv, act);
+    redraw();
+    cv._redraw = redraw;
+    attachPanelResize(cv);
+    const rh = document.getElementById('hist-resize');
+    if (rh) {
+      rh.addEventListener('pointerdown', ev => {
+        ev.preventDefault();
+        rh.setPointerCapture(ev.pointerId);
+        const sy = ev.clientY, sh = cv.clientHeight || Math.round(cv.clientWidth * 0.55);
+        const onMove = e => { const h = Math.max(140, sh + e.clientY - sy); cv.style.height = h + 'px'; cv.dataset.userH = h; };
+        const onUp   = () => { rh.removeEventListener('pointermove', onMove); rh.removeEventListener('pointerup', onUp); cv.dataset.userH = cv.clientHeight; cv.style.height = ''; redraw(); };
+        rh.addEventListener('pointermove', onMove, { passive: true });
+        rh.addEventListener('pointerup', onUp);
+      });
+    }
+  });
+}
+
+function _drawHistogram(canvas, act) {
+  const dpr = window.devicePixelRatio || 1;
+  const W   = canvas.clientWidth || 560;
+  const exH = canvas.dataset.userH ? parseInt(canvas.dataset.userH, 10) : 0;
+  const H   = exH > 80 ? exH : Math.round(Math.min(W * 0.55, 320));
+  canvas.width  = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const BINS   = 20;
+  const MX = 36, MY = 14, MR = 10, MB = 42;
+  const PW = W - MX - MR, PH = H - MY - MB;
+  const fSz = Math.min(10, Math.max(8, Math.round(9 * W / 500)));
+
+  // ── Fondo ──
+  ctx.clearRect(0, 0, W, H);
+
+  // ── Calcular histograma por temperamento ──
+  // 132 intervalos: semi 1..11, raíz 0..11 → cents = semi*100 + offsets[nj] - offsets[ni]
+  // Los replicamos por octava simétrica (0–1200), mapeamos a consonancia con _consValue
+  // Bin = Math.floor(cons * BINS), clamped a [0, BINS-1]
+  const histData = act.map(t => {
+    const counts = new Array(BINS).fill(0);
+    for (let semi = 1; semi <= 11; semi++) {
+      for (let ni = 0; ni < 12; ni++) {
+        const nj = (ni + semi) % 12;
+        const cents = semi * 100 + t.offsets[nj] - t.offsets[ni];
+        const cons  = _consValue(cents);
+        const bin   = Math.min(BINS - 1, Math.floor(cons * BINS));
+        counts[bin]++;
+      }
+    }
+    return counts;
+  });
+
+  const maxCount = Math.max(1, ...histData.flatMap(c => c));
+
+  // Helpers coord
+  const toX = bin => MX + (bin / BINS) * PW;
+  const toY = v   => MY + PH - (v / maxCount) * PH;
+  const bW  = PW / BINS;
+
+  // ── Y grid ──
+  ctx.font = `${fSz}px monospace`;
+  for (let i = 0; i <= 4; i++) {
+    const v = Math.round(maxCount * i / 4);
+    const y = toY(v);
+    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(MX, y); ctx.lineTo(MX + PW, y); ctx.stroke();
+    ctx.fillStyle = '#475569'; ctx.textAlign = 'right';
+    ctx.fillText(v, MX - 4, y + 3);
+  }
+
+  // ── Líneas verticales de los intervalos justos (referencia) ──
+  // Mapeamos sus cents a bin-x y dibujamos líneas tenues con etiqueta
+  const labeledBins = new Set();
+  ctx.font = `${fSz}px monospace`;
+  for (const j of JUST_IVLS) {
+    if (j.cents === 0 || j.cents === 1200) continue;
+    const cons = j.w; // la consonancia en el pico exacto = peso del intervalo
+    const binF = cons * BINS;
+    const x = MX + binF / BINS * PW; // posición continua en x
+    ctx.strokeStyle = `rgba(148,163,184,${(0.08 + j.w * 0.12).toFixed(2)})`;
+    ctx.lineWidth = 1; ctx.setLineDash([3, 5]);
+    ctx.beginPath(); ctx.moveTo(x, MY); ctx.lineTo(x, MY + PH); ctx.stroke();
+    ctx.setLineDash([]);
+    // Etiqueta solo si no hay otra muy cercana
+    const bKey = Math.round(binF * 2);
+    if (!labeledBins.has(bKey)) {
+      labeledBins.add(bKey);
+      ctx.fillStyle = `rgba(148,163,184,${(0.45 + j.w * 0.4).toFixed(2)})`;
+      ctx.textAlign = 'center';
+      ctx.fillText(j.name, x, MY + PH + 14);
+    }
+  }
+
+  // ── Barras por temperamento ──
+  const HIST_COLORS   = ['rgba(96,165,250,0.55)', 'rgba(248,113,113,0.55)', 'rgba(74,222,128,0.55)'];
+  const HIST_BORDERS  = ['#60a5fa', '#f87171', '#4ade80'];
+  histData.forEach((counts, ti) => {
+    const ci = selected.indexOf(act[ti]);
+    const fill   = HIST_COLORS[ci]  || HIST_COLORS[ti % 3];
+    const stroke = HIST_BORDERS[ci] || HIST_BORDERS[ti % 3];
+    counts.forEach((count, bin) => {
+      if (count === 0) return;
+      const x = toX(bin) + 1;
+      const y = toY(count);
+      const bh = MY + PH - y;
+      ctx.fillStyle = fill;
+      ctx.fillRect(x, y, bW - 2, bh);
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1; ctx.setLineDash([]);
+      ctx.strokeRect(x, y, bW - 2, bh);
+    });
+  });
+
+  // ── Eje X: etiquetas 0.0 – 1.0 ──
+  ctx.font = `${fSz}px monospace`; ctx.textAlign = 'center'; ctx.fillStyle = '#475569';
+  for (let i = 0; i <= 4; i++) {
+    const v = i / 4;
+    const x = MX + v * PW;
+    ctx.fillText(v.toFixed(2), x, MY + PH + 28);
+  }
+  ctx.fillStyle = '#6b7280'; ctx.font = `${fSz + 1}px monospace`;
+  ctx.fillText('Consonancia teórica →', MX + PW / 2, MY + PH + 40);
+
+  // ── Eje Y label ──
+  ctx.save();
+  ctx.translate(10, MY + PH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#6b7280'; ctx.font = `${fSz}px monospace`;
+  ctx.fillText('Nº intervalos', 0, 0);
+  ctx.restore();
+
+  // ── Leyenda ──
+  if (act.length > 1) {
+    let lx = MX + 4;
+    act.forEach((t, ti) => {
+      const ci = selected.indexOf(t);
+      const col = HIST_BORDERS[ci] || HIST_BORDERS[ti % 3];
+      ctx.fillStyle = col;
+      ctx.fillRect(lx, MY + 2, 10, 8);
+      ctx.fillStyle = '#d1d5db'; ctx.textAlign = 'left'; ctx.font = `${fSz}px monospace`;
+      ctx.fillText(shortName(t, 20), lx + 13, MY + 10);
+      lx += ctx.measureText(shortName(t, 20)).width + 28;
+    });
+  }
 }
 
 function _drawConsonance(canvas, cursorCanvas, act) {
