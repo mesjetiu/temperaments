@@ -1328,13 +1328,7 @@ function restoreSession() {
     const hint = document.getElementById('desk-header-hint');
     if (hint) hint.textContent = activeTab === 'compare' ? 'Selecciona 1–3 para comparar:' : 'Selecciona un temperamento:';
   }
-  // Restaurar estado de la barra de audio
-  if (p.audioBarHidden) {
-    const coll = document.getElementById('top-collapsible');
-    const arrow = document.getElementById('top-toggle-arrow');
-    if (coll) coll.classList.add('top-hidden');
-    if (arrow) arrow.style.transform = 'rotate(180deg)';
-  }
+  // La barra de audio siempre visible al iniciar (no persistir estado oculto)
   // Restaurar temperamento seleccionado; si nunca se eligió, usar Equal temperament de GrandOrgue
   const nameToRestore = p.selectedName || 'Equal temperament';
   const t = all.find(x => x.name === nameToRestore && (!p.selectedName ? x.source === 'GrandOrgue' : true));
