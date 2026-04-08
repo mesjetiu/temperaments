@@ -1,4 +1,4 @@
-const APP_VERSION = '0599c6e · 2026-04-08';
+const APP_VERSION = '0c53810 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -423,7 +423,7 @@ document.getElementById('pitch-input').addEventListener('input', function() {
 
 function setPitchAGlobal(val) {
   const v = parseFloat(val);
-  if (!v || v < 390 || v > 470) return;
+  if (!v || v <= 0) return;
   pitchA = v; savePrefs({ pitchA: v });
   document.querySelectorAll('#pitch-input,#tuner-pitch-input,#kb-pitch-input,#dt-pitch-input').forEach(el => el.value = v);
   if (TUNER.refOsc) TUNER.refOsc.frequency.setTargetAtTime(TUNER.getTargetFreq(), getCtx().currentTime, 0.01);
@@ -1329,8 +1329,7 @@ function parseMarkdown(text) {
 function restoreSession() {
   const p = loadPrefs();
   // Restaurar pitch A
-  // Validar rango: pitchA debe estar entre 390–470 Hz (A4 estándar ± ~3 semitonos)
-  if (p.pitchA && p.pitchA >= 390 && p.pitchA <= 470) {
+  if (p.pitchA && p.pitchA > 0) {
     pitchA = p.pitchA;
     document.getElementById('pitch-input').value = p.pitchA;
   }
