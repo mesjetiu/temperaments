@@ -5278,7 +5278,30 @@ document.getElementById('hamburger').addEventListener('click', openSidebar);
 document.getElementById('content-fullscreen-close').addEventListener('click', toggleContentFullscreen);
 document.getElementById('kb-fs-close').addEventListener('click', toggleKbFullscreen);
 document.getElementById('desk-fullscreen-btn').addEventListener('click', toggleContentFullscreen);
-document.getElementById('tuner-fab').addEventListener('click', () => document.querySelector('.tab[data-tab=tuner]').click());
+document.getElementById('tuner-fab').addEventListener('click', e => {
+  e.stopPropagation();
+  const menu = document.getElementById('tools-fab-menu');
+  const fab  = document.getElementById('tuner-fab');
+  const rect = fab.getBoundingClientRect();
+  menu.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+  menu.style.right  = (window.innerWidth - rect.right) + 'px';
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+  if (menu.style.display === 'block') {
+    document.addEventListener('click', function h() {
+      menu.style.display = 'none';
+      document.removeEventListener('click', h);
+    });
+  }
+});
+
+function openTuner() {
+  document.getElementById('tools-fab-menu').style.display = 'none';
+  viewTuner();
+}
+function openMedidor() {
+  document.getElementById('tools-fab-menu').style.display = 'none';
+  viewMedidor();
+}
 document.getElementById('oct-down-btn').addEventListener('click', () => octShift(-1));
 document.getElementById('oct-up-btn').addEventListener('click', () => octShift(+1));
 document.getElementById('chart-play-mode-label').addEventListener('click', toggleChartPlayMode);
