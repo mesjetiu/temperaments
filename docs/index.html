@@ -100,6 +100,8 @@
     #mob-header { display: flex !important; }
     #content { flex-direction: column !important; flex-wrap: nowrap !important; padding: 12px !important; gap: 12px !important; }
     .panel { width: 100% !important; max-width: 100% !important; min-width: unset !important; flex: none !important; box-sizing: border-box !important; }
+    .card-toolbar { display: flex !important; }
+    .card-toolbar button { color: #6b7280; font-size: 15px; padding: 3px 7px; }
     .panel:not(.panel-resized) canvas { max-height: 220px; }
     #circle-wrap svg { width: min(270px,90vw); height: auto; }
     #audio-hint { display: none; }
@@ -459,7 +461,7 @@
     <div id="content">
       <div class="empty-state">Selecciona un temperamento de la lista para empezar.</div>
     </div>
-    <div id="add-card-btn" onclick="WS.openAddCardMenu(event)">＋ Añadir tarjeta</div>
+    <div id="add-card-btn" onclick="WS.openAddCardMenu(event,this)">＋ Añadir tarjeta</div>
   </div>
 </div>
 
