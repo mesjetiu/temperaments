@@ -1,4 +1,4 @@
-const APP_VERSION = 'd96ba43 · 2026-04-08';
+const APP_VERSION = 'e907865 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1471,7 +1471,7 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
 // SWIPE HORIZONTAL EN CONTENT PARA CAMBIAR PESTAÑA (móvil)
 // ══════════════════════════════════════════════
 (function() {
-  const TABS_ORDER = ['overview','fifths','thirds','compare','intervals','beats','consonance','histogram','tonnetz','scatter','keyboard','medidor'];
+  const TABS_ORDER = ['overview','fifths','thirds','compare','intervals','beats','consonance','histogram','lattice','tonnetz','scatter','keyboard','medidor'];
   let sx = 0, sy = 0, swiping = false;
   document.getElementById('content').addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
@@ -1735,7 +1735,7 @@ function renderContent() {
   if (activeTab !== 'keyboard' && activeTab !== 'tuner' && activeTab !== 'scatter' && activeTab !== 'medidor' && !act.length) {
     el.innerHTML='<div class="empty-state">Selecciona un temperamento de la lista para empezar.</div>'; return;
   }
-  ({overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,intervals:viewIntervals,beats:viewBeats,consonance:viewConsonance,histogram:viewHistogram,tonnetz:viewTonnetz,scatter:viewScatter,keyboard:viewKeyboard,medidor:viewMedidor,tuner:viewTuner}[activeTab])?.(act);
+  ({overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,intervals:viewIntervals,beats:viewBeats,consonance:viewConsonance,histogram:viewHistogram,lattice:viewLattice,tonnetz:viewTonnetz,scatter:viewScatter,keyboard:viewKeyboard,medidor:viewMedidor,tuner:viewTuner}[activeTab])?.(act);
 }
 
 // ─── VISTA GENERAL ───
@@ -2701,6 +2701,221 @@ function _drawConsonance(canvas, cursorCanvas, act) {
   }, { signal: sig });
 
   startAnim();
+}
+
+// ══════════════════════════════════════════════
+// LATTICE DE EULER (red de quintas × terceras)
+// ══════════════════════════════════════════════
+// Grid 4×3: columnas = quintas, filas = terceras mayores
+// Row 0: Ab Eb Bb F  (índices 8,3,10,5)
+// Row 1: C  G  D  A  (índices 0,7,2,9)
+// Row 2: E  B  F# C# (índices 4,11,6,1)
+const LATTICE_GRID = [
+  [8, 3, 10, 5],   // row 0 (bottom): Ab Eb Bb F
+  [0, 7,  2, 9],   // row 1 (mid):    C  G  D  A
+  [4,11,  6, 1],   // row 2 (top):    E  B  F# C#
+];
+
+function viewLattice(act) {
+  document.getElementById('content').innerHTML = panel(
+    'Lattice de Euler <small style="color:#4b5563;font-size:10px;font-weight:400">— red de quintas × terceras mayores</small>',
+    `<canvas id="c-lattice" style="width:100%;display:block;cursor:pointer;touch-action:none"></canvas>`,
+    'width:100%'
+  );
+  requestAnimationFrame(() => {
+    const cv = document.getElementById('c-lattice');
+    if (!cv) return;
+    const redraw = () => _drawLattice(cv, act);
+    redraw();
+    cv._redraw = redraw;
+    attachPanelResize(cv);
+
+    // Hover / tap: mostrar info de nota
+    cv._hoverNode = null;
+    function _nodeAtPoint(x, y) {
+      const info = cv._nodeInfo;
+      if (!info) return null;
+      const R = cv._nodeR || 18;
+      for (const n of info) {
+        const dx = x - n.px, dy = y - n.py;
+        if (dx*dx + dy*dy <= R*R) return n;
+      }
+      return null;
+    }
+    cv.addEventListener('pointermove', e => {
+      const r = cv.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const node = _nodeAtPoint((e.clientX - r.left) * dpr / dpr, (e.clientY - r.top));
+      if (node !== cv._hoverNode) { cv._hoverNode = node; redraw(); }
+    });
+    cv.addEventListener('pointerleave', () => { cv._hoverNode = null; redraw(); });
+    cv.addEventListener('click', e => {
+      const r = cv.getBoundingClientRect();
+      const node = _nodeAtPoint(e.clientX - r.left, e.clientY - r.top);
+      if (!node) return;
+      // Reproducir la nota del primer temperamento activo
+      const t = act[0]; if (!t) return;
+      const freq = noteFreq(node.ni, t.offsets, pitchA, octaveShift);
+      playNote(freq, 1.2);
+    });
+  });
+}
+
+function _drawLattice(canvas, act) {
+  const dpr = window.devicePixelRatio || 1;
+  const W   = canvas.clientWidth || 500;
+  const H   = Math.round(Math.min(W * 0.52, 280));
+  canvas.width  = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const ROWS = LATTICE_GRID.length;   // 3
+  const COLS = LATTICE_GRID[0].length; // 4
+  const PAD  = Math.round(Math.min(W, H) * 0.10);
+  const cellW = (W - PAD * 2) / (COLS - 1);
+  const cellH = (H - PAD * 2) / (ROWS - 1);
+  const R = Math.round(Math.min(cellW, cellH) * 0.30);
+  canvas._nodeR = R;
+
+  // Coordenadas de cada nodo: row 0 = abajo, row 2 = arriba
+  function nodeXY(row, col) {
+    return {
+      x: PAD + col * cellW,
+      y: H - PAD - row * cellH,
+    };
+  }
+
+  // Colores de desviación (usa la del primer temperamento activo)
+  const t0 = act[0];
+  function deviationColor(ni) {
+    if (!t0) return '#334155';
+    // Desviación = offset[ni] (cents respecto a ET)
+    // Verde=cerca de justo, naranja/rojo=lejos
+    const v = Math.abs(t0.offsets[ni]);
+    if (v < 1)  return '#4ade80';
+    if (v < 3)  return '#a3e635';
+    if (v < 6)  return '#facc15';
+    if (v < 10) return '#fb923c';
+    return '#f87171';
+  }
+
+  // ── Aristas de quinta (horizontales) ──
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS - 1; col++) {
+      const ni = LATTICE_GRID[row][col];
+      const nj = LATTICE_GRID[row][col + 1];
+      const {x:x1,y:y1} = nodeXY(row, col);
+      const {x:x2,y:y2} = nodeXY(row, col + 1);
+      // Calidad de la quinta: desviación respecto a 701.955¢
+      let fifthDev = 0;
+      if (t0) {
+        const semi = (nj - ni + 12) % 12; // debería ser 7
+        const cents = semi * 100 + t0.offsets[nj] - t0.offsets[ni];
+        fifthDev = Math.abs(cents - PURE_FIFTH);
+      }
+      const alpha = t0 ? Math.max(0.2, 1 - fifthDev / 12) : 0.4;
+      ctx.strokeStyle = `rgba(148,163,184,${alpha.toFixed(2)})`;
+      ctx.lineWidth = t0 ? Math.max(1, 3 - fifthDev / 4) : 1.5;
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+  }
+
+  // ── Aristas de tercera mayor (verticales) ──
+  for (let row = 0; row < ROWS - 1; row++) {
+    for (let col = 0; col < COLS; col++) {
+      const ni = LATTICE_GRID[row][col];
+      const nj = LATTICE_GRID[row + 1][col];
+      const {x:x1,y:y1} = nodeXY(row, col);
+      const {x:x2,y:y2} = nodeXY(row + 1, col);
+      let maj3Dev = 0;
+      if (t0) {
+        const semi = (nj - ni + 12) % 12; // debería ser 4
+        const cents = semi * 100 + t0.offsets[nj] - t0.offsets[ni];
+        maj3Dev = Math.abs(cents - PURE_MAJ3);
+      }
+      const alpha = t0 ? Math.max(0.15, 1 - maj3Dev / 20) : 0.3;
+      ctx.strokeStyle = `rgba(96,165,250,${alpha.toFixed(2)})`;
+      ctx.lineWidth = t0 ? Math.max(1, 3 - maj3Dev / 6) : 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // ── Nodos ──
+  const nodeInfo = [];
+  const fSz = Math.min(11, Math.max(9, Math.round(R * 0.65)));
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      const ni = LATTICE_GRID[row][col];
+      const {x, y} = nodeXY(row, col);
+      const isHover = canvas._hoverNode && canvas._hoverNode.ni === ni;
+      const col0 = deviationColor(ni);
+
+      // Sombra en hover
+      if (isHover) {
+        ctx.shadowColor = col0; ctx.shadowBlur = 12;
+      }
+
+      // Círculo relleno
+      ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2);
+      ctx.fillStyle = isHover ? col0 : (t0 ? col0 + '33' : '#1e293b');
+      ctx.fill();
+      ctx.strokeStyle = col0; ctx.lineWidth = isHover ? 2.5 : 1.5;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Etiqueta de nota
+      ctx.fillStyle = isHover ? '#0f172a' : '#e2e8f0';
+      ctx.font = `${isHover ? 'bold ' : ''}${fSz}px monospace`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(NOTES[ni], x, y);
+
+      // Offset en cents debajo del nodo (solo si hay temperamento)
+      if (t0) {
+        const off = t0.offsets[ni];
+        ctx.fillStyle = '#6b7280'; ctx.font = `${fSz - 2}px monospace`;
+        ctx.fillText(`${off >= 0 ? '+' : ''}${off.toFixed(1)}`, x, y + R + 8);
+      }
+
+      nodeInfo.push({ ni, px: x, py: y });
+    }
+  }
+  canvas._nodeInfo = nodeInfo;
+
+  // ── Tooltip hover ──
+  if (canvas._hoverNode && t0) {
+    const { ni, px, py } = canvas._hoverNode;
+    const freq = noteFreq(ni, t0.offsets, pitchA, octaveShift);
+    const off  = t0.offsets[ni];
+    const txt  = `${NOTES[ni]}  ${freq.toFixed(2)} Hz  ${off >= 0 ? '+' : ''}${off.toFixed(2)}¢`;
+    const txW  = ctx.measureText(txt).width + 16;
+    const txX  = Math.min(W - txW - 4, Math.max(4, px - txW / 2));
+    const txY  = py - R - 28;
+    ctx.fillStyle = 'rgba(15,23,42,0.92)';
+    ctx.beginPath();
+    ctx.roundRect(txX, txY, txW, 20, 4);
+    ctx.fill();
+    ctx.fillStyle = '#e2e8f0'; ctx.font = `${fSz}px monospace`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(txt, txX + 8, txY + 10);
+  }
+
+  // ── Leyenda de aristas ──
+  const legY = H - 6;
+  ctx.font = `${fSz - 1}px monospace`; ctx.textBaseline = 'alphabetic';
+  ctx.strokeStyle = 'rgba(148,163,184,0.7)'; ctx.lineWidth = 2; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(PAD, legY - 4); ctx.lineTo(PAD + 18, legY - 4); ctx.stroke();
+  ctx.fillStyle = '#6b7280'; ctx.textAlign = 'left';
+  ctx.fillText('quinta', PAD + 22, legY);
+  ctx.strokeStyle = 'rgba(96,165,250,0.7)'; ctx.lineWidth = 2; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(PAD + 70, legY - 4); ctx.lineTo(PAD + 88, legY - 4); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillText('3ª mayor', PAD + 92, legY);
 }
 
 // ─── TONNETZ ───
