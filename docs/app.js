@@ -1,4 +1,4 @@
-const APP_VERSION = '6a96cd0 · 2026-04-08';
+const APP_VERSION = '4cf2e2c · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -5481,9 +5481,16 @@ const DT = {
     const wrap = document.getElementById('dt-kb-wrap');
     if (!wrap) return;
     const mob   = isMobile();
-    const availW = mob ? (window.innerWidth - 20) : Math.min(500, (wrap.clientWidth || 500) - 8);
+    const landscape = mob && window.innerWidth > window.innerHeight;
+    // En horizontal: limitar altura del teclado a ~40% del alto disponible
+    const maxKbH = landscape ? Math.round(window.innerHeight * 0.38) : (mob ? 170 : 210);
+    // availW: en horizontal el teclado no puede ser más ancho de lo que permite maxKbH
+    const maxWfromH = Math.round(maxKbH / 3.4) * 7;
+    const availW = mob
+      ? Math.min(window.innerWidth - 20, maxWfromH)
+      : Math.min(500, (wrap.clientWidth || 500) - 8);
     const W  = Math.floor(availW / 7);      // 7 teclas blancas
-    const H  = Math.min(mob ? 170 : 210, Math.round(W * 3.4));
+    const H  = Math.min(maxKbH, Math.round(W * 3.4));
     const BW = Math.round(W * 0.6);
     const BH = Math.round(H * 0.62);
     const WN = [0,2,4,5,7,9,11];
@@ -5818,6 +5825,7 @@ function _onResize() {
   _kbResizeTimer = setTimeout(() => {
     if (activeTab === 'keyboard') KB.render();
     if (document.getElementById('tuner-mini-kb')) TUNER.renderMiniKb();
+    if (document.getElementById('dt-kb-wrap')) DT._renderKeyboard();
   }, 120);
 }
 window.addEventListener('resize', _onResize);
