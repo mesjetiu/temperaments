@@ -1,4 +1,4 @@
-const APP_VERSION = 'e907865 · 2026-04-08';
+const APP_VERSION = 'cdaa899 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2772,12 +2772,15 @@ function _drawLattice(canvas, act) {
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, W, H);
 
-  const ROWS = LATTICE_GRID.length;   // 3
+  const ROWS = LATTICE_GRID.length;    // 3
   const COLS = LATTICE_GRID[0].length; // 4
-  const PAD  = Math.round(Math.min(W, H) * 0.10);
+  // Calcular R primero a partir del espacio disponible, luego PAD garantiza que no se corte
+  const cellW0 = (W * 0.82) / (COLS - 1);
+  const cellH0 = (H * 0.72) / (ROWS - 1);
+  const R = Math.round(Math.min(cellW0, cellH0) * 0.30);
+  const PAD = R + Math.round(Math.min(W, H) * 0.04);
   const cellW = (W - PAD * 2) / (COLS - 1);
   const cellH = (H - PAD * 2) / (ROWS - 1);
-  const R = Math.round(Math.min(cellW, cellH) * 0.30);
   canvas._nodeR = R;
 
   // Coordenadas de cada nodo: row 0 = abajo, row 2 = arriba
