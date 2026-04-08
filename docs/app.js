@@ -1,4 +1,4 @@
-const APP_VERSION = '88be2f4 · 2026-04-08';
+const APP_VERSION = 'fa174e0 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -5418,53 +5418,14 @@ const DT = {
     const { freq } = res;
     const { ni } = _appFindNote(freq);
 
-    // ── captureA mode: tomar cualquier pitch estable como nueva referencia La ──
-    if (this._captureA) {
-      // Estabilidad sobre frecuencia directa
-      if (this._stableNi === 0 && this._stableFreq > 0) {
-        const ratio = freq / this._stableFreq;
-        if (ratio < 0.95 || ratio > 1.05) {
-          this._stableCount = 1; this._stableFreq = freq;
-        } else {
-          this._stableCount++;
-          this._stableFreq = this._stableFreq * 0.8 + freq * 0.2;
-        }
-      } else {
-        this._stableNi = 0; this._stableCount = 1; this._stableFreq = freq;
-      }
-      const prog = Math.min(1, this._stableCount / this.STABLE_FRAMES);
-      this._updateStatus(`🎤 ${this._stableFreq.toFixed(2)} Hz`, prog);
-      if (this._stableCount >= this.STABLE_FRAMES) {
-        // Calcular a qué La4 (390–470 Hz) corresponde el pitch detectado.
-        // En lugar de doblar/dividir (que falla si ninguna octava cae en el rango),
-        // calculamos cuántos semitonos ET separan el pitch del pitchA actual,
-        // extraemos cuántas octavas completas lo alejan, y ajustamos.
-        const stableF = this._stableFreq;
-        const octavesFromA4 = Math.round(Math.log2(stableF / pitchA));
-        const aFreq = stableF / Math.pow(2, octavesFromA4);
-        const oldPitchA = pitchA;
-        console.log('[captureA] stableF=', stableF, 'octavesFromA4=', octavesFromA4, 'aFreq=', aFreq, 'pitchA antes=', pitchA);
-        this.setPitchA(aFreq);
-        console.log('[captureA] pitchA después=', pitchA);
-        this._updateStatus(`DBG stableF:${stableF.toFixed(2)} aFreq:${aFreq.toFixed(2)} old:${oldPitchA.toFixed(2)} new:${pitchA.toFixed(2)}`);
-        if (this.notes[9] !== null) this.notes[9] = 0;
-        this._captureA = false;
-        this._stableNi = -1; this._stableCount = 0;
-        this._updateStatus(`✓ La: ${oldPitchA.toFixed(2)} → ${pitchA.toFixed(2)} Hz`);
-        this._statusLock = Date.now() + 3000;
-        this._updatePitchRow();
-        this._renderKeyboard();
-      }
-      return;
-    }
-
     // ── Medición ──
     // En manual: solo medir si hay nota seleccionada
     if (this.mode === 'manual' && this._targetNi < 0) {
       this._updateStatus('Pulsa una tecla para seleccionar nota');
       return;
     }
-    const measureNi = (this.mode === 'manual') ? this._targetNi : ni;
+    // captureA en modo auto: forzar medición del La (ni=9)
+    const measureNi = this._captureA ? 9 : (this.mode === 'manual') ? this._targetNi : ni;
 
     // Calcular offset en cents vs ET puro de la nota objetivo
     const { oct } = _appFindNote(freq);
@@ -5496,19 +5457,18 @@ const DT = {
       if (cnt) cnt.textContent = this.measuredCount() + '/12';
       const sp = document.getElementById('dt-save-row');
       if (sp) sp.style.display = this.measuredCount() > 0 ? 'flex' : 'none';
-      // Manual: al medir A, fijar pitchA a la frecuencia real detectada (offset queda en 0)
-      if (measureNi === 9 && this.mode === 'manual') {
+      // Al medir La (modo manual o captureA en auto): fijar pitchA a la frecuencia real
+      if (measureNi === 9 && (this.mode === 'manual' || this._captureA)) {
         let aFreq = this._stableFreq;
         while (aFreq < 390) aFreq *= 2;
         while (aFreq > 470) aFreq /= 2;
         const oldPitchA = pitchA;
-        console.log('[manual La] _stableFreq=', this._stableFreq, 'aFreq=', aFreq, 'pitchA antes=', pitchA);
         this.setPitchA(aFreq);
-        console.log('[manual La] pitchA después=', pitchA);
-        this._updateStatus(`DBG stableF:${this._stableFreq.toFixed(2)} aFreq:${aFreq.toFixed(2)} old:${oldPitchA.toFixed(2)} new:${pitchA.toFixed(2)}`);
         this.notes[9] = 0;
+        this._captureA = false;
         this._updateStatus(`✓ La: ${oldPitchA.toFixed(2)} → ${pitchA.toFixed(2)} Hz`);
-        this._statusLock = Date.now() + 3000;  // bloquear loop 3s DESPUÉS de mostrar
+        this._statusLock = Date.now() + 3000;
+        this._updatePitchRow();
       }
       this._renderKeyboard();
       this._updatePitchRow();
