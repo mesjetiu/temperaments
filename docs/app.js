@@ -1,4 +1,4 @@
-const APP_VERSION = 'fa174e0 · 2026-04-08';
+const APP_VERSION = 'b710a95 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -5424,8 +5424,12 @@ const DT = {
       this._updateStatus('Pulsa una tecla para seleccionar nota');
       return;
     }
-    // captureA en modo auto: forzar medición del La (ni=9)
-    const measureNi = this._captureA ? 9 : (this.mode === 'manual') ? this._targetNi : ni;
+    // captureA en modo auto: solo medir si la nota detectada es La (ni=9)
+    if (this._captureA && ni !== 9) {
+      this._updateStatus('Toca La en tu instrumento…');
+      return;
+    }
+    const measureNi = (this.mode === 'manual') ? this._targetNi : ni;
 
     // Calcular offset en cents vs ET puro de la nota objetivo
     const { oct } = _appFindNote(freq);
