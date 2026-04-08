@@ -1,4 +1,4 @@
-const APP_VERSION = 'caf1821 · 2026-04-08';
+const APP_VERSION = '5d21afd · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -5863,11 +5863,12 @@ document.getElementById('desk-fullscreen-btn').addEventListener('click', toggleC
     if (saved) applyPos(saved);
   } catch(e) {}
 
-  let dragStartX, dragStartY, fabStartX, fabStartY, dragged = false;
+  let dragStartX, dragStartY, fabStartX, fabStartY, dragged = false, isDown = false;
 
   fab.addEventListener('pointerdown', e => {
     if (e.button !== undefined && e.button !== 0) return;
     dragged = false;
+    isDown = true;
     const r = fab.getBoundingClientRect();
     // Fijar left/top antes del drag para evitar salto al cambiar de right/bottom
     fab.style.left   = r.left + 'px';
@@ -5884,6 +5885,7 @@ document.getElementById('desk-fullscreen-btn').addEventListener('click', toggleC
   });
 
   fab.addEventListener('pointermove', e => {
+    if (!isDown) return;
     const dx = e.clientX - dragStartX;
     const dy = e.clientY - dragStartY;
     if (!dragged && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
@@ -5897,6 +5899,7 @@ document.getElementById('desk-fullscreen-btn').addEventListener('click', toggleC
   });
 
   fab.addEventListener('pointerup', e => {
+    isDown = false;
     fab.classList.remove('fab-dragging');
     fab.releasePointerCapture(e.pointerId);
     if (dragged) {
@@ -5929,6 +5932,7 @@ document.getElementById('desk-fullscreen-btn').addEventListener('click', toggleC
   });
 
   fab.addEventListener('pointercancel', () => {
+    isDown = false;
     fab.classList.remove('fab-dragging');
     dragged = false;
   });
