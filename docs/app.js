@@ -1,4 +1,4 @@
-const APP_VERSION = '7032f26 · 2026-04-08';
+const APP_VERSION = '830f162 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2100,7 +2100,7 @@ function _panel_keyboard(act, el) {
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:#4b5563;margin-bottom:10px">
         <span style="color:var(--muted)">La =</span>
-        <input id="kb-pitch-input" type="number" value="${pitchA}" min="390" max="470" step="0.1"
+        <input id="kb-pitch-input" type="number" value="${pitchA}" min="1" max="9999" step="0.1"
           style="width:58px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:11px;text-align:center;outline:none"
           onchange="setPitchAGlobal(this.value)" onkeydown="if(event.key==='Enter')setPitchAGlobal(this.value)">
         <span style="color:var(--muted)">Hz</span>
@@ -4431,7 +4431,7 @@ function viewKeyboard() {
       <!-- La + Temperamento en la misma fila -->
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:#4b5563;margin-bottom:10px">
         <span style="color:var(--muted)">La =</span>
-        <input id="kb-pitch-input" type="number" value="${pitchA}" min="390" max="470" step="0.1"
+        <input id="kb-pitch-input" type="number" value="${pitchA}" min="1" max="9999" step="0.1"
           style="width:58px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:11px;text-align:center;outline:none"
           onchange="setPitchAGlobal(this.value)"
           onkeydown="if(event.key==='Enter')setPitchAGlobal(this.value)">
@@ -5291,7 +5291,7 @@ const DT = {
   // ── pitchA: cambiar referencia y recalcular todos los offsets medidos ──
   setPitchA(newVal) {
     const newP = Math.round(parseFloat(newVal) * 100) / 100;
-    if (isNaN(newP) || newP < 390 || newP > 470) return;
+    if (isNaN(newP) || newP <= 0) return;
     const shift = 1200 * Math.log2(pitchA / newP);
     for (let ni = 0; ni < 12; ni++) {
       if (this.notes[ni] !== null) this.notes[ni] = Math.round((this.notes[ni] + shift) * 10) / 10;
@@ -5337,7 +5337,7 @@ const DT = {
       : '';
     el.innerHTML =
       `<span style="font-size:11px;color:var(--muted)">La ref:</span>
-       <input id="dt-pitch-input" type="number" value="${pitchA}" step="0.01" min="390" max="470"
+       <input id="dt-pitch-input" type="number" value="${pitchA}" step="0.01" min="1" max="9999"
          style="width:64px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:11px;text-align:center;outline:none"
          onchange="DT.setPitchA(this.value)" onkeydown="if(event.key==='Enter')DT.setPitchA(this.value)">
        <span style="font-size:11px;color:var(--muted)">Hz</span>`
