@@ -1,4 +1,4 @@
-const APP_VERSION = '985d370 · 2026-04-08';
+const APP_VERSION = 'a17de2e · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2051,18 +2051,284 @@ function _panel_keyboard(act, el) {
   KB.render();
 }
 
-// Registrar paneles atómicos del grupo 1
+// ── Grupo 2: gráficas de barras y línea ──────────────────────────────────────
+
+function _panel_fifths_bar(act, el) {
+  const mob = isMobile();
+  const fl = FIFTH_LBL.map((n,i) => `${n}→${FIFTH_LBL[(i+1)%12]}`);
+  el.innerHTML = panel(
+    'Desviación de las 12 quintas respecto a la quinta pura (701.955 ¢) <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
+    `<canvas id="c-fifths" ${mob?'height="160"':'height="110"'}></canvas>`,
+    'width:100%'
+  );
+  mkBar('c-fifths', fl,
+    selected.map((t,i) => !t ? null : dsFifth(t, i, getFifths(t.offsets).map(f => f.dev))).filter(Boolean),
+    'Desv. de quinta pura (¢)',
+    ctx => `${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(3)}¢  (${(PURE_FIFTH+ctx.parsed.y).toFixed(2)}¢)`,
+    'fifths', true);
+}
+
+function _panel_maj3_bar(act, el) {
+  const mob = isMobile();
+  el.innerHTML = panel(
+    'Terceras mayores — desv. de la 3ª mayor pura (386.314 ¢) <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
+    `<canvas id="c-maj3" ${mob?'height="160"':'height="110"'}></canvas>`,
+    'width:100%'
+  );
+  mkBar('c-maj3', NOTES,
+    selected.map((t,i) => !t ? null : dsMaj3(t, i, getMaj3(t.offsets).map(x => x.dev))).filter(Boolean),
+    'Desv. de 3ª mayor pura (¢)',
+    ctx => `${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢  (${(PURE_MAJ3+ctx.parsed.y).toFixed(2)}¢)`,
+    'maj3', true);
+}
+
+function _panel_min3_bar(act, el) {
+  const mob = isMobile();
+  el.innerHTML = panel(
+    'Terceras menores — desv. de la 3ª menor pura (315.641 ¢) <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
+    `<canvas id="c-min3" ${mob?'height="160"':'height="110"'}></canvas>`,
+    'width:100%'
+  );
+  mkBar('c-min3', NOTES,
+    selected.map((t,i) => !t ? null : dsMaj3(t, i, getMin3(t.offsets).map(x => x.dev))).filter(Boolean),
+    'Desv. de 3ª menor pura (¢)',
+    ctx => `${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢  (${(PURE_MIN3+ctx.parsed.y).toFixed(2)}¢)`,
+    'min3', true);
+}
+
+function _panel_offsets_line(act, el) {
+  const mob = isMobile();
+  el.innerHTML = panel(
+    'Offsets de las 12 notas <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un punto</small>',
+    `<canvas id="c-off" ${mob?'height="180"':'height="100"'}></canvas>`,
+    'width:100%'
+  );
+  mkLine('c-off', NOTES,
+    selected.map((t,i) => !t ? null : ({...ds(t, i, t.offsets, {pointRadius:5, tension:0.3, fill:i===0})})).filter(Boolean),
+    'Desviación del ET (¢)',
+    ctx => `${ctx.dataset.label}: ${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(3)}¢`,
+    'offsets');
+}
+
+function _panel_compare_fifths(act, el) {
+  const mob = isMobile();
+  const fl = FIFTH_LBL.map((n,i) => `${n}→${FIFTH_LBL[(i+1)%12]}`);
+  el.innerHTML = panel(
+    'Quintas — desviación de pura <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
+    (act.length > 1 ? tempIdentityHtml(act) : '') + `<canvas id="c-fif" ${mob?'height="180"':'height="100"'}></canvas>`,
+    'width:100%'
+  );
+  mkBar('c-fif', fl,
+    selected.map((t,i) => !t ? null : dsFifth(t, i, getFifths(t.offsets).map(f => f.dev))).filter(Boolean),
+    'Desv. de quinta pura (¢)',
+    ctx => `${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(3)}¢`,
+    'fifths', true);
+}
+
+function _panel_compare_thirds(act, el) {
+  const mob = isMobile();
+  el.innerHTML = panel(
+    'Terceras mayores — desviación de pura <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
+    (act.length > 1 ? tempIdentityHtml(act) : '') + `<canvas id="c-3rd" ${mob?'height="180"':'height="100"'}></canvas>`,
+    'width:100%'
+  );
+  mkBar('c-3rd', NOTES,
+    selected.map((t,i) => !t ? null : dsMaj3(t, i, getMaj3(t.offsets).map(x => x.dev))).filter(Boolean),
+    'Desv. de 3ª mayor pura (¢)',
+    ctx => `${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢`,
+    'maj3', true);
+}
+
+// ── Grupo 3: paneles con tabla por temperamento ──────────────────────────────
+
+function _panel_intervals(act, el) {
+  const JUST_REF  = [0, 111.731, 203.910, 315.641, 386.314, 498.045, 600.0, 701.955, 813.686, 884.359, 1017.596, 1088.269];
+  const INT_NAMES = ['P1','m2','M2','m3','M3','P4','tt','P5','m6','M6','m7','M7'];
+  function devColor(dev) {
+    const t = Math.min(1, Math.abs(dev) / 22);
+    const hue = t < 0.5 ? 142 - t * 2 * 92 : 50 - (t - 0.5) * 2 * 50;
+    return `hsl(${hue.toFixed(0)},${(70 + t * 20).toFixed(0)}%,36%)`;
+  }
+  let html = '';
+  act.forEach((temp, ti) => {
+    let rows = '';
+    for (let start = 0; start < 12; start++) {
+      let cells = `<td style="padding:2px 6px;font-size:9px;color:var(--muted);white-space:nowrap;font-weight:600">${NOTES[start]}</td>`;
+      for (let semi = 0; semi < 12; semi++) {
+        if (semi === 0) { cells += `<td style="background:#161e2e;text-align:center;padding:3px 4px;font-size:9px;color:#2d3f55;border:1px solid rgba(0,0,0,0.3)">—</td>`; continue; }
+        const end = (start + semi) % 12;
+        const actual = semi * 100 + temp.offsets[end] - temp.offsets[start];
+        const dev = actual - JUST_REF[semi];
+        const sign = dev >= 0 ? '+' : '';
+        const title = `${NOTES[start]}→${NOTES[end]} (${INT_NAMES[semi]}): ${actual.toFixed(1)}¢  desv. ${sign}${dev.toFixed(1)}¢ de la justa`;
+        cells += `<td title="${title}" style="background:${devColor(dev)};text-align:center;padding:3px 4px;font-size:9px;cursor:pointer;border:1px solid rgba(0,0,0,0.25)" onpointerdown="playHeatCell(${ti},${start},${semi})">${sign}${dev.toFixed(1)}</td>`;
+      }
+      rows += `<tr>${cells}</tr>`;
+    }
+    const headerCols = INT_NAMES.map(n => `<th style="padding:3px 4px;font-size:9px;color:var(--accent);text-align:center;white-space:nowrap">${n}</th>`).join('');
+    html += panel(
+      `Matriz de intervalos — <span style="color:${COLORS[ti]}">${temp.name}</span>`,
+      `<div class="table-zoom-wrap" style="overflow:hidden;position:relative;height:260px;touch-action:none">
+         <table style="border-collapse:collapse">
+           <thead><tr><th style="padding:3px 6px;font-size:9px;color:var(--muted)"></th>${headerCols}</tr></thead>
+           <tbody>${rows}</tbody>
+         </table>
+       </div>
+       <div class="grad-bar" style="margin-top:10px">
+         <span>0¢ justo</span>
+         <div style="height:10px;border-radius:3px;flex:1;min-width:60px;background:linear-gradient(to right,hsl(142,72%,36%),hsl(96,76%,36%),hsl(50,80%,36%),hsl(25,84%,36%),hsl(0,88%,36%))"></div>
+         <span>≥22¢ impuro</span>
+       </div>`,
+      'width:100%');
+  });
+  el.innerHTML = html;
+  el.querySelectorAll('.table-zoom-wrap').forEach(_initZoomTable);
+}
+
+function _panel_beats(act, el) {
+  const IVLS = [
+    { semi:4, name:'M3', p:5, q:4 }, { semi:3, name:'m3', p:6, q:5 },
+    { semi:7, name:'P5', p:3, q:2 }, { semi:5, name:'P4', p:4, q:3 },
+    { semi:9, name:'M6', p:5, q:3 }, { semi:8, name:'m6', p:8, q:5 },
+    { semi:2, name:'M2', p:9, q:8 }, { semi:10, name:'m7', p:9, q:5 },
+  ];
+  function beatColor(hz) {
+    const t = Math.min(1, hz / 12);
+    const hue = t < 0.5 ? 142 - t * 2 * 92 : 50 - (t - 0.5) * 2 * 50;
+    return `hsl(${hue.toFixed(0)},${(70 + t * 20).toFixed(0)}%,36%)`;
+  }
+  let html = '';
+  act.forEach((temp, ti) => {
+    const headerCols = IVLS.map(iv => `<th style="padding:3px 6px;font-size:9px;color:var(--accent);text-align:center">${iv.name}</th>`).join('');
+    let rows = '';
+    for (let start = 0; start < 12; start++) {
+      const f1 = noteFreq(start, temp.offsets, pitchA, octaveShift);
+      let cells = `<td style="padding:2px 6px;font-size:9px;color:var(--muted);font-weight:600;white-space:nowrap">${NOTES[start]}</td>`;
+      IVLS.forEach(iv => {
+        const end = (start + iv.semi) % 12;
+        const actual = iv.semi * 100 + temp.offsets[end] - temp.offsets[start];
+        const f2 = f1 * Math.pow(2, actual / 1200);
+        const beat = Math.abs(iv.p * f1 - iv.q * f2);
+        const dispHz = beat < 0.05 ? '0' : beat < 10 ? beat.toFixed(1) : beat.toFixed(0);
+        const title = `${NOTES[start]}→${NOTES[end]} (${iv.name}): ${beat.toFixed(2)} Hz`;
+        cells += `<td title="${title}" style="background:${beatColor(beat)};text-align:center;padding:3px 5px;font-size:9px;cursor:pointer;border:1px solid rgba(0,0,0,0.25)" onpointerdown="playHeatCell(${ti},${start},${iv.semi})">${dispHz}</td>`;
+      });
+      rows += `<tr>${cells}</tr>`;
+    }
+    html += panel(
+      `Batidos — <span style="color:${COLORS[ti]}">${temp.name}</span>`,
+      `<p style="font-size:10px;color:var(--muted);margin-bottom:8px">Hz de batido. 0 = intervalo justo puro. La = ${pitchA} Hz.</p>
+       <div class="table-zoom-wrap" style="overflow:hidden;position:relative;height:260px;touch-action:none">
+         <table style="border-collapse:collapse">
+           <thead><tr><th style="padding:3px 6px;font-size:9px;color:var(--muted)"></th>${headerCols}</tr></thead>
+           <tbody>${rows}</tbody>
+         </table>
+       </div>
+       <div class="grad-bar" style="margin-top:10px">
+         <span>0 Hz puro</span>
+         <div style="height:10px;border-radius:3px;flex:1;min-width:60px;background:linear-gradient(to right,hsl(142,72%,36%),hsl(96,76%,36%),hsl(50,80%,36%),hsl(25,84%,36%),hsl(0,88%,36%))"></div>
+         <span>≥12 Hz áspero</span>
+       </div>`,
+      'width:100%');
+  });
+  el.innerHTML = html;
+  el.querySelectorAll('.table-zoom-wrap').forEach(_initZoomTable);
+}
+
+function _panel_fifths_table(act, el) {
+  const mob = isMobile();
+  el.innerHTML = act.map(t => {
+    const ci = selected.indexOf(t);
+    return panel(`<span style="color:${COLORS[ci]}">${shortName(t, 40)}</span>`, fifthsTable(t),
+      mob ? '' : 'flex:1;min-width:190px');
+  }).join('');
+}
+
+function _panel_thirds_table(act, el) {
+  const mob = isMobile();
+  el.innerHTML = act.map(t => {
+    const ci = selected.indexOf(t);
+    return panel(`<span style="color:${COLORS[ci]}">${shortName(t, 40)}</span>`, thirdsTableFn(t),
+      mob ? '' : 'flex:1;min-width:190px');
+  }).join('');
+}
+
+// ── Grupo 4: hero / tarjeta de información ────────────────────────────────────
+
+function _panel_hero(act, el) {
+  if (!act.length) { el.innerHTML = '<div class="empty-state" style="width:100%">Selecciona un temperamento.</div>'; return; }
+  const t = act[0];
+  const fif = getFifths(t.offsets), maj = getMaj3(t.offsets);
+  const wf = fif.reduce((a,b) => Math.abs(a.dev)>Math.abs(b.dev)?a:b);
+  const bf = fif.reduce((a,b) => Math.abs(a.dev)<Math.abs(b.dev)?a:b);
+  const wm = maj.reduce((a,b) => Math.abs(a.dev)>Math.abs(b.dev)?a:b);
+  const bm = maj.reduce((a,b) => Math.abs(a.dev)<Math.abs(b.dev)?a:b);
+  const avgF = fif.reduce((s,f) => s+f.dev, 0) / 12;
+  const f = v => `${v>=0?'+':''}${v.toFixed(2)}¢`;
+  const cc = v => v>8?'#f87171':v<-4?'#fb923c':Math.abs(v)<0.5?'#4ade80':v>3?'#a78bfa':'#facc15';
+  const statCard = (label, note, value, color) =>
+    `<div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px 12px;flex:1;min-width:120px">
+       <div style="font-size:10px;color:#64748b;margin-bottom:2px">${label}</div>
+       <div style="font-size:12px;color:#94a3b8;margin-bottom:4px">${note}</div>
+       <div style="font-size:15px;font-weight:700;color:${color}">${value}</div>
+     </div>`;
+  el.innerHTML =
+    `<div style="width:100%;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);border:1px solid #1e293b;border-radius:12px;padding:20px 24px;box-sizing:border-box">
+       <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+         <div style="flex:1;min-width:200px">
+           <div style="font-size:22px;font-weight:700;color:#e2e8f0;line-height:1.2;margin-bottom:6px">${t.name}</div>
+           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+             <span style="font-size:11px;background:#1e3a5f;color:#60a5fa;border-radius:4px;padding:2px 8px">${t.source}</span>
+             <span style="font-size:11px;color:#475569">${fif.filter(x=>Math.abs(x.dev)<0.5).length} quintas puras</span>
+             <span style="font-size:11px;color:#475569">·</span>
+             <span style="font-size:11px;color:#475569">avg quinta ${f(avgF)}</span>
+           </div>
+         </div>
+         <button onclick="openTempMenu(${all.indexOf(t)},event)" title="Opciones"
+           style="background:none;border:none;color:#475569;cursor:pointer;font-size:22px;line-height:1;padding:0 4px;flex-shrink:0;-webkit-tap-highlight-color:transparent">···</button>
+       </div>
+       <div style="margin-top:14px">
+         <div style="font-size:11px;color:#64748b;margin-bottom:5px">Notas</div>
+         <textarea id="overview-notes" rows="3" placeholder="Descripción, origen histórico, características…"
+           style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;color:#cbd5e1;border-radius:6px;padding:8px 10px;font-size:12px;outline:none;resize:vertical;font-family:inherit"
+           onblur="saveTempNotes('${t.name.replace(/'/g,"\\'")}', this.value)">${getTempNotes(t.name)}</textarea>
+       </div>
+     </div>
+     <div style="width:100%;display:flex;gap:8px;flex-wrap:wrap">
+       ${statCard('Quinta más pura',   bf.from+'→'+bf.to, bf.size.toFixed(2)+'¢ ('+f(bf.dev)+')', cc(bf.dev))}
+       ${statCard('Quinta más impura', wf.from+'→'+wf.to, wf.size.toFixed(2)+'¢ ('+f(wf.dev)+')', cc(wf.dev))}
+       ${statCard('3ª mayor más pura',   bm.from+'→'+bm.to, bm.size.toFixed(2)+'¢ ('+f(bm.dev)+')', '#4ade80')}
+       ${statCard('3ª mayor más impura', wm.from+'→'+wm.to, wm.size.toFixed(2)+'¢ ('+f(wm.dev)+')', '#f87171')}
+     </div>`;
+}
+
+// Registrar todos los paneles atómicos
 Object.assign(_PANEL_FN, {
-  circle:     _panel_circle,
-  radar:      _panel_radar,
-  offsets:    _panel_offsets,
-  scatter:    _panel_scatter,
-  lattice:    _panel_lattice,
-  triads:     _panel_triads,
-  tonnetz:    _panel_tonnetz,
-  histogram:  _panel_histogram,
-  consonance: _panel_consonance,
-  keyboard:   _panel_keyboard,
+  // Grupo 1
+  circle:          _panel_circle,
+  radar:           _panel_radar,
+  offsets:         _panel_offsets,
+  scatter:         _panel_scatter,
+  lattice:         _panel_lattice,
+  triads:          _panel_triads,
+  tonnetz:         _panel_tonnetz,
+  histogram:       _panel_histogram,
+  consonance:      _panel_consonance,
+  keyboard:        _panel_keyboard,
+  // Grupo 2
+  fifths_bar:      _panel_fifths_bar,
+  maj3_bar:        _panel_maj3_bar,
+  min3_bar:        _panel_min3_bar,
+  offsets_line:    _panel_offsets_line,
+  compare_fifths:  _panel_compare_fifths,
+  compare_thirds:  _panel_compare_thirds,
+  // Grupo 3
+  intervals:       _panel_intervals,
+  beats:           _panel_beats,
+  fifths_table:    _panel_fifths_table,
+  thirds_table:    _panel_thirds_table,
+  // Grupo 4
+  hero:            _panel_hero,
 });
 
 // ─── VISTA GENERAL ───
