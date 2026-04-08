@@ -6,6 +6,9 @@
 |---|---|
 | Overview, Fifths, Thirds, Compare, Intervals, Beats | ✅ |
 | Consonancia (curva gaussiana + audio + batimentos + zoom + raíz) | ✅ |
+| Histograma de consonancia (distribución de 132 intervalos por consonancia teórica) | ✅ |
+| Lattice de Euler (red 4×3 quintas × terceras, nodos coloreados por desviación, hover + click) | ✅ |
+| Mapa de tríadas (rueda + grid, 24 tríadas coloreadas por pureza, hover + click reproduce) | ✅ |
 | Tonnetz, Scatter, Keyboard, Medidor/Tuner | ✅ |
 
 ---
@@ -14,23 +17,11 @@
 
 ### 2D (más rápidas)
 
-**A. Lattice de Euler (red de quintas × terceras)**
-- Red 2D: eje X = quintas sucesivas, eje Y = terceras mayores
-- Nodos = notas del temperamento, coloreados por desviación respecto a justo
-- Aristas = intervalos, con grosor/color según pureza
-- Interactivo: hover → info Hz + cents; click → reproduce nota
-- Sin dependencias externas, canvas 2D
+**A. ~~Lattice de Euler~~ ✅ implementado**
 
-**B. Histograma de consonancia**
-- Distribución de los 132 intervalos del temperamento agrupados por consonancia teórica
-- Comparativa superpuesta entre varios temperamentos seleccionados
-- Muestra si el temperamento "concentra" consonancias o las dispersa
+**B. ~~Histograma de consonancia~~ ✅ implementado**
 
-**C. Mapa de tríadas**
-- Rueda o grid con las 24 tríadas (12 mayores + 12 menores)
-- Color = pureza de la tríada (desviación combinada de 3ª y 5ª)
-- Click → reproduce la tríada
-- Complementa el Tonnetz con datos cuantitativos de pureza
+**C. ~~Mapa de tríadas~~ ✅ implementado**
 
 **D. Espiral de tonos**
 - Espiral cromática (12 posiciones, 1 vuelta = octava)
@@ -61,4 +52,4 @@
 
 - **Rápida + útil musicalmente**: C (mapa de tríadas) o A (Euler lattice)
 - **Rica visualmente**: E (Tonnetz 3D) o F (espacio 3D)
-- **Analítica**: B (histograma de consonancia)
+- **Analítica**: ~~B (histograma de consonancia)~~ ✅ → C (mapa de tríadas)

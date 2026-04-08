@@ -3,19 +3,29 @@
 // ══════════════════════════════════════════════
 
 const CARD_REGISTRY = {
-  overview:   { label: 'Vista general', icon: '◎', needsSelection: true  },
-  fifths:     { label: 'Quintas',       icon: '↻', needsSelection: true  },
-  thirds:     { label: 'Terceras',      icon: '△', needsSelection: true  },
-  compare:    { label: 'Comparar',      icon: '⚖', needsSelection: true  },
-  intervals:  { label: 'Intervalos',    icon: '▦', needsSelection: true  },
-  beats:      { label: 'Batidos',       icon: '〰', needsSelection: true  },
-  consonance: { label: 'Consonancia',   icon: '◉', needsSelection: true  },
-  histogram:  { label: 'Histograma',    icon: '▯', needsSelection: true  },
-  lattice:    { label: 'Lattice',       icon: '⬡', needsSelection: true  },
-  triads:     { label: 'Tríadas',       icon: '▲', needsSelection: true  },
-  tonnetz:    { label: 'Tonnetz',       icon: '◈', needsSelection: true  },
-  scatter:    { label: 'Mapa global',   icon: '⠿', needsSelection: false },
-  keyboard:   { label: 'Teclado',       icon: '▬', needsSelection: false },
+  // ── Grupo 1: paneles individuales ──────────────────────────────────────────
+  circle:         { label: 'Círculo de quintas',    icon: '◎', needsSelection: true,  group: 'Quintas'     },
+  radar:          { label: 'Radar de offsets',       icon: '◈', needsSelection: true,  group: 'Overview'    },
+  offsets:        { label: 'Tabla de offsets',       icon: '▤', needsSelection: true,  group: 'Overview'    },
+  scatter:        { label: 'Mapa global',            icon: '⠿', needsSelection: false, group: 'Global'      },
+  lattice:        { label: 'Lattice de Euler',       icon: '⬡', needsSelection: true,  group: 'Afinación'   },
+  triads:         { label: 'Mapa de tríadas',        icon: '▲', needsSelection: true,  group: 'Afinación'   },
+  tonnetz:        { label: 'Tonnetz',                icon: '◇', needsSelection: true,  group: 'Afinación'   },
+  histogram:      { label: 'Histograma consonancia', icon: '▯', needsSelection: true,  group: 'Consonancia' },
+  consonance:     { label: 'Curva de consonancia',   icon: '◉', needsSelection: true,  group: 'Consonancia' },
+  keyboard:       { label: 'Teclado',                icon: '▬', needsSelection: false, group: 'Interacción' },
+  // ── Grupo 2: gráficas de barras y línea ────────────────────────────────────
+  fifths_bar:     { label: 'Gráfica de quintas',     icon: '↕', needsSelection: true,  group: 'Quintas'     },
+  maj3_bar:       { label: 'Gráfica 3ª mayores',     icon: '↕', needsSelection: true,  group: 'Terceras'    },
+  min3_bar:       { label: 'Gráfica 3ª menores',     icon: '↕', needsSelection: true,  group: 'Terceras'    },
+  offsets_line:   { label: 'Línea de offsets',       icon: '〜', needsSelection: true,  group: 'Overview'    },
+  // ── Grupo 3: tablas por temperamento ───────────────────────────────────────
+  intervals:      { label: 'Matriz de intervalos',   icon: '▦', needsSelection: true,  group: 'Intervalos'  },
+  beats:          { label: 'Tabla de batidos',       icon: '〰', needsSelection: true,  group: 'Intervalos'  },
+  fifths_table:   { label: 'Tabla de quintas',       icon: '▤', needsSelection: true,  group: 'Quintas'     },
+  thirds_table:   { label: 'Tabla de terceras',      icon: '▤', needsSelection: true,  group: 'Terceras'    },
+  // ── Grupo 4: tarjeta informativa ───────────────────────────────────────────
+  hero:           { label: 'Ficha del temperamento', icon: '★', needsSelection: true,  group: 'Overview'    },
   // medidor y tuner excluidos — van al botón flotante unificado
 };
 
@@ -26,10 +36,10 @@ const DEFAULT_WORKSPACE = {
     id: 'tab-default',
     label: 'Vista general',
     cards: [
-      { id: 'card-1', type: 'overview'  },
-      { id: 'card-2', type: 'fifths'    },
-      { id: 'card-3', type: 'thirds'    },
-      { id: 'card-4', type: 'compare'   },
+      { id: 'card-1', type: 'circle'  },
+      { id: 'card-2', type: 'radar'   },
+      { id: 'card-3', type: 'offsets' },
+      { id: 'card-4', type: 'scatter' },
     ]
   }]
 };
@@ -56,15 +66,21 @@ const WS = {
     if (typeof renderContent === 'function') renderContent();
   },
 
-  // Crea workspace por defecto si no existe todavía
+  // Crea workspace por defecto si no existe todavía, o si contiene tipos obsoletos
   migrateFromLegacy(activeTabName) {
-    if (localStorage.getItem(WS_KEY)) return;
-    // Si el activeTab era uno de los nuestros, arrancamos con esa tarjeta más las básicas
-    const ws = JSON.parse(JSON.stringify(DEFAULT_WORKSPACE));
-    if (activeTabName && CARD_REGISTRY[activeTabName] && activeTabName !== 'overview') {
-      ws.tabs[0].cards.push({ id: _uid(), type: activeTabName });
+    const raw = localStorage.getItem(WS_KEY);
+    if (raw) {
+      try {
+        const ws = JSON.parse(raw);
+        // Si alguna tarjeta tiene un type que ya no existe en CARD_REGISTRY, resetear
+        const hasObsolete = ws.tabs?.some(t =>
+          t.cards?.some(c => c.type && !CARD_REGISTRY[c.type])
+        );
+        if (!hasObsolete) return; // workspace válido, no tocar
+      } catch(e) {}
+      // Obsoleto o corrupto → reemplazar
     }
-    localStorage.setItem(WS_KEY, JSON.stringify(ws));
+    localStorage.setItem(WS_KEY, JSON.stringify(JSON.parse(JSON.stringify(DEFAULT_WORKSPACE))));
   },
 
   init() {
@@ -79,12 +95,13 @@ const WS = {
     if (typeof KB !== 'undefined' && KB.mode !== 'chord') KB.clearAll();
     if (document.body.classList.contains('kb-fullscreen') && typeof toggleKbFullscreen === 'function') toggleKbFullscreen();
     if (typeof TUNER !== 'undefined') { TUNER.stop(); document.getElementById('tuner-screen')?.remove(); }
-    if (typeof DT !== 'undefined') DT.stopMic();
+    if (typeof DT !== 'undefined') { DT.stopMic(); document.getElementById('medidor-screen')?.remove(); }
   },
 
   switchTab(id) {
     const ws = this.current();
     if (!ws.tabs.find(t => t.id === id)) return;
+    if (ws.activeTabId === id) return; // ya activa, no re-renderizar
     this._leaveCurrentTab();
     ws.activeTabId = id;
     this.save(ws);
@@ -186,9 +203,9 @@ const WS = {
         ? `<span class="tab-x" onclick="event.stopPropagation();WS.deleteTab('${tab.id}')" title="Cerrar">×</span>`
         : '';
       return `<div class="tab${active}" data-tabid="${tab.id}"
-                   onclick="WS.switchTab('${tab.id}')">
-                <span class="tab-label"
-                      ondblclick="event.stopPropagation();WS._startRename(this,'${tab.id}')">${tab.label}</span>
+                   onclick="WS.switchTab('${tab.id}')"
+                   ondblclick="WS._startRenameTab('${tab.id}',this)">
+                <span class="tab-label">${tab.label}</span>
                 ${closeBtn}
               </div>`;
     }).join('') +
@@ -202,14 +219,15 @@ const WS = {
     const ws = this.current();
     const otherTabs = ws.tabs.filter(t => t.id !== ws.activeTabId);
     const moveBtn = otherTabs.length > 0
-      ? `<button onclick="WS.openMoveCardMenu('${card.id}',event)" title="Mover a pestaña">⇒</button>`
+      ? `<button onclick="event.stopPropagation();WS.openMoveCardMenu('${card.id}',event)" title="Mover a pestaña">⇒</button>`
       : '';
     const div = document.createElement('div');
     div.className = 'card-toolbar';
+    div.setAttribute('onclick', 'event.stopPropagation()');
     div.innerHTML =
-      `<button onclick="WS.removeCard('${card.id}')" title="Quitar tarjeta">✕</button>` +
-      `<button onclick="WS.duplicateCard('${card.id}')" title="Duplicar tarjeta">⧉</button>` +
-      moveBtn;
+      `<button onclick="event.stopPropagation();WS.duplicateCard('${card.id}')" title="Duplicar tarjeta">⧉</button>` +
+      moveBtn +
+      `<button onclick="event.stopPropagation();WS.removeCard('${card.id}')" title="Quitar tarjeta">✕</button>`;
     return div;
   },
 
@@ -219,16 +237,35 @@ const WS = {
     document.querySelectorAll('.ws-popover').forEach(p => p.remove());
   },
 
-  _popover(html, anchorEvent) {
+  _popover(html, anchorEvent, anchorEl) {
     this._closePopovers();
     const div = document.createElement('div');
     div.className = 'ws-popover';
     div.innerHTML = html;
     document.body.appendChild(div);
-    // Posición
-    const x = anchorEvent.clientX, y = anchorEvent.clientY;
-    div.style.left = Math.min(x, window.innerWidth - 220) + 'px';
-    div.style.top  = (y + 4) + 'px';
+    // Si hay elemento ancla, usar su borde como referencia (más fiable que clientY en móvil)
+    let x, yTop, yBottom;
+    if (anchorEl) {
+      const r = anchorEl.getBoundingClientRect();
+      x = r.left;
+      yTop = r.top;
+      yBottom = r.bottom;
+    } else {
+      x = anchorEvent.clientX;
+      yTop = yBottom = anchorEvent.clientY;
+    }
+    const maxH = Math.round(window.innerHeight * 0.75);
+    div.style.maxHeight = maxH + 'px';
+    const spaceBelow = window.innerHeight - yBottom - 8;
+    const spaceAbove = yTop - 8;
+    // Siempre usar top (nunca bottom) para evitar bugs en móvil con barra del navegador
+    if (spaceAbove > spaceBelow) {
+      // Abrir hacia arriba: el borde inferior del popover = yTop - 4
+      div.style.top = Math.max(4, yTop - maxH - 4) + 'px';
+    } else {
+      div.style.top = (yBottom + 4) + 'px';
+    }
+    div.style.left = Math.max(4, Math.min(x, window.innerWidth - 224)) + 'px';
     // Cerrar al click fuera
     setTimeout(() => {
       document.addEventListener('click', function h(e) {
@@ -238,13 +275,24 @@ const WS = {
     return div;
   },
 
-  openAddCardMenu(event) {
-    const items = Object.entries(CARD_REGISTRY).map(([type, desc]) =>
-      `<div class="ws-popover-item" onclick="WS.addCard('${type}');WS._closePopovers()">
-        <span class="ws-popover-icon">${desc.icon}</span> ${desc.label}
-       </div>`
-    ).join('');
-    this._popover(items, event);
+  openAddCardMenu(event, anchorEl) {
+    // Agrupar por group
+    const groups = {};
+    for (const [type, desc] of Object.entries(CARD_REGISTRY)) {
+      const g = desc.group || 'Otros';
+      if (!groups[g]) groups[g] = [];
+      groups[g].push([type, desc]);
+    }
+    let html = '';
+    for (const [groupName, entries] of Object.entries(groups)) {
+      html += `<div class="ws-popover-group">${groupName}</div>`;
+      html += entries.map(([type, desc]) =>
+        `<div class="ws-popover-item" onclick="WS.addCard('${type}');WS._closePopovers()">
+           <span class="ws-popover-icon">${desc.icon}</span> ${desc.label}
+         </div>`
+      ).join('');
+    }
+    this._popover(html, event, anchorEl);
   },
 
   openMoveCardMenu(cardId, event) {
@@ -309,23 +357,40 @@ const WS = {
 
   // ── Renombrado de pestaña in-place ────────────
 
-  _startRename(spanEl, tabId) {
+  _startRenameTab(tabId, tabDiv) {
+    // Evitar doble instancia
+    if (tabDiv.querySelector('input')) return;
+    const span = tabDiv.querySelector('.tab-label');
+    const currentLabel = span ? span.textContent : '';
+
     const input = document.createElement('input');
     input.className = 'tab-rename-input';
-    input.value = spanEl.textContent;
-    input.style.width = Math.max(60, spanEl.offsetWidth) + 'px';
-    spanEl.replaceWith(input);
+    input.value = currentLabel;
+    input.style.width = Math.max(80, (currentLabel.length + 2) * 8) + 'px';
+
+    // Ocultar el span y poner el input en su lugar
+    if (span) span.style.display = 'none';
+    tabDiv.insertBefore(input, span || tabDiv.firstChild);
     input.focus();
     input.select();
-    const confirm = () => {
-      WS.renameTab(tabId, input.value);
-      // renderTabBar() llamado desde renameTab → save()
+
+    const done = (save) => {
+      input.remove();
+      if (span) span.style.display = '';
+      if (save && input.value.trim()) {
+        // Actualizar el span directamente sin re-render completo
+        if (span) span.textContent = input.value.trim();
+        WS.renameTab(tabId, input.value.trim());
+      }
     };
-    input.addEventListener('blur', confirm);
+
+    input.addEventListener('blur', () => done(true));
     input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
-      if (e.key === 'Escape') { input.removeEventListener('blur', confirm); WS.renderTabBar(); }
+      if (e.key === 'Enter')  { e.preventDefault(); done(true); }
+      if (e.key === 'Escape') { e.preventDefault(); done(false); }
     });
+    input.addEventListener('click', e => e.stopPropagation());
+    input.addEventListener('dblclick', e => e.stopPropagation());
   },
 
   onResize() {
