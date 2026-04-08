@@ -1,4 +1,4 @@
-const APP_VERSION = '9e0587a · 2026-04-08';
+const APP_VERSION = '1a084dc · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -896,19 +896,32 @@ function bindCircleAudio() {
     clearHL();
     _hlPath = p;
     if (p) {
-      p._origStroke = p.style.stroke;
-      p._origStrokeW = p.style.strokeWidth;
-      p._origOpacity = p.style.opacity;
-      p.style.stroke = '#fff';
-      p.style.strokeWidth = '2';
-      p.style.opacity = '1';
+      p._origFill = p.getAttribute('fill');
+      p._origStroke = p.getAttribute('stroke');
+      p._origStrokeW = p.getAttribute('stroke-width');
+      // Aclarar el color original mezclándolo con blanco
+      p.setAttribute('fill', '#ffffff');
+      p.setAttribute('stroke', '#fff');
+      p.setAttribute('stroke-width', '2');
+      p.style.opacity = '0.85';
+      // Volver al color en 80ms para dar efecto de flash
+      p._hlTimer = setTimeout(() => {
+        if (_hlPath === p) {
+          p.setAttribute('fill', p._origFill);
+          p.setAttribute('stroke', p._origStroke ?? '#111827');
+          p.setAttribute('stroke-width', p._origStrokeW ?? '0.8');
+          p.style.opacity = '1';
+        }
+      }, 80);
     }
   }
   function clearHL() {
     if (!_hlPath) return;
-    _hlPath.style.stroke = _hlPath._origStroke ?? '';
-    _hlPath.style.strokeWidth = _hlPath._origStrokeW ?? '';
-    _hlPath.style.opacity = _hlPath._origOpacity ?? '';
+    clearTimeout(_hlPath._hlTimer);
+    _hlPath.setAttribute('fill', _hlPath._origFill ?? '');
+    _hlPath.setAttribute('stroke', _hlPath._origStroke ?? '#111827');
+    _hlPath.setAttribute('stroke-width', _hlPath._origStrokeW ?? '0.8');
+    _hlPath.style.opacity = '';
     _hlPath = null;
   }
 
