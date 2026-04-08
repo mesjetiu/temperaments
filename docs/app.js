@@ -1,4 +1,4 @@
-const APP_VERSION = '7d8546b · 2026-04-07';
+const APP_VERSION = '5ec7ab5 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2040,14 +2040,28 @@ function _toggleSw(el) {
 function _swOn(id) { return document.getElementById(id)?.dataset.on === '1'; }
 
 function viewConsonance(act) {
+  const _noteBtnStyle = (on) =>
+    `font-size:9px;padding:2px 5px;border-radius:3px;cursor:pointer;border:none;font-family:monospace;` +
+    (on ? 'background:#1e40af;color:#e2e8f0' : 'background:#1e293b;color:#475569');
+  const notesBtns = NOTES.map((n, i) =>
+    `<button id="cons-root-${i}" data-ni="${i}" style="${_noteBtnStyle(true)}">${n}</button>`
+  ).join('');
+  const auxBtn = `font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;border:1px solid #334155;background:transparent;color:#6b7280`;
+
   document.getElementById('content').innerHTML = panel(
     'Curva de consonancia <small style="color:#4b5563;font-size:10px;font-weight:400">— firma espectral del temperamento</small>',
-    `<div style="display:flex;align-items:center;gap:14px;margin-bottom:8px;flex-wrap:wrap">
+    `<div style="display:flex;align-items:center;gap:14px;margin-bottom:6px;flex-wrap:wrap">
        ${_swHtml('cons-audio-sw', 'Audio continuo', false)}
        ${_swHtml('cons-beat-sw',  'Ver batimentos', false)}
        <span id="cons-nfo" style="font-size:10px;color:var(--muted);flex:1;min-width:0">
-         Mueve el ratón sobre la gráfica · pulsa para oír un intervalo · rueda/pinch=zoom
+         Mueve el ratón sobre la gráfica · pulsa para oír un intervalo
        </span>
+     </div>
+     <div style="display:flex;align-items:center;gap:3px;margin-bottom:6px;flex-wrap:wrap">
+       <span style="font-size:10px;color:#6b7280;white-space:nowrap;margin-right:2px">Raíz:</span>
+       ${notesBtns}
+       <button id="cons-roots-all"  style="${auxBtn};margin-left:6px">Todas</button>
+       <button id="cons-roots-none" style="${auxBtn}">Ninguna</button>
      </div>
      <div style="position:relative">
        <canvas id="c-cons" style="width:100%;display:block;cursor:crosshair;touch-action:none"></canvas>
@@ -2063,6 +2077,35 @@ function viewConsonance(act) {
     const redraw = () => _drawConsonance(cv, cvCur, act);
     redraw();
     cv._redraw = redraw;
+
+    // ── Selector de notas raíz ──
+    cv._rootNotes = null; // null = todas activas
+
+    function _updateRootBtns() {
+      NOTES.forEach((_, i) => {
+        const btn = document.getElementById(`cons-root-${i}`);
+        if (!btn) return;
+        const on = !cv._rootNotes || cv._rootNotes.has(i);
+        btn.style.background = on ? '#1e40af' : '#1e293b';
+        btn.style.color      = on ? '#e2e8f0' : '#475569';
+      });
+    }
+
+    NOTES.forEach((_, i) => {
+      document.getElementById(`cons-root-${i}`)?.addEventListener('click', () => {
+        if (!cv._rootNotes) cv._rootNotes = new Set(NOTES.map((__, j) => j));
+        if (cv._rootNotes.has(i)) { cv._rootNotes.delete(i); } else { cv._rootNotes.add(i); }
+        if (cv._rootNotes.size === 12) cv._rootNotes = null;
+        _updateRootBtns(); redraw();
+      });
+    });
+    document.getElementById('cons-roots-all')?.addEventListener('click', () => {
+      cv._rootNotes = null; _updateRootBtns(); redraw();
+    });
+    document.getElementById('cons-roots-none')?.addEventListener('click', () => {
+      cv._rootNotes = new Set(); _updateRootBtns(); redraw();
+    });
+
     attachPanelResize(cv);
     const rh = document.getElementById('cons-resize');
     if (rh) {
@@ -2196,10 +2239,12 @@ function _drawConsonance(canvas, cursorCanvas, act) {
 
   // ── Puntos de los temperamentos ──
   dots.length = 0;
+  const rootFilter = canvas._rootNotes; // Set<number> | null (null = todas)
   act.forEach(t => {
     const ci = selected.indexOf(t);
     for (let semi = 1; semi <= 11; semi++) {
       for (let ni = 0; ni < 12; ni++) {
+        if (rootFilter && !rootFilter.has(ni)) continue;
         const nj = (ni + semi) % 12;
         const cents = semi * 100 + t.offsets[nj] - t.offsets[ni];
         if (cents < zMin || cents > zMax) continue;
