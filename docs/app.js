@@ -1,4 +1,4 @@
-const APP_VERSION = 'fdf1fbf · 2026-04-08';
+const APP_VERSION = 'e87b4a2 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -184,12 +184,14 @@ function openTempMenu(idx, event) {
   menu.style.top  = (r.bottom + 4) + 'px';
   setTimeout(() => document.addEventListener('click', () => document.querySelectorAll('.temp-ctx-menu').forEach(m => m.remove()), { once: true }), 0);
 }
-function _tempShareText(name, offsets) {
+function _tempShareText(name, offsets, notes) {
   const lines = offsets.map((o, i) => {
     const sign = o >= 0 ? '+' : '';
     return `  ${NOTES[i].padEnd(3)} ${sign}${o.toFixed(2)}¢`;
   });
-  return `🎹 ${name}\n\nDesviaciones vs ET (cents):\n${lines.join('\n')}`;
+  let text = `🎹 ${name}\n\nDesviaciones vs ET (cents):\n${lines.join('\n')}`;
+  if (notes) text += `\n\n${notes}`;
+  return text;
 }
 function _tempShareUrl(name, offsets, notes) {
   const offs = offsets.map(o => Math.round(o * 100) / 100).join(',');
@@ -219,7 +221,7 @@ function confirmShare() {
   const notesRaw = document.getElementById('share-notes-input').value.trim();
   const notes = includeNotes ? notesRaw : '';
   const url = _tempShareUrl(name, _shareTemp.offsets, notes);
-  const text = _tempShareText(name, _shareTemp.offsets);
+  const text = _tempShareText(name, _shareTemp.offsets, notes);
   closeShareDialog();
   if (navigator.share) navigator.share({ title: name, text: text + '\n\n' + url }).catch(() => {});
   else navigator.clipboard?.writeText(text + '\n\n' + url).then(() => alert('Copiado al portapapeles')).catch(() => { prompt('Copia este enlace:', text + '\n\n' + url); });
