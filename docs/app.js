@@ -1,4 +1,4 @@
-const APP_VERSION = '777b3c5 · 2026-04-08';
+const APP_VERSION = '22e2935 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1376,8 +1376,10 @@ function getFilteredList() {
 }
 function refreshList() {
   const f = getFilteredList();
-  document.getElementById('count').textContent = showFavsOnly
-    ? `${f.length} favoritos` : (f.length < all.length ? `${f.length} / ${all.length}` : `${all.length} temperamentos`);
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const filtered = showFavsOnly || srcFilter !== 'Todos' || q;
+  document.getElementById('count').textContent = filtered
+    ? `${f.length} / ${all.length}` : `${all.length} temperamentos`;
   renderList(f);
 }
 function toggleFavFilter() {
