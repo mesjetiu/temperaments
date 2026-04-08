@@ -1,4 +1,4 @@
-const APP_VERSION = '941aa33 · 2026-04-08';
+const APP_VERSION = '88be2f4 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -5446,6 +5446,7 @@ const DT = {
         console.log('[captureA] stableF=', stableF, 'octavesFromA4=', octavesFromA4, 'aFreq=', aFreq, 'pitchA antes=', pitchA);
         this.setPitchA(aFreq);
         console.log('[captureA] pitchA después=', pitchA);
+        this._updateStatus(`DBG stableF:${stableF.toFixed(2)} aFreq:${aFreq.toFixed(2)} old:${oldPitchA.toFixed(2)} new:${pitchA.toFixed(2)}`);
         if (this.notes[9] !== null) this.notes[9] = 0;
         this._captureA = false;
         this._stableNi = -1; this._stableCount = 0;
@@ -5504,6 +5505,7 @@ const DT = {
         console.log('[manual La] _stableFreq=', this._stableFreq, 'aFreq=', aFreq, 'pitchA antes=', pitchA);
         this.setPitchA(aFreq);
         console.log('[manual La] pitchA después=', pitchA);
+        this._updateStatus(`DBG stableF:${this._stableFreq.toFixed(2)} aFreq:${aFreq.toFixed(2)} old:${oldPitchA.toFixed(2)} new:${pitchA.toFixed(2)}`);
         this.notes[9] = 0;
         this._updateStatus(`✓ La: ${oldPitchA.toFixed(2)} → ${pitchA.toFixed(2)} Hz`);
         this._statusLock = Date.now() + 3000;  // bloquear loop 3s DESPUÉS de mostrar
