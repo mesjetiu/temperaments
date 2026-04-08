@@ -1,4 +1,4 @@
-const APP_VERSION = 'da93c53 · 2026-04-08';
+const APP_VERSION = '4de982d · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1847,22 +1847,52 @@ function _panel_lattice(act, el) {
     cv._redraw = redraw;
     attachPanelResize(cv);
     cv._hoverNode = null;
+    cv._hoverEdge = null;
+
     function _nodeAtPoint(x, y) {
       const info = cv._nodeInfo; if (!info) return null;
       const R = cv._nodeR || 18;
       for (const n of info) { const dx = x - n.px, dy = y - n.py; if (dx*dx + dy*dy <= R*R) return n; }
       return null;
     }
+    function _edgeAtPoint(x, y) {
+      const edges = cv._edgeInfo; if (!edges) return null;
+      const THRESH = Math.max(8, (cv._nodeR || 18) * 0.5);
+      for (const e of edges) {
+        // Distancia punto-segmento
+        const dx = e.x2 - e.x1, dy = e.y2 - e.y1;
+        const lenSq = dx*dx + dy*dy;
+        if (lenSq === 0) continue;
+        const t = Math.max(0, Math.min(1, ((x - e.x1)*dx + (y - e.y1)*dy) / lenSq));
+        const px = e.x1 + t*dx - x, py = e.y1 + t*dy - y;
+        if (px*px + py*py <= THRESH*THRESH) return e;
+      }
+      return null;
+    }
+
     cv.addEventListener('pointermove', e => {
       const r = cv.getBoundingClientRect();
-      const node = _nodeAtPoint(e.clientX - r.left, e.clientY - r.top);
-      if (node !== cv._hoverNode) { cv._hoverNode = node; redraw(); }
+      const mx = e.clientX - r.left, my = e.clientY - r.top;
+      const node = _nodeAtPoint(mx, my);
+      const edge = node ? null : _edgeAtPoint(mx, my);
+      if (node !== cv._hoverNode || edge !== cv._hoverEdge) {
+        cv._hoverNode = node; cv._hoverEdge = edge; redraw();
+      }
     });
-    cv.addEventListener('pointerleave', () => { if (cv._hoverNode) { cv._hoverNode = null; redraw(); } });
+    cv.addEventListener('pointerleave', () => {
+      if (cv._hoverNode || cv._hoverEdge) { cv._hoverNode = null; cv._hoverEdge = null; redraw(); }
+    });
     cv.addEventListener('pointerdown', e => {
       const r = cv.getBoundingClientRect();
-      const node = _nodeAtPoint(e.clientX - r.left, e.clientY - r.top);
-      if (node) playNote(node.ni, act[0].offsets);
+      const mx = e.clientX - r.left, my = e.clientY - r.top;
+      const node = _nodeAtPoint(mx, my);
+      if (node) { playNote(node.ni, act[0].offsets); return; }
+      const edge = _edgeAtPoint(mx, my);
+      if (edge) {
+        const off = act[0].offsets;
+        const f1 = noteFreq(edge.ni, off, pitchA, octaveShift);
+        playFreqs([f1, f1 * Math.pow(2, edge.cents / 1200)]);
+      }
     });
   });
 }
@@ -3390,6 +3420,9 @@ function _drawLattice(canvas, act) {
     return '#f87171';
   }
 
+  // Guardar aristas para hit-testing
+  const edgeInfo = [];
+
   // ── Aristas de quinta (horizontales) ──
   for (let row = 0; row < ROWS; row++) {
     for (let col = 0; col < COLS - 1; col++) {
@@ -3397,18 +3430,19 @@ function _drawLattice(canvas, act) {
       const nj = LATTICE_GRID[row][col + 1];
       const {x:x1,y:y1} = nodeXY(row, col);
       const {x:x2,y:y2} = nodeXY(row, col + 1);
-      // Calidad de la quinta: desviación respecto a 701.955¢
-      let fifthDev = 0;
+      let fifthDev = 0, cents = 700;
       if (t0) {
-        const semi = (nj - ni + 12) % 12; // debería ser 7
-        const cents = semi * 100 + t0.offsets[nj] - t0.offsets[ni];
+        const semi = (nj - ni + 12) % 12;
+        cents = semi * 100 + t0.offsets[nj] - t0.offsets[ni];
         fifthDev = Math.abs(cents - PURE_FIFTH);
       }
-      const alpha = t0 ? Math.max(0.2, 1 - fifthDev / 12) : 0.4;
-      ctx.strokeStyle = `rgba(148,163,184,${alpha.toFixed(2)})`;
-      ctx.lineWidth = t0 ? Math.max(1, 3 - fifthDev / 4) : 1.5;
+      const isHoverEdge = canvas._hoverEdge && canvas._hoverEdge.ni === ni && canvas._hoverEdge.nj === nj;
+      const alpha = isHoverEdge ? 1 : (t0 ? Math.max(0.2, 1 - fifthDev / 12) : 0.4);
+      ctx.strokeStyle = isHoverEdge ? '#f8fafc' : `rgba(148,163,184,${alpha.toFixed(2)})`;
+      ctx.lineWidth = isHoverEdge ? 4 : (t0 ? Math.max(1, 3 - fifthDev / 4) : 1.5);
       ctx.setLineDash([]);
       ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      edgeInfo.push({ ni, nj, x1, y1, x2, y2, type: 'fifth', cents });
     }
   }
 
@@ -3419,20 +3453,23 @@ function _drawLattice(canvas, act) {
       const nj = LATTICE_GRID[row + 1][col];
       const {x:x1,y:y1} = nodeXY(row, col);
       const {x:x2,y:y2} = nodeXY(row + 1, col);
-      let maj3Dev = 0;
+      let maj3Dev = 0, cents = 400;
       if (t0) {
-        const semi = (nj - ni + 12) % 12; // debería ser 4
-        const cents = semi * 100 + t0.offsets[nj] - t0.offsets[ni];
+        const semi = (nj - ni + 12) % 12;
+        cents = semi * 100 + t0.offsets[nj] - t0.offsets[ni];
         maj3Dev = Math.abs(cents - PURE_MAJ3);
       }
-      const alpha = t0 ? Math.max(0.15, 1 - maj3Dev / 20) : 0.3;
-      ctx.strokeStyle = `rgba(96,165,250,${alpha.toFixed(2)})`;
-      ctx.lineWidth = t0 ? Math.max(1, 3 - maj3Dev / 6) : 1.5;
-      ctx.setLineDash([4, 4]);
+      const isHoverEdge = canvas._hoverEdge && canvas._hoverEdge.ni === ni && canvas._hoverEdge.nj === nj;
+      const alpha = isHoverEdge ? 1 : (t0 ? Math.max(0.15, 1 - maj3Dev / 20) : 0.3);
+      ctx.strokeStyle = isHoverEdge ? '#93c5fd' : `rgba(96,165,250,${alpha.toFixed(2)})`;
+      ctx.lineWidth = isHoverEdge ? 4 : (t0 ? Math.max(1, 3 - maj3Dev / 6) : 1.5);
+      ctx.setLineDash(isHoverEdge ? [] : [4, 4]);
       ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
       ctx.setLineDash([]);
+      edgeInfo.push({ ni, nj, x1, y1, x2, y2, type: 'maj3', cents });
     }
   }
+  canvas._edgeInfo = edgeInfo;
 
   // ── Nodos ──
   const nodeInfo = [];
