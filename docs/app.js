@@ -1319,19 +1319,15 @@ function restoreSession() {
   if (p.tunerOct !== undefined) TUNER.tunerOct = p.tunerOct;
   // Restaurar filtro de fuentes del medidor
   if (p.dtSuggSources !== undefined) DT._suggSources = p.dtSuggSources ? new Set(p.dtSuggSources) : null;
-  // Restaurar pestaña activa (no restaurar 'tuner' al inicio)
-  if (p.activeTab && p.activeTab !== 'tuner') {
-    activeTab = p.activeTab;
-    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-    const tabEl = document.querySelector(`.tab[data-tab="${p.activeTab}"]`);
-    if (tabEl) tabEl.classList.add('active');
-    const hint = document.getElementById('desk-header-hint');
-    if (hint) hint.textContent = activeTab === 'compare' ? 'Selecciona 1–3 para comparar:' : 'Selecciona un temperamento:';
-  }
   // La barra de audio siempre visible al iniciar (no persistir estado oculto)
   // Restaurar temperamento seleccionado; si nunca se eligió, usar Equal temperament de GrandOrgue
   const nameToRestore = p.selectedName || 'Equal temperament';
   const t = all.find(x => x.name === nameToRestore && (!p.selectedName ? x.source === 'GrandOrgue' : true));
+
+  // Inicializar workspace (migrar desde prefs si es la primera vez)
+  WS.migrateFromLegacy(p.activeTab && p.activeTab !== 'tuner' ? p.activeTab : 'overview');
+  WS.init();
+
   if (t) { selected[0] = t; lastSelected = t; renderBadges(); renderContent(); }
 }
 
@@ -1443,35 +1439,14 @@ function renderBadges() {
 function clearSel(i) { selected[i]=null; renderBadges(); refreshList(); renderContent(); }
 
 // ══════════════════════════════════════════════
-// TABS
+// TABS — gestionados por WS (workspace.js)
 // ══════════════════════════════════════════════
-document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', function() {
-  if (activeTab === 'keyboard' && this.dataset.tab !== 'keyboard') {
-    if (KB.mode !== 'chord') KB.clearAll();
-    if (document.body.classList.contains('kb-fullscreen')) toggleKbFullscreen();
-  }
-  if (activeTab === 'tuner' && this.dataset.tab !== 'tuner') {
-    TUNER.stop();
-    document.getElementById('tuner-screen')?.remove();
-  }
-  if (activeTab === 'medidor' && this.dataset.tab !== 'medidor') DT.stopMic();
-  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-  this.classList.add('active'); activeTab = this.dataset.tab;
-  savePrefs({ activeTab: this.dataset.tab });
-  // Hint de selección según pestaña
-  const hint = document.getElementById('desk-header-hint');
-  if (hint) hint.textContent = activeTab === 'compare' ? 'Selecciona 1–3 para comparar:' : 'Selecciona un temperamento:';
-  // FAB: ocultar cuando el afinador está activo
-  const fab = document.getElementById('tuner-fab');
-  if (fab) fab.style.display = activeTab === 'tuner' ? 'none' : 'flex';
-  renderContent();
-}));
+// Los clicks de pestaña los maneja WS.switchTab() vía onclick en el HTML generado.
 
 // ══════════════════════════════════════════════
 // SWIPE HORIZONTAL EN CONTENT PARA CAMBIAR PESTAÑA (móvil)
 // ══════════════════════════════════════════════
 (function() {
-  const TABS_ORDER = ['overview','fifths','thirds','compare','intervals','beats','consonance','histogram','lattice','triads','tonnetz','scatter','keyboard','medidor'];
   let sx = 0, sy = 0, swiping = false;
   document.getElementById('content').addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
@@ -1481,12 +1456,8 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
     if (!swiping) return; swiping = false;
     const dx = e.changedTouches[0].clientX - sx;
     const dy = e.changedTouches[0].clientY - sy;
-    if (Math.abs(dx) < window.innerWidth * 0.6 || Math.abs(dx) < Math.abs(dy) * 4) return; // gesto de al menos 60% del ancho de pantalla
-    if (activeTab === 'tuner' || activeTab === 'keyboard') return; // estas pestañas manejan su propio scroll/touch
-    const idx = TABS_ORDER.indexOf(activeTab);
-    const next = dx < 0 ? TABS_ORDER[idx + 1] : TABS_ORDER[idx - 1];
-    if (!next) return;
-    document.querySelector(`.tab[data-tab="${next}"]`)?.click();
+    if (Math.abs(dx) < window.innerWidth * 0.6 || Math.abs(dx) < Math.abs(dy) * 4) return;
+    WS.switchTabRelative(dx < 0 ? 1 : -1);
   }, { passive: true });
 })();
 
@@ -1727,15 +1698,51 @@ function panel(title, bodyHtml, style = '') {
 // ══════════════════════════════════════════════
 // VISTAS
 // ══════════════════════════════════════════════
+const _VIEW_MAP = {overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,intervals:viewIntervals,beats:viewBeats,consonance:viewConsonance,histogram:viewHistogram,lattice:viewLattice,triads:viewTriads,tonnetz:viewTonnetz,scatter:viewScatter,keyboard:viewKeyboard};
+
 function renderContent() {
   destroyCharts(); stopSound(true);
-  if (activeTab !== 'keyboard') { /* KB keeps its chord */ }
-  const act=selected.filter(Boolean);
-  const el=document.getElementById('content');
-  if (activeTab !== 'keyboard' && activeTab !== 'tuner' && activeTab !== 'scatter' && activeTab !== 'medidor' && !act.length) {
-    el.innerHTML='<div class="empty-state">Selecciona un temperamento de la lista para empezar.</div>'; return;
+  const act = selected.filter(Boolean);
+  const ws  = WS.current();
+  const tab = ws.tabs.find(t => t.id === ws.activeTabId);
+  const el  = document.getElementById('content');
+
+  if (!tab || !tab.cards.length) {
+    el.innerHTML = '<div class="empty-state">Añade una tarjeta con el botón de abajo.</div>';
+    return;
   }
-  ({overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,intervals:viewIntervals,beats:viewBeats,consonance:viewConsonance,histogram:viewHistogram,lattice:viewLattice,triads:viewTriads,tonnetz:viewTonnetz,scatter:viewScatter,keyboard:viewKeyboard,medidor:viewMedidor,tuner:viewTuner}[activeTab])?.(act);
+
+  el.innerHTML = '';
+
+  for (const card of tab.cards) {
+    const desc = CARD_REGISTRY[card.type];
+    if (!desc) continue;
+
+    const wrap = document.createElement('div');
+    wrap.dataset.cardId = card.id;
+    wrap.style.cssText = 'display:contents';
+    el.appendChild(wrap);
+
+    // Redirigir getElementById('content') al wrapper de esta tarjeta
+    const origGet = document.getElementById.bind(document);
+    document.getElementById = id => id === 'content' ? wrap : origGet(id);
+
+    activeTab = card.type; // charts y panel() necesitan activeTab
+    if (desc.needsSelection && !act.length) {
+      wrap.innerHTML = '<div class="empty-state" style="width:100%">Selecciona un temperamento de la lista para empezar.</div>';
+    } else {
+      _VIEW_MAP[card.type]?.(act);
+    }
+
+    document.getElementById = origGet; // restaurar siempre
+
+    // Inyectar toolbar sobre el primer panel del wrapper
+    const firstPanel = wrap.querySelector?.('.panel') || wrap.firstElementChild;
+    if (firstPanel) {
+      firstPanel.style.position = 'relative';
+      firstPanel.appendChild(WS.makeCardToolbar(card));
+    }
+  }
 }
 
 // ─── VISTA GENERAL ───
@@ -5246,13 +5253,13 @@ function viewTuner() {
 let lastMobile = isMobile();
 let _kbResizeTimer = null;
 function _onResize() {
+  WS.onResize();
   const m = isMobile();
   if (m !== lastMobile) { lastMobile = m; renderContent(); return; }
   // Misma clase de dispositivo (e.g. rotación en móvil): re-renderizar teclados visibles
   clearTimeout(_kbResizeTimer);
   _kbResizeTimer = setTimeout(() => {
     if (activeTab === 'keyboard') KB.render();
-    if (activeTab === 'medidor')  DT._renderKeyboard();
     if (document.getElementById('tuner-mini-kb')) TUNER.renderMiniKb();
   }, 120);
 }
