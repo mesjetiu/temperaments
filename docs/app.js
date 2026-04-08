@@ -1,4 +1,4 @@
-const APP_VERSION = '276cf15 · 2026-04-08';
+const APP_VERSION = '37b0270 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1393,28 +1393,15 @@ document.getElementById('search').addEventListener('input', refreshList);
 function toggleSelect(idx) {
   const t = all[idx];
   const ei = selected.findIndex(s => s && s.name === t.name);
-  if (activeTab === 'compare') {
-    // En Comparar: multi-selección hasta 3 (añadir/quitar)
-    if (ei >= 0) {
-      selected[ei] = null;
-      if (lastSelected?.name === t.name) lastSelected = selected.find(Boolean) ?? null;
-    } else {
-      const e2 = selected.findIndex(s => !s);
-      if (e2 >= 0) selected[e2] = t; else selected = [t, null, null];
-      lastSelected = t;
-      savePrefs({ selectedName: t.name });
-    }
+  // Multi-selección siempre: hasta 3 temperamentos en paralelo
+  if (ei >= 0) {
+    selected[ei] = null;
+    if (lastSelected?.name === t.name) lastSelected = selected.find(Boolean) ?? null;
   } else {
-    // En el resto: selección simple — sustituye al anterior
-    if (ei >= 0) {
-      // Pulsar el mismo → deseleccionar
-      selected = [null, null, null];
-      lastSelected = null;
-    } else {
-      selected = [t, null, null];
-      lastSelected = t;
-      savePrefs({ selectedName: t.name });
-    }
+    const free = selected.findIndex(s => !s);
+    if (free >= 0) selected[free] = t; else selected = [t, null, null];
+    lastSelected = t;
+    savePrefs({ selectedName: t.name });
   }
   renderBadges();
   refreshList();
