@@ -1,4 +1,4 @@
-const APP_VERSION = '756f432 · 2026-04-08';
+const APP_VERSION = '16868bb · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -5443,7 +5443,9 @@ const DT = {
         const octavesFromA4 = Math.round(Math.log2(stableF / pitchA));
         const aFreq = stableF / Math.pow(2, octavesFromA4);
         const oldPitchA = pitchA;
+        console.log('[captureA] stableF=', stableF, 'octavesFromA4=', octavesFromA4, 'aFreq=', aFreq, 'pitchA antes=', pitchA);
         this.setPitchA(aFreq);
+        console.log('[captureA] pitchA después=', pitchA);
         if (this.notes[9] !== null) this.notes[9] = 0;
         this._captureA = false;
         this._stableNi = -1; this._stableCount = 0;
@@ -5499,7 +5501,9 @@ const DT = {
         while (aFreq < 390) aFreq *= 2;
         while (aFreq > 470) aFreq /= 2;
         const oldPitchA = pitchA;
+        console.log('[manual La] _stableFreq=', this._stableFreq, 'aFreq=', aFreq, 'pitchA antes=', pitchA);
         this.setPitchA(aFreq);
+        console.log('[manual La] pitchA después=', pitchA);
         this.notes[9] = 0;
         this._updateStatus(`✓ La: ${oldPitchA.toFixed(2)} → ${pitchA.toFixed(2)} Hz`);
         this._statusLock = Date.now() + 3000;  // bloquear loop 3s DESPUÉS de mostrar
