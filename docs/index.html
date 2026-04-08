@@ -137,9 +137,11 @@
   .panel-fs-close { display: none; position: fixed; top: 10px; right: 10px; z-index: 9999; background: rgba(15,23,42,0.85); border: 1px solid #334155; color: #e2e8f0; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
   .panel:fullscreen .panel-fs-close,
   .panel:-webkit-full-screen .panel-fs-close { display: flex; }
-  /* En fullscreen: ocultar solo el botón ⛶ del header */
+  /* En fullscreen: ocultar botón ⛶ y toolbar de gestión */
   .panel:fullscreen .panel-zoom-btn,
   .panel:-webkit-full-screen .panel-zoom-btn { display: none !important; }
+  .panel:fullscreen .card-toolbar,
+  .panel:-webkit-full-screen .card-toolbar { display: none !important; }
   /* En fullscreen: forzar panel-body visible aunque el panel esté colapsado */
   .panel:fullscreen .panel-body,
   .panel:-webkit-full-screen .panel-body { display: block !important; }
