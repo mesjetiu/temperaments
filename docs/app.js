@@ -1,4 +1,4 @@
-const APP_VERSION = 'a17de2e · 2026-04-08';
+const APP_VERSION = '3fcc789 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1731,11 +1731,12 @@ function renderContent() {
       _PANEL_FN[card.type]?.(act, wrap);
     }
 
-    // Inyectar toolbar sobre el primer panel del wrapper
-    const firstPanel = wrap.querySelector('.panel') || wrap.firstElementChild;
-    if (firstPanel) {
-      firstPanel.style.position = 'relative';
-      firstPanel.appendChild(WS.makeCardToolbar(card));
+    // Inyectar toolbar en el header del primer panel
+    const hdr = wrap.querySelector('.panel-h3-row') || wrap.querySelector('.panel-hdr');
+    if (hdr) {
+      // Insertar antes del zoom-btn (último elemento del header) para no tapar nada
+      const zoomBtn = hdr.querySelector('.panel-zoom-btn');
+      hdr.insertBefore(WS.makeCardToolbar(card), zoomBtn || null);
     }
   }
 }
