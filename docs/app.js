@@ -1,4 +1,4 @@
-const APP_VERSION = 'dc59ff7 · 2026-04-08';
+const APP_VERSION = '2ed41a4 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -5275,7 +5275,7 @@ document.getElementById('tuner-fab').addEventListener('click', () => document.qu
 document.getElementById('oct-down-btn').addEventListener('click', () => octShift(-1));
 document.getElementById('oct-up-btn').addEventListener('click', () => octShift(+1));
 document.getElementById('chart-play-mode-label').addEventListener('click', toggleChartPlayMode);
-document.getElementById('top-toggle').addEventListener('click', toggleTopBar);
+document.getElementById('top-toggle').addEventListener('click', () => toggleTopBar());
 document.getElementById('about-modal').addEventListener('click', e => { if (e.target === e.currentTarget) hideAbout(); });
 document.getElementById('about-close-btn').addEventListener('click', hideAbout);
 document.getElementById('share-cancel-btn').addEventListener('click', closeShareDialog);
