@@ -1,4 +1,4 @@
-const APP_VERSION = '5d21afd · 2026-04-08';
+const APP_VERSION = '0857691 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -3323,8 +3323,7 @@ function viewLattice(act) {
       if (!node) return;
       // Reproducir la nota del primer temperamento activo
       const t = act[0]; if (!t) return;
-      const freq = noteFreq(node.ni, t.offsets, pitchA, octaveShift);
-      playNote(freq, 1.2);
+      playFreqs([noteFreq(node.ni, t.offsets, pitchA, octaveShift)]);
     });
   });
 }
@@ -3575,11 +3574,8 @@ function viewTriads(act) {
       if (!hit || !act[0]) return;
       const t = act[0];
       const intervals = hit.type === 'M' ? [0,4,7] : [0,3,7];
-      intervals.forEach((semi, i) => {
-        const ni = (hit.root + semi) % 12;
-        const freq = noteFreq(ni, t.offsets, pitchA, octaveShift);
-        setTimeout(() => playNote(freq, 1.0), i * 30);
-      });
+      const freqs = intervals.map(semi => noteFreq((hit.root + semi) % 12, t.offsets, pitchA, octaveShift));
+      playFreqs(freqs);
     });
   });
 }
