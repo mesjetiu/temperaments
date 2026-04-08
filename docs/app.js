@@ -1,4 +1,4 @@
-const APP_VERSION = '9bacf36 · 2026-04-08';
+const APP_VERSION = 'fdf1fbf · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -5031,8 +5031,6 @@ function tunerTempName() {
 function exitTuner() {
   TUNER.stop();
   document.getElementById('tuner-screen')?.remove();
-  const prev = document.querySelector('.tab:not([data-tab="tuner"])');
-  if (prev) prev.click(); else document.querySelector('.tab')?.click();
 }
 
 function buildTunerScreen() {
@@ -5847,7 +5845,75 @@ function openTuner() {
 }
 function openMedidor() {
   document.getElementById('tools-fab-menu').style.display = 'none';
-  viewMedidor();
+  // Crear overlay a pantalla completa igual que el tuner
+  document.getElementById('medidor-screen')?.remove();
+  const sc = document.createElement('div');
+  sc.id = 'medidor-screen';
+  if (!isMobile()) {
+    sc.style.left  = '280px';
+    sc.style.width = 'calc(100% - 280px)';
+  }
+  // Barra superior con botón ‹ de cierre
+  sc.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;padding:0 10px;background:#0f172a;border-bottom:1px solid #1e293b;flex-shrink:0;height:46px;box-sizing:border-box">
+      <button onclick="exitMedidor()" style="background:none;border:none;color:#93c5fd;font-size:24px;cursor:pointer;line-height:1;padding:0 4px">‹</button>
+      <span style="font-size:14px;color:#94a3b8;font-weight:600">Medidor de afinación</span>
+    </div>
+    <div id="medidor-body" style="flex:1;overflow-y:auto;padding:16px;box-sizing:border-box"></div>`;
+  document.body.appendChild(sc);
+
+  // Volcar el contenido del medidor en el body del overlay
+  const bodyEl = sc.querySelector('#medidor-body');
+  bodyEl.innerHTML = `
+    <div style="width:100%;max-width:560px;margin:0 auto">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        <label onclick="DT.toggleMic()" style="display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none">
+          <span style="font-size:15px">🎤</span>
+          <div class="dt-mic-track" style="position:relative;width:34px;height:18px;background:${DT.micOn?'#3b82f6':'#334155'};border-radius:9px;flex-shrink:0">
+            <div class="dt-mic-thumb" style="position:absolute;top:2px;left:${DT.micOn?'16px':'2px'};width:14px;height:14px;background:#fff;border-radius:50%;transition:left 0.2s"></div>
+          </div>
+        </label>
+        <button class="dt-mode-btn icon-btn${DT.mode==='auto'?' sel':''}" data-m="auto"  onclick="DT.setMode('auto')">Auto</button>
+        <button class="dt-mode-btn icon-btn${DT.mode==='manual'?' sel':''}" data-m="manual" onclick="DT.setMode('manual')">Manual</button>
+        <span style="flex:1"></span>
+        <span id="dt-count" style="font-size:11px;color:var(--muted)">${DT.measuredCount()}/12</span>
+        <button class="icon-btn" onclick="DT.importJson()" style="font-size:11px">⬆</button>
+        <button class="icon-btn" onclick="DT.reset()">↺ Reiniciar</button>
+      </div>
+      <div id="dt-pitch-row" style="display:flex;align-items:center;gap:6px;background:#0f172a;border-radius:6px;padding:7px 10px;margin-bottom:12px;min-height:34px"></div>
+      <div id="dt-kb-wrap" style="overflow-x:auto;padding-bottom:6px;margin-bottom:10px;-webkit-overflow-scrolling:touch"></div>
+      <div style="background:#0f172a;border-radius:4px;height:5px;overflow:hidden;margin-bottom:5px">
+        <div id="dt-bar-fill" style="height:100%;width:0%;background:var(--accent);transition:width 0.1s;border-radius:4px"></div>
+      </div>
+      <div id="dt-status" style="text-align:center;font-size:12px;color:var(--muted);min-height:1.5em;margin-bottom:14px">—</div>
+      <div id="dt-save-row" style="display:${DT.measuredCount()>0?'flex':'none'};align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <input id="dt-name-input" type="text" placeholder="Nombre del temperamento…"
+          style="flex:1;min-width:140px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;outline:none"
+          onkeydown="if(event.key==='Enter')DT.save()">
+        <button class="icon-btn" onclick="DT.save()" style="background:#1d4ed8;color:#fff;border-color:#1d4ed8">Guardar</button>
+      </div>
+      <div id="dt-export-panel" style="display:none;gap:8px;flex-wrap:wrap">
+        <button class="icon-btn" onclick="DT.shareUrl()">📤 Compartir enlace</button>
+        <button class="icon-btn" onclick="DT.downloadJson()">⬇ Descargar .json</button>
+      </div>
+      <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px">
+        <div id="dt-suggestions"></div>
+      </div>
+    </div>`;
+
+  DT._updatePitchRow();
+  DT._renderKeyboard();
+  DT._renderSuggestions();
+  if (DT.micOn && !DT.rafId) DT._scheduleLoop();
+  if (!DT.micOn) {
+    const _micPref = localStorage.getItem('micAutoStart');
+    if (_micPref === null || _micPref === '1') DT.startMic();
+  }
+}
+
+function exitMedidor() {
+  DT.stopMic();
+  document.getElementById('medidor-screen')?.remove();
 }
 document.getElementById('oct-down-btn').addEventListener('click', () => octShift(-1));
 document.getElementById('oct-up-btn').addEventListener('click', () => octShift(+1));
