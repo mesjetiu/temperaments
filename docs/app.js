@@ -1,4 +1,4 @@
-const APP_VERSION = 'c3fa97e · 2026-04-08';
+const APP_VERSION = 'd96ba43 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1717,7 +1717,7 @@ function mkRadar(id, datasets) {
 // En desktop devuelve el HTML tal cual (sin wrapper extra).
 function panel(title, bodyHtml, style = '') {
   const closeBtn = `<button class="panel-fs-close" onclick="togglePanelFullscreen(this)" title="Salir de pantalla completa">✕</button>`;
-  const zoomBtn  = `<button class="panel-zoom-btn" onclick="togglePanelFullscreen(this)" title="Pantalla completa">${ICON_EXPAND}</button>`;
+  const zoomBtn  = `<button class="panel-zoom-btn" onclick="togglePanelFullscreen(this);event.stopPropagation()" title="Pantalla completa">${ICON_EXPAND}</button>`;
   if (!isMobile()) {
     return `<div class="panel" style="${style}">${closeBtn}<div class="panel-h3-row"><h3>${title}</h3>${zoomBtn}</div>${bodyHtml}</div>`;
   }
