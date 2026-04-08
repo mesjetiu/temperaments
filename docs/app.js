@@ -1,4 +1,4 @@
-const APP_VERSION = 'cdaa899 · 2026-04-08';
+const APP_VERSION = 'dc59ff7 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1471,7 +1471,7 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', funct
 // SWIPE HORIZONTAL EN CONTENT PARA CAMBIAR PESTAÑA (móvil)
 // ══════════════════════════════════════════════
 (function() {
-  const TABS_ORDER = ['overview','fifths','thirds','compare','intervals','beats','consonance','histogram','lattice','tonnetz','scatter','keyboard','medidor'];
+  const TABS_ORDER = ['overview','fifths','thirds','compare','intervals','beats','consonance','histogram','lattice','triads','tonnetz','scatter','keyboard','medidor'];
   let sx = 0, sy = 0, swiping = false;
   document.getElementById('content').addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
@@ -1735,7 +1735,7 @@ function renderContent() {
   if (activeTab !== 'keyboard' && activeTab !== 'tuner' && activeTab !== 'scatter' && activeTab !== 'medidor' && !act.length) {
     el.innerHTML='<div class="empty-state">Selecciona un temperamento de la lista para empezar.</div>'; return;
   }
-  ({overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,intervals:viewIntervals,beats:viewBeats,consonance:viewConsonance,histogram:viewHistogram,lattice:viewLattice,tonnetz:viewTonnetz,scatter:viewScatter,keyboard:viewKeyboard,medidor:viewMedidor,tuner:viewTuner}[activeTab])?.(act);
+  ({overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,intervals:viewIntervals,beats:viewBeats,consonance:viewConsonance,histogram:viewHistogram,lattice:viewLattice,triads:viewTriads,tonnetz:viewTonnetz,scatter:viewScatter,keyboard:viewKeyboard,medidor:viewMedidor,tuner:viewTuner}[activeTab])?.(act);
 }
 
 // ─── VISTA GENERAL ───
@@ -2919,6 +2919,344 @@ function _drawLattice(canvas, act) {
   ctx.beginPath(); ctx.moveTo(PAD + 70, legY - 4); ctx.lineTo(PAD + 88, legY - 4); ctx.stroke();
   ctx.setLineDash([]);
   ctx.fillText('3ª mayor', PAD + 92, legY);
+}
+
+// ══════════════════════════════════════════════
+// MAPA DE TRÍADAS
+// ══════════════════════════════════════════════
+// 24 tríadas: 12 mayores + 12 menores
+// Pureza = |dev3ª| + |dev5ª| (menor = más pura)
+// Dos vistas: rueda (círculo de quintas) y grid (12×2)
+
+// Orden cromático de notas para el grid
+const TRIAD_CHROMA = [0,1,2,3,4,5,6,7,8,9,10,11]; // C C# D ... B
+// Orden por círculo de quintas para la rueda
+const TRIAD_FIFTHS = [0,7,2,9,4,11,6,1,8,3,10,5];  // C G D A E B F# C# Ab Eb Bb F
+
+// Calcula las 24 tríadas de un temperamento
+// Retorna array de {root, type:'M'|'m', dev3, dev5, purity, cents3, cents5}
+function _computeTriads(t) {
+  const triads = [];
+  for (let root = 0; root < 12; root++) {
+    // Mayor: 3ª mayor (4 semitonos) + 5ª justa (7 semitonos)
+    const m3i  = (root + 4) % 12;
+    const p5i  = (root + 7) % 12;
+    const cents3M = 4*100 + t.offsets[m3i] - t.offsets[root];
+    const cents5M = 7*100 + t.offsets[p5i] - t.offsets[root];
+    const dev3M = cents3M - PURE_MAJ3;
+    const dev5M = cents5M - PURE_FIFTH;
+    triads.push({ root, type:'M', dev3:dev3M, dev5:dev5M,
+                  purity: Math.abs(dev3M) + Math.abs(dev5M), cents3:cents3M, cents5:cents5M });
+    // Menor: 3ª menor (3 semitonos) + 5ª justa (7 semitonos)
+    const mn3i = (root + 3) % 12;
+    const cents3m = 3*100 + t.offsets[mn3i] - t.offsets[root];
+    const cents5m = cents5M; // misma quinta
+    const dev3m = cents3m - PURE_MIN3;
+    const dev5m = dev5M;
+    triads.push({ root, type:'m', dev3:dev3m, dev5:dev5m,
+                  purity: Math.abs(dev3m) + Math.abs(dev5m), cents3:cents3m, cents5:cents5m });
+  }
+  return triads;
+}
+
+// Color según pureza (cents totales de desviación)
+function _triadColor(purity) {
+  if (purity <  4) return '#4ade80';
+  if (purity <  8) return '#a3e635';
+  if (purity < 14) return '#facc15';
+  if (purity < 22) return '#fb923c';
+  return '#f87171';
+}
+
+let _triadsMode = 'wheel'; // 'wheel' | 'grid'
+
+function viewTriads(act) {
+  const btnStyle = (active) =>
+    `font-size:11px;padding:3px 10px;border-radius:4px;cursor:pointer;border:1px solid #334155;` +
+    (active ? 'background:#1e40af;color:#e2e8f0' : 'background:transparent;color:#6b7280');
+
+  document.getElementById('content').innerHTML = panel(
+    'Mapa de tríadas <small style="color:#4b5563;font-size:10px;font-weight:400">— pureza de las 24 tríadas (mayores + menores)</small>',
+    `<div style="display:flex;gap:6px;margin-bottom:8px">
+       <button id="triads-btn-wheel" style="${btnStyle(_triadsMode==='wheel')}" onclick="setTriadsMode('wheel')">Rueda</button>
+       <button id="triads-btn-grid"  style="${btnStyle(_triadsMode==='grid')}"  onclick="setTriadsMode('grid')">Grid</button>
+     </div>
+     <canvas id="c-triads" style="width:100%;display:block;cursor:pointer;touch-action:none"></canvas>`,
+    'width:100%'
+  );
+  requestAnimationFrame(() => {
+    const cv = document.getElementById('c-triads');
+    if (!cv) return;
+    const redraw = () => _drawTriads(cv, act);
+    redraw();
+    cv._redraw = redraw;
+    attachPanelResize(cv);
+
+    // Hover
+    cv.addEventListener('pointermove', e => {
+      const r = cv.getBoundingClientRect();
+      const nx = _nodeAtTriad(cv, e.clientX - r.left, e.clientY - r.top);
+      if (JSON.stringify(nx) !== JSON.stringify(cv._hoverTriad)) { cv._hoverTriad = nx; redraw(); }
+    });
+    cv.addEventListener('pointerleave', () => { cv._hoverTriad = null; redraw(); });
+
+    // Click → reproducir tríada
+    cv.addEventListener('click', e => {
+      const r = cv.getBoundingClientRect();
+      const hit = _nodeAtTriad(cv, e.clientX - r.left, e.clientY - r.top);
+      if (!hit || !act[0]) return;
+      const t = act[0];
+      const intervals = hit.type === 'M' ? [0,4,7] : [0,3,7];
+      intervals.forEach((semi, i) => {
+        const ni = (hit.root + semi) % 12;
+        const freq = noteFreq(ni, t.offsets, pitchA, octaveShift);
+        setTimeout(() => playNote(freq, 1.0), i * 30);
+      });
+    });
+  });
+}
+
+function setTriadsMode(mode) {
+  _triadsMode = mode;
+  ['wheel','grid'].forEach(m => {
+    const b = document.getElementById(`triads-btn-${m}`);
+    if (b) {
+      const active = m === mode;
+      b.style.background = active ? '#1e40af' : 'transparent';
+      b.style.color = active ? '#e2e8f0' : '#6b7280';
+    }
+  });
+  const cv = document.getElementById('c-triads');
+  if (cv?._redraw) cv._redraw();
+}
+
+function _nodeAtTriad(cv, mx, my) {
+  if (!cv._triadHits) return null;
+  for (const h of cv._triadHits) {
+    if (_triadsMode === 'wheel') {
+      const dx = mx - h.cx, dy = my - h.cy;
+      if (dx*dx + dy*dy <= h.r*h.r) return h;
+    } else {
+      if (mx >= h.x && mx <= h.x + h.w && my >= h.y && my <= h.y + h.h) return h;
+    }
+  }
+  return null;
+}
+
+function _drawTriads(canvas, act) {
+  const dpr = window.devicePixelRatio || 1;
+  const W   = canvas.clientWidth || 500;
+  const isWheel = _triadsMode === 'wheel';
+  const H   = isWheel ? Math.round(Math.min(W, 420)) : Math.round(Math.min(W * 0.45, 200));
+  canvas.width  = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const t0 = act[0];
+  const triads = t0 ? _computeTriads(t0) : null;
+  // Para comparación, segundo y tercer temperamento
+  const t1 = act[1] ? _computeTriads(act[1]) : null;
+  const t2 = act[2] ? _computeTriads(act[2]) : null;
+
+  canvas._triadHits = [];
+
+  if (isWheel) {
+    _drawTriadsWheel(ctx, W, H, triads, t1, t2, act, canvas);
+  } else {
+    _drawTriadsGrid(ctx, W, H, triads, t1, t2, act, canvas);
+  }
+}
+
+function _drawTriadsWheel(ctx, W, H, triads, t1, t2, act, canvas) {
+  const cx = W / 2, cy = H / 2;
+  const maxR = Math.min(cx, cy) - 10;
+  // Anillos: mayores fuera, menores dentro
+  const rOuter = maxR * 0.95;
+  const rMid   = maxR * 0.58;
+  const rInner = maxR * 0.22;
+  const segR_M = (rOuter - rMid) / 2;   // radio de celda mayor
+  const segR_m = (rMid - rInner) / 2;   // radio de celda menor
+  const fSz = Math.min(11, Math.max(8, Math.round(maxR * 0.06)));
+
+  // 12 sectores por círculo de quintas
+  const N = 12;
+  const angleStep = (Math.PI * 2) / N;
+  const gapAngle  = 0.04;
+
+  TRIAD_FIFTHS.forEach((rootIdx, i) => {
+    const angle = -Math.PI / 2 + i * angleStep; // empieza arriba
+    const aStart = angle + gapAngle / 2;
+    const aEnd   = angle + angleStep - gapAngle / 2;
+    const aMid   = (aStart + aEnd) / 2;
+
+    // ── Sector mayor (anillo exterior) ──
+    const triadM = triads?.find(tr => tr.root === rootIdx && tr.type === 'M');
+    const fillM  = triadM ? _triadColor(triadM.purity) : '#1e293b';
+    ctx.beginPath();
+    ctx.arc(cx, cy, rOuter, aStart, aEnd);
+    ctx.arc(cx, cy, rMid,   aEnd,   aStart, true);
+    ctx.closePath();
+    ctx.fillStyle = fillM + '99';
+    ctx.fill();
+    ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 1; ctx.setLineDash([]);
+    ctx.stroke();
+
+    // ── Sector menor (anillo interior) ──
+    const triadm = triads?.find(tr => tr.root === rootIdx && tr.type === 'm');
+    const fillm  = triadm ? _triadColor(triadm.purity) : '#1e293b';
+    ctx.beginPath();
+    ctx.arc(cx, cy, rMid,   aStart, aEnd);
+    ctx.arc(cx, cy, rInner, aEnd,   aStart, true);
+    ctx.closePath();
+    ctx.fillStyle = fillm + '99';
+    ctx.fill();
+    ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // ── Etiqueta nota (entre los dos anillos → en el borde de rMid) ──
+    const lbR = rMid + (rOuter - rMid) * 0.48;
+    const lx  = cx + Math.cos(aMid) * lbR;
+    const ly  = cy + Math.sin(aMid) * lbR;
+    ctx.fillStyle = '#e2e8f0'; ctx.font = `bold ${fSz}px monospace`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(NOTES[rootIdx], lx, ly);
+
+    // ── Etiqueta nota menor (entre los dos anillos → en el borde de rInner) ──
+    const lbRm = rInner + (rMid - rInner) * 0.48;
+    const lxm  = cx + Math.cos(aMid) * lbRm;
+    const lym  = cy + Math.sin(aMid) * lbRm;
+    ctx.fillStyle = '#cbd5e1'; ctx.font = `${fSz - 1}px monospace`;
+    ctx.fillText(NOTES[rootIdx] + 'm', lxm, lym);
+
+    // Hit areas
+    const hitRM = (rOuter + rMid) / 2;
+    const hitrm = (rMid + rInner) / 2;
+    if (triadM) canvas._triadHits.push({ ...triadM, cx: cx + Math.cos(aMid)*hitRM, cy: cy + Math.sin(aMid)*hitRM, r: segR_M * 0.8 });
+    if (triadm) canvas._triadHits.push({ ...triadm, cx: cx + Math.cos(aMid)*hitrm, cy: cy + Math.sin(aMid)*hitrm, r: segR_m * 0.8 });
+  });
+
+  // ── Hover tooltip ──
+  const hov = canvas._hoverTriad;
+  if (hov && triads) {
+    const txt = `${NOTES[hov.root]}${hov.type==='M'?'':' m'}  3ª:${hov.dev3>=0?'+':''}${hov.dev3.toFixed(1)}¢  5ª:${hov.dev5>=0?'+':''}${hov.dev5.toFixed(1)}¢  Σ${hov.purity.toFixed(1)}¢`;
+    const txW = ctx.measureText(txt).width + 16;
+    const txX = Math.min(W - txW - 4, Math.max(4, hov.cx - txW / 2));
+    const txY = Math.max(4, hov.cy - 28);
+    ctx.fillStyle = 'rgba(15,23,42,0.92)';
+    ctx.beginPath(); ctx.roundRect(txX, txY, txW, 20, 4); ctx.fill();
+    ctx.fillStyle = '#e2e8f0'; ctx.font = `${fSz}px monospace`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(txt, txX + 8, txY + 10);
+  }
+
+  // ── Leyenda anillos ──
+  ctx.font = `${fSz}px monospace`; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center';
+  ctx.fillStyle = '#6b7280';
+  ctx.fillText('Mayores', cx, cy - rInner * 0.35);
+  ctx.fillText('m', cx, cy + rInner * 0.35);
+
+  // ── Escala de color ──
+  _drawTriadColorLegend(ctx, W, H, fSz);
+}
+
+function _drawTriadsGrid(ctx, W, H, triads, t1, t2, act, canvas) {
+  const fSz  = Math.min(11, Math.max(8, Math.round(W / 52)));
+  const PAD  = 8;
+  const labelW = fSz * 3.2;
+  const gridW  = W - PAD * 2 - labelW;
+  const cellW  = gridW / 12;
+  // 2 filas por temperamento seleccionado (M + m), separadas por un pequeño gap
+  const nTemps = act.length;
+  const rowH   = Math.max(18, Math.round((H - PAD * 2 - fSz * 2 - 10) / (nTemps * 2)));
+
+  // Cabecera: nombre de notas
+  ctx.font = `${fSz}px monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  TRIAD_CHROMA.forEach((ni, col) => {
+    const x = PAD + labelW + col * cellW + cellW / 2;
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(NOTES[ni], x, PAD + fSz / 2);
+  });
+
+  const allTriadSets = [triads, t1, t2].filter(Boolean);
+  allTriadSets.forEach((trs, ti) => {
+    const baseY = PAD + fSz + 6 + ti * (rowH * 2 + 6);
+
+    ['M','m'].forEach((type, ri) => {
+      const rowY = baseY + ri * rowH;
+
+      // Etiqueta fila
+      ctx.fillStyle = COLORS[act.indexOf(act[ti])] || '#94a3b8';
+      ctx.font = `${fSz - 1}px monospace`; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      ctx.fillText(type === 'M' ? (ti === 0 ? 'Mayor' : 'M') : (ti === 0 ? 'Menor' : 'm'),
+                   PAD + labelW - 4, rowY + rowH / 2);
+
+      TRIAD_CHROMA.forEach((rootIdx, col) => {
+        const tr = trs.find(t => t.root === rootIdx && t.type === type);
+        const x  = PAD + labelW + col * cellW;
+        const fill = tr ? _triadColor(tr.purity) : '#1e293b';
+
+        ctx.fillStyle = fill + 'bb';
+        ctx.fillRect(x + 1, rowY + 1, cellW - 2, rowH - 2);
+        ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 0.5; ctx.setLineDash([]);
+        ctx.strokeRect(x + 1, rowY + 1, cellW - 2, rowH - 2);
+
+        // Valor numérico si hay espacio
+        if (tr && cellW > 28 && rowH > 14) {
+          ctx.fillStyle = '#0f172a'; ctx.font = `${fSz - 2}px monospace`;
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(tr.purity.toFixed(1), x + cellW / 2, rowY + rowH / 2);
+        }
+
+        // Hit area
+        if (tr) canvas._triadHits.push({ ...tr, x: x+1, y: rowY+1, w: cellW-2, h: rowH-2 });
+      });
+    });
+
+    // Nombre del temperamento a la derecha
+    if (act[ti]) {
+      ctx.fillStyle = COLORS[ti] || '#94a3b8';
+      ctx.font = `${fSz - 1}px monospace`; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillText(shortName(act[ti], 18), PAD + labelW, PAD + fSz + 6 + ti * (rowH * 2 + 6) - fSz - 1);
+    }
+  });
+
+  // ── Hover tooltip ──
+  const hov = canvas._hoverTriad;
+  if (hov) {
+    const txt = `${NOTES[hov.root]}${hov.type==='M'?'':' m'}  3ª:${hov.dev3>=0?'+':''}${hov.dev3.toFixed(1)}¢  5ª:${hov.dev5>=0?'+':''}${hov.dev5.toFixed(1)}¢  Σ${hov.purity.toFixed(1)}¢`;
+    const txW = ctx.measureText(txt).width + 16;
+    const txX = Math.min(W - txW - 4, Math.max(4, hov.x - 4));
+    const txY = Math.max(4, hov.y - 24);
+    ctx.fillStyle = 'rgba(15,23,42,0.92)';
+    ctx.beginPath(); ctx.roundRect(txX, txY, txW, 20, 4); ctx.fill();
+    ctx.fillStyle = '#e2e8f0'; ctx.font = `${fSz}px monospace`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(txt, txX + 8, txY + 10);
+  }
+
+  _drawTriadColorLegend(ctx, W, H, fSz);
+}
+
+function _drawTriadColorLegend(ctx, W, H, fSz) {
+  const steps = [
+    { label:'<4¢', color:'#4ade80' }, { label:'<8¢', color:'#a3e635' },
+    { label:'<14¢', color:'#facc15' }, { label:'<22¢', color:'#fb923c' },
+    { label:'≥22¢', color:'#f87171' },
+  ];
+  let lx = W - (steps.length * 42) - 4;
+  ctx.font = `${fSz - 1}px monospace`; ctx.textBaseline = 'alphabetic';
+  steps.forEach(s => {
+    ctx.fillStyle = s.color + '99';
+    ctx.fillRect(lx, H - fSz - 6, 10, 10);
+    ctx.strokeStyle = s.color; ctx.lineWidth = 0.5; ctx.setLineDash([]);
+    ctx.strokeRect(lx, H - fSz - 6, 10, 10);
+    ctx.fillStyle = '#6b7280'; ctx.textAlign = 'left';
+    ctx.fillText(s.label, lx + 13, H - 4);
+    lx += 42;
+  });
 }
 
 // ─── TONNETZ ───
