@@ -1,4 +1,4 @@
-const APP_VERSION = '5af3b2c · 2026-04-08';
+const APP_VERSION = '5e33137 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -480,8 +480,9 @@ function _onPanelFullscreenChange() {
     const panel = btn.closest('.panel');
     btn.innerHTML = (panel && panel === fsEl) ? ICON_COLLAPSE : ICON_EXPAND;
   });
-  // Redibujar para que canvas/chart adapte su tamaño
-  setTimeout(renderContent, 50);
+  // Al salir de fullscreen sí redibujamos (el panel vuelve a su tamaño original).
+  // Al entrar NO: renderContent destruye el DOM y el navegador cancela el fullscreen.
+  if (!fsEl) setTimeout(renderContent, 50);
 }
 
 // ── ResizeObserver para canvas custom (scatter, tonnetz) y tablas ──
