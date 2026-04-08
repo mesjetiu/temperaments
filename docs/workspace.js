@@ -74,9 +74,18 @@ const WS = {
 
   // ── Pestañas ──────────────────────────────────
 
+  _leaveCurrentTab() {
+    // Limpiar estado de vistas que manejan recursos propios
+    if (typeof KB !== 'undefined' && KB.mode !== 'chord') KB.clearAll();
+    if (document.body.classList.contains('kb-fullscreen') && typeof toggleKbFullscreen === 'function') toggleKbFullscreen();
+    if (typeof TUNER !== 'undefined') { TUNER.stop(); document.getElementById('tuner-screen')?.remove(); }
+    if (typeof DT !== 'undefined') DT.stopMic();
+  },
+
   switchTab(id) {
     const ws = this.current();
     if (!ws.tabs.find(t => t.id === id)) return;
+    this._leaveCurrentTab();
     ws.activeTabId = id;
     this.save(ws);
   },
@@ -85,6 +94,7 @@ const WS = {
     const ws = this.current();
     const idx = ws.tabs.findIndex(t => t.id === ws.activeTabId);
     const next = (idx + delta + ws.tabs.length) % ws.tabs.length;
+    this._leaveCurrentTab();
     ws.activeTabId = ws.tabs[next].id;
     this.save(ws);
   },
