@@ -1,4 +1,4 @@
-const APP_VERSION = 'eae46a6 · 2026-04-08';
+const APP_VERSION = '985d370 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1698,7 +1698,9 @@ function panel(title, bodyHtml, style = '') {
 // ══════════════════════════════════════════════
 // VISTAS
 // ══════════════════════════════════════════════
-const _VIEW_MAP = {overview:viewOverview,fifths:viewFifths,thirds:viewThirds,compare:viewCompare,intervals:viewIntervals,beats:viewBeats,consonance:viewConsonance,histogram:viewHistogram,lattice:viewLattice,triads:viewTriads,tonnetz:viewTonnetz,scatter:viewScatter,keyboard:viewKeyboard};
+// Mapa de type → función de panel atómica _panel_xxx(act, el)
+// Se completa abajo a medida que se añaden grupos de paneles.
+const _PANEL_FN = {};
 
 function renderContent() {
   destroyCharts(); stopSound(true);
@@ -1723,27 +1725,345 @@ function renderContent() {
     wrap.style.cssText = 'display:contents';
     el.appendChild(wrap);
 
-    // Redirigir getElementById('content') al wrapper de esta tarjeta
-    const origGet = document.getElementById.bind(document);
-    document.getElementById = id => id === 'content' ? wrap : origGet(id);
-
-    activeTab = card.type; // charts y panel() necesitan activeTab
     if (desc.needsSelection && !act.length) {
-      wrap.innerHTML = '<div class="empty-state" style="width:100%">Selecciona un temperamento de la lista para empezar.</div>';
+      wrap.innerHTML = '<div class="empty-state" style="width:100%;margin:8px 0">Selecciona un temperamento de la lista para empezar.</div>';
     } else {
-      _VIEW_MAP[card.type]?.(act);
+      _PANEL_FN[card.type]?.(act, wrap);
     }
 
-    document.getElementById = origGet; // restaurar siempre
-
     // Inyectar toolbar sobre el primer panel del wrapper
-    const firstPanel = wrap.querySelector?.('.panel') || wrap.firstElementChild;
+    const firstPanel = wrap.querySelector('.panel') || wrap.firstElementChild;
     if (firstPanel) {
       firstPanel.style.position = 'relative';
       firstPanel.appendChild(WS.makeCardToolbar(card));
     }
   }
 }
+
+// ══════════════════════════════════════════════
+// PANELES ATÓMICOS — cada función renderiza UN solo panel
+// Convención: _panel_xxx(act, el)  donde el = contenedor destino
+// ══════════════════════════════════════════════
+
+function _panel_circle(act, el) {
+  const mob = isMobile();
+  el.innerHTML = panel(
+    'Círculo de quintas <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un sector</small>',
+    `<div class="grad-bar"><span>−8¢</span><div class="grad-strip"></div><span>+4¢</span><span style="color:#4b5563">● pura=701.955¢</span></div>
+     ${circleHtml(selected)}`,
+    mob ? '' : 'width:290px'
+  );
+  bindCircleAudio();
+}
+
+function _panel_radar(act, el) {
+  const mob = isMobile();
+  el.innerHTML = panel(
+    'Radar — offsets <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un punto</small>',
+    `<canvas id="c-radar" ${mob ? 'height="200"' : 'height="240"'}></canvas>`,
+    mob ? '' : 'flex:1;min-width:280px'
+  );
+  mkRadar('c-radar', selected.map((t,i) => !t ? null : ({
+    label: shortName(t), data: t.offsets,
+    backgroundColor: COLORS_A[i], borderColor: COLORS[i], borderWidth: 2, pointRadius: 4
+  })).filter(Boolean));
+}
+
+function _panel_offsets(act, el) {
+  const mob = isMobile();
+  el.innerHTML = panel('Offsets respecto al ET (¢)', offsetsTable(act), mob ? '' : 'flex:1;min-width:200px');
+}
+
+function _panel_scatter(act, el) {
+  if (!_scatterPts) {
+    _scatterPts = all.map((temp, idx) => {
+      let minM3 = Infinity;
+      for (let i = 0; i < 12; i++) {
+        const d = Math.abs(400 + temp.offsets[(i+4)%12] - temp.offsets[i] - 386.314);
+        if (d < minM3) minM3 = d;
+      }
+      let maxP5 = 0;
+      for (let i = 0; i < 12; i++) {
+        const d = Math.abs(700 + temp.offsets[(i+7)%12] - temp.offsets[i] - 701.955);
+        if (d > maxP5) maxP5 = d;
+      }
+      return { idx, x: minM3, y: maxP5, src: temp.source, name: temp.name };
+    });
+  }
+  el.innerHTML = panel(
+    `Cartografía de temperamentos (${all.length})`,
+    `<canvas id="scat-cv" style="width:100%;cursor:grab;display:block;touch-action:none"></canvas>
+     <div id="scat-resize" class="chart-resize-handle" title="Arrastra para cambiar altura"></div>
+     <div id="scat-nfo" style="margin-top:4px;min-height:1.4em;font-size:10px;color:var(--muted);text-align:center">pulsa un punto para seleccionarlo · rueda/pinch para zoom · arrastra para mover</div>
+     <div style="margin-top:4px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;font-size:10px;color:#6b7280">
+       <span><span style="color:#60a5fa">●</span> Scala</span>
+       <span><span style="color:#fb923c">●</span> GrandOrgue</span>
+       <span><span style="color:#a78bfa">●</span> Otros</span>
+       <span style="color:#4b5563">← 3ªM mejor &nbsp;↓ 5ª mejor</span>
+     </div>`,
+    'width:100%'
+  );
+  requestAnimationFrame(() => {
+    const cv = document.getElementById('scat-cv');
+    if (cv) _initScatter(cv);
+  });
+}
+
+function _panel_lattice(act, el) {
+  el.innerHTML = panel(
+    'Lattice de Euler <small style="color:#4b5563;font-size:10px;font-weight:400">— red de quintas × terceras mayores</small>',
+    `<canvas id="c-lattice" style="width:100%;display:block;cursor:pointer;touch-action:none"></canvas>`,
+    'width:100%'
+  );
+  requestAnimationFrame(() => {
+    const cv = document.getElementById('c-lattice');
+    if (!cv) return;
+    const redraw = () => _drawLattice(cv, act);
+    redraw();
+    cv._redraw = redraw;
+    attachPanelResize(cv);
+    cv._hoverNode = null;
+    function _nodeAtPoint(x, y) {
+      const info = cv._nodeInfo; if (!info) return null;
+      const R = cv._nodeR || 18;
+      for (const n of info) { const dx = x - n.px, dy = y - n.py; if (dx*dx + dy*dy <= R*R) return n; }
+      return null;
+    }
+    cv.addEventListener('pointermove', e => {
+      const r = cv.getBoundingClientRect();
+      const node = _nodeAtPoint(e.clientX - r.left, e.clientY - r.top);
+      if (node !== cv._hoverNode) { cv._hoverNode = node; redraw(); }
+    });
+    cv.addEventListener('pointerleave', () => { if (cv._hoverNode) { cv._hoverNode = null; redraw(); } });
+    cv.addEventListener('pointerdown', e => {
+      const r = cv.getBoundingClientRect();
+      const node = _nodeAtPoint(e.clientX - r.left, e.clientY - r.top);
+      if (node) playNote(node.ni, act[0]);
+    });
+  });
+}
+
+function _panel_triads(act, el) {
+  const btnStyle = (active) =>
+    `font-size:11px;padding:3px 10px;border-radius:4px;cursor:pointer;border:1px solid #334155;` +
+    (active ? 'background:#1e40af;color:#e2e8f0' : 'background:transparent;color:#6b7280');
+  el.innerHTML = panel(
+    'Mapa de tríadas <small style="color:#4b5563;font-size:10px;font-weight:400">— pureza de las 24 tríadas (mayores + menores)</small>',
+    `<div style="display:flex;gap:6px;margin-bottom:8px">
+       <button id="triads-btn-wheel" style="${btnStyle(_triadsMode==='wheel')}" onclick="setTriadsMode('wheel')">Rueda</button>
+       <button id="triads-btn-grid"  style="${btnStyle(_triadsMode==='grid')}"  onclick="setTriadsMode('grid')">Grid</button>
+     </div>
+     <canvas id="c-triads" style="width:100%;display:block;cursor:pointer;touch-action:none"></canvas>`,
+    'width:100%'
+  );
+  requestAnimationFrame(() => {
+    const cv = document.getElementById('c-triads');
+    if (!cv) return;
+    const redraw = () => _drawTriads(cv, act);
+    redraw(); cv._redraw = redraw; attachPanelResize(cv);
+    cv.addEventListener('pointermove', e => {
+      const r = cv.getBoundingClientRect();
+      const nx = _nodeAtTriad(cv, e.clientX - r.left, e.clientY - r.top);
+      if (JSON.stringify(nx) !== JSON.stringify(cv._hoverTriad)) { cv._hoverTriad = nx; redraw(); }
+    });
+    cv.addEventListener('pointerleave', () => { cv._hoverTriad = null; redraw(); });
+    cv.addEventListener('pointerdown', e => {
+      const r = cv.getBoundingClientRect();
+      const nx = _nodeAtTriad(cv, e.clientX - r.left, e.clientY - r.top);
+      if (nx) { cv._clickTriad = nx; redraw(); playTriad(nx, act[0]); }
+    });
+  });
+}
+
+function _panel_tonnetz(act, el) {
+  let html = '';
+  act.forEach((temp, ti) => {
+    html += panel(
+      `Tonnetz — <span style="color:${COLORS[ti]}">${temp.name}</span>`,
+      `<canvas id="tz-${ti}" style="width:100%;cursor:pointer;display:block"></canvas>
+       <div style="margin-top:4px;font-size:9px;color:#4b5563;text-align:center">→ quinta &nbsp;↗ 3ª Mayor &nbsp;↘ 3ª menor &nbsp;·&nbsp; ▲ tríada mayor &nbsp;▽ tríada menor</div>
+       <div id="tz-nfo-${ti}" style="margin-top:8px;min-height:1.8em;font-size:clamp(14px,4vw,18px);color:var(--text);text-align:center;font-weight:500;letter-spacing:0.2px">pulsa una nota o región para oír</div>
+       <div class="grad-bar" style="margin-top:6px">
+         <span>tríada pura</span>
+         <div style="height:10px;border-radius:3px;flex:1;min-width:60px;background:linear-gradient(to right,hsl(142,65%,30%),hsl(50,80%,30%),hsl(0,85%,30%))"></div>
+         <span>tríada impura</span>
+       </div>`,
+      'width:100%'
+    );
+  });
+  el.innerHTML = html;
+  act.forEach((temp, ti) => {
+    requestAnimationFrame(() => {
+      const cv = document.getElementById(`tz-${ti}`);
+      if (cv) {
+        const nfo = document.getElementById(`tz-nfo-${ti}`);
+        _initTonnetz(cv, nfo, temp, ti);
+        cv._redraw = () => _initTonnetz(cv, nfo, temp, ti);
+        attachPanelResize(cv);
+      }
+    });
+  });
+}
+
+function _panel_histogram(act, el) {
+  el.innerHTML = panel(
+    'Histograma de consonancia <small style="color:#4b5563;font-size:10px;font-weight:400">— distribución de los 132 intervalos por consonancia teórica</small>',
+    `<canvas id="c-hist" style="width:100%;display:block"></canvas>
+     <div id="hist-resize" class="chart-resize-handle" title="Arrastra para cambiar altura"></div>`,
+    'width:100%'
+  );
+  requestAnimationFrame(() => {
+    const cv = document.getElementById('c-hist');
+    if (!cv) return;
+    const redraw = () => _drawHistogram(cv, act);
+    redraw(); cv._redraw = redraw; attachPanelResize(cv);
+    const rh = document.getElementById('hist-resize');
+    if (rh) {
+      rh.addEventListener('pointerdown', ev => {
+        ev.preventDefault(); rh.setPointerCapture(ev.pointerId);
+        const sy = ev.clientY, sh = cv.clientHeight || Math.round(cv.clientWidth * 0.55);
+        const onMove = e => { const h = Math.max(140, sh + e.clientY - sy); cv.style.height = h + 'px'; cv.dataset.userH = h; };
+        const onUp = () => { rh.removeEventListener('pointermove', onMove); rh.removeEventListener('pointerup', onUp); cv.dataset.userH = cv.clientHeight; cv.style.height = ''; redraw(); };
+        rh.addEventListener('pointermove', onMove, { passive: true });
+        rh.addEventListener('pointerup', onUp);
+      });
+    }
+  });
+}
+
+function _panel_consonance(act, el) {
+  const _noteBtnStyle = (on) =>
+    `font-size:9px;padding:2px 5px;border-radius:3px;cursor:pointer;border:none;font-family:monospace;` +
+    (on ? 'background:#1e40af;color:#e2e8f0' : 'background:#1e293b;color:#475569');
+  const notesBtns = NOTES.map((n, i) =>
+    `<button id="cons-root-${i}" data-ni="${i}" style="${_noteBtnStyle(true)}">${n}</button>`
+  ).join('');
+  const auxBtn = `font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;border:1px solid #334155;background:transparent;color:#6b7280`;
+  el.innerHTML = panel(
+    'Curva de consonancia <small style="color:#4b5563;font-size:10px;font-weight:400">— firma espectral del temperamento</small>',
+    `<div style="display:flex;align-items:center;gap:14px;margin-bottom:6px;flex-wrap:wrap">
+       ${_swHtml('cons-audio-sw', 'Audio continuo', false)}
+       ${_swHtml('cons-beat-sw',  'Ver batimentos', false)}
+       <span id="cons-nfo" style="font-size:10px;color:var(--muted);flex:1;min-width:0">
+         Mueve el ratón sobre la gráfica · pulsa para oír un intervalo
+       </span>
+     </div>
+     <div style="display:flex;align-items:center;gap:3px;margin-bottom:6px;flex-wrap:wrap">
+       <span style="font-size:10px;color:#6b7280;white-space:nowrap;margin-right:2px">Raíz:</span>
+       ${notesBtns}
+       <button id="cons-roots-all"  style="${auxBtn};margin-left:6px">Todas</button>
+       <button id="cons-roots-none" style="${auxBtn}">Ninguna</button>
+     </div>
+     <div style="position:relative">
+       <canvas id="c-cons" style="width:100%;display:block;cursor:crosshair;touch-action:none"></canvas>
+       <canvas id="c-cons-cur" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none"></canvas>
+     </div>
+     <div id="cons-resize" class="chart-resize-handle" title="Arrastra para cambiar altura"></div>`,
+    'width:100%'
+  );
+  requestAnimationFrame(() => {
+    const cv = document.getElementById('c-cons');
+    const cvCur = document.getElementById('c-cons-cur');
+    if (!cv) return;
+    const redraw = () => _drawConsonance(cv, cvCur, act);
+    redraw(); cv._redraw = redraw;
+    cv._rootNotes = null;
+    function _updateRootBtns() {
+      NOTES.forEach((_, i) => {
+        const btn = document.getElementById(`cons-root-${i}`);
+        if (!btn) return;
+        const on = !cv._rootNotes || cv._rootNotes.has(i);
+        btn.style.background = on ? '#1e40af' : '#1e293b';
+        btn.style.color      = on ? '#e2e8f0' : '#475569';
+      });
+    }
+    NOTES.forEach((_, i) => {
+      document.getElementById(`cons-root-${i}`)?.addEventListener('click', () => {
+        if (!cv._rootNotes) cv._rootNotes = new Set(NOTES.map((__, j) => j));
+        if (cv._rootNotes.has(i)) { cv._rootNotes.delete(i); } else { cv._rootNotes.add(i); }
+        if (cv._rootNotes.size === 12) cv._rootNotes = null;
+        _updateRootBtns(); redraw();
+      });
+    });
+    document.getElementById('cons-roots-all')?.addEventListener('click', () => { cv._rootNotes = null; _updateRootBtns(); redraw(); });
+    document.getElementById('cons-roots-none')?.addEventListener('click', () => { cv._rootNotes = new Set(); _updateRootBtns(); redraw(); });
+    attachPanelResize(cv);
+    const rh = document.getElementById('cons-resize');
+    if (rh) {
+      rh.addEventListener('pointerdown', ev => {
+        ev.preventDefault(); rh.setPointerCapture(ev.pointerId);
+        const sy = ev.clientY, sh = cv.clientHeight || parseInt(cv.dataset.userH||'0',10) || Math.round(cv.clientWidth*0.5);
+        const onMove = e => { const newH = Math.max(140, sh + e.clientY - sy); cv.style.height = newH + 'px'; cv.dataset.userH = newH; };
+        const onUp = () => { rh.removeEventListener('pointermove', onMove); rh.removeEventListener('pointerup', onUp); cv.dataset.userH = cv.clientHeight; cv.style.height = ''; redraw(); };
+        rh.addEventListener('pointermove', onMove, { passive: true });
+        rh.addEventListener('pointerup', onUp);
+      });
+    }
+  });
+}
+
+function _panel_keyboard(act, el) {
+  const tempName = selected.find(Boolean)?.name ?? '—';
+  el.innerHTML = `
+    <div class="panel" style="width:100%">
+      <div id="kb-controls">
+        <div style="display:flex;gap:4px">
+          <button class="kb-mode${KB.mode==='normal'?' sel':''}" data-mode="normal" onclick="KB.setMode('normal')">Normal</button>
+          <button class="kb-mode${KB.mode==='legato'?' sel':''}" data-mode="legato" onclick="KB.setMode('legato')">Legato</button>
+          <button class="kb-mode${KB.mode==='chord'?' sel':''}"  data-mode="chord"  onclick="KB.setMode('chord')">Acorde</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px">
+          <button class="icon-btn" onclick="KB.shiftOct(-1)">◀</button>
+          <span id="kb-oct-lbl" style="font-size:11px;color:var(--muted);white-space:nowrap">Oct. ${KB.octave}–${KB.octave+2}</span>
+          <button class="icon-btn" onclick="KB.shiftOct(+1)">▶</button>
+        </div>
+        <div id="kb-semi-btns" style="display:flex;align-items:center;gap:4px">
+          <button class="icon-btn" onclick="KB.shiftSemitone(-1)" style="padding:4px 12px;font-size:15px">−</button>
+          <span style="font-size:10px;color:var(--muted);white-space:nowrap">Semitono</span>
+          <button class="icon-btn" onclick="KB.shiftSemitone(+1)" style="padding:4px 12px;font-size:15px">+</button>
+        </div>
+        <button id="kb-clear-btn" class="icon-btn" onclick="KB.clearAll()"
+          style="display:${KB.mode==='chord'?'inline-block':'none'};opacity:${KB.chordMap.size>0?'1':'0.4'}">
+          Limpiar ✕
+        </button>
+        <button id="kb-fs-btn" class="icon-btn" onclick="toggleKbFullscreen()" title="Pantalla completa" style="margin-left:auto;display:flex;align-items:center;justify-content:center;padding:4px 8px">
+          ${document.body.classList.contains('kb-fullscreen') ? ICON_COLLAPSE : ICON_EXPAND}
+        </button>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:#4b5563;margin-bottom:10px">
+        <span style="color:var(--muted)">La =</span>
+        <input id="kb-pitch-input" type="number" value="${pitchA}" min="390" max="470" step="0.1"
+          style="width:58px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:11px;text-align:center;outline:none"
+          onchange="setPitchAGlobal(this.value)" onkeydown="if(event.key==='Enter')setPitchAGlobal(this.value)">
+        <span style="color:var(--muted)">Hz</span>
+        <span style="color:var(--border)">·</span>
+        Temperamento: <span style="color:var(--c0)">${tempName}</span>
+        ${!selected.find(Boolean) ? '<span style="color:#f87171"> — selecciona uno en la lista</span>' : ''}
+      </div>
+      <div id="kb-wrap"></div>
+      <div id="kb-lbl">—</div>
+      <div style="margin-top:16px;font-size:10px;color:#4b5563;line-height:1.8">
+        <b style="color:#6b7280">Normal</b> — suena solo mientras se pulsa &nbsp;·&nbsp;
+        <b style="color:#6b7280">Legato</b> — la nota sigue hasta que se pulsa otra &nbsp;·&nbsp;
+        <b style="color:#6b7280">Acorde</b> — las notas se acumulan; pulsa de nuevo para quitar
+      </div>
+    </div>`;
+  KB.render();
+}
+
+// Registrar paneles atómicos del grupo 1
+Object.assign(_PANEL_FN, {
+  circle:     _panel_circle,
+  radar:      _panel_radar,
+  offsets:    _panel_offsets,
+  scatter:    _panel_scatter,
+  lattice:    _panel_lattice,
+  triads:     _panel_triads,
+  tonnetz:    _panel_tonnetz,
+  histogram:  _panel_histogram,
+  consonance: _panel_consonance,
+  keyboard:   _panel_keyboard,
+});
 
 // ─── VISTA GENERAL ───
 function viewOverview(act) {
