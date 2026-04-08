@@ -1,4 +1,4 @@
-const APP_VERSION = '3fcc789 · 2026-04-08';
+const APP_VERSION = '87a5349 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
