@@ -1,4 +1,4 @@
-const APP_VERSION = '32b759e · 2026-04-08';
+const APP_VERSION = '9bacf36 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1415,6 +1415,7 @@ function updateTunerTempName() {
   if (el) el.textContent = tunerTempName();
 }
 function renderBadges() {
+  const act = selected.filter(Boolean);
   const html = selected.map((t,i) => {
     if (!t) return '';
     const tidx = all.indexOf(t);
@@ -1422,6 +1423,9 @@ function renderBadges() {
   }).join('');
   document.getElementById('desk-badges').innerHTML = html;
   document.getElementById('mob-badges').innerHTML  = html;
+  // En móvil: ocultar el título cuando hay temperamentos seleccionados para ganar espacio
+  const mobTitle = document.getElementById('mob-title');
+  if (mobTitle) mobTitle.style.display = act.length ? 'none' : '';
 }
 function clearSel(i) { selected[i]=null; renderBadges(); refreshList(); renderContent(); }
 

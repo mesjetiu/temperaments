@@ -109,13 +109,13 @@
   }
 
   /* ═══ MOB HEADER ═══ */
-  #mob-header { display: none; background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 14px; align-items: center; gap: 10px; flex-shrink: 0; }
+  #mob-header { display: none; background: var(--surface); border-bottom: 1px solid var(--border); padding: 6px 10px; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
   #hamburger { background: none; border: none; color: var(--accent); cursor: pointer; padding: 4px; flex-shrink: 0; display: flex; align-items: center; }
   #hamburger svg { width: 22px; height: 22px; }
   #mob-branding { display:flex; align-items:center; gap:7px; flex-shrink:0; }
   #mob-branding img { width:26px; height:26px; border-radius:6px; }
   #mob-title { font-size: 17px; color: var(--accent); font-weight: 700; letter-spacing:-.3px; }
-  #mob-badges { display: flex; gap: 6px; flex-wrap: wrap; overflow: hidden; max-height: 52px; flex:1; }
+  #mob-badges { display: flex; gap: 5px; flex-wrap: wrap; flex: 1; min-width: 0; align-items: center; }
   .badge-menu-btn { cursor:pointer; background:rgba(255,255,255,0.08); border-radius:5px; padding:1px 5px; font-size:16px; font-weight:700; line-height:1.4; letter-spacing:1px; color:#e2e8f0; -webkit-tap-highlight-color:transparent; flex-shrink:0; }
   .badge-close-btn { cursor:pointer; font-size:14px; opacity:0.7; padding:0 2px; line-height:1; flex-shrink:0; }
 
@@ -184,7 +184,7 @@
   .temp-item.sel2 { border-left-color: var(--c2); background: #1f3f2a; color: #bbf7d0; }
 
   /* ═══ BADGES ═══ */
-  .badge { padding: 4px 8px; border-radius: 10px; font-size: 12px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default; flex-shrink: 0; -webkit-tap-highlight-color: transparent; display:inline-flex; align-items:center; gap:6px; }
+  .badge { padding: 4px 8px; border-radius: 10px; font-size: 12px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default; flex-shrink: 1; -webkit-tap-highlight-color: transparent; display:inline-flex; align-items:center; gap:6px; min-width: 0; }
   .badge0 { background: #1d4ed8; } .badge1 { background: #991b1b; } .badge2 { background: #166534; }
 
   /* ═══ TABS ═══ */
