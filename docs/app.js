@@ -1,4 +1,4 @@
-const APP_VERSION = '22e2935 · 2026-04-08';
+const APP_VERSION = 'caf1821 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -5869,6 +5869,11 @@ document.getElementById('desk-fullscreen-btn').addEventListener('click', toggleC
     if (e.button !== undefined && e.button !== 0) return;
     dragged = false;
     const r = fab.getBoundingClientRect();
+    // Fijar left/top antes del drag para evitar salto al cambiar de right/bottom
+    fab.style.left   = r.left + 'px';
+    fab.style.top    = r.top  + 'px';
+    fab.style.right  = 'auto';
+    fab.style.bottom = 'auto';
     dragStartX = e.clientX;
     dragStartY = e.clientY;
     fabStartX  = r.left;
