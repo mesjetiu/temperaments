@@ -1,4 +1,4 @@
-const APP_VERSION = '0857691 · 2026-04-08';
+const APP_VERSION = '414a790 · 2026-04-08';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -449,15 +449,28 @@ function toggleKbFullscreen() {
   if (activeTab === 'keyboard') KB.render();
 }
 
-// ── Pantalla completa de gráfica (legacy, mantenido para desk-btn) ──
+// ── Fullscreen de toda la app (Fullscreen API) ──
+function toggleAppFullscreen() {
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    (document.documentElement.requestFullscreen?.() || document.documentElement.webkitRequestFullscreen?.());
+  } else {
+    (document.exitFullscreen?.() || document.webkitExitFullscreen?.());
+  }
+}
+function _updateFsBtn() {
+  const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  const b = document.getElementById('desk-fullscreen-btn');
+  if (b) b.innerHTML = isFs ? ICON_COLLAPSE : ICON_EXPAND;
+}
+document.addEventListener('fullscreenchange', _updateFsBtn);
+document.addEventListener('webkitfullscreenchange', _updateFsBtn);
+
+// ── Pantalla completa de gráfica (usado por teclado) ──
 function toggleContentFullscreen() {
   const content = document.getElementById('content');
   const closeBtn = document.getElementById('content-fullscreen-close');
   const isFs = content.classList.toggle('content-fullscreen');
   if (closeBtn) closeBtn.style.display = isFs ? 'flex' : 'none';
-  ['mob-fullscreen-btn','desk-fullscreen-btn'].forEach(id => {
-    const b = document.getElementById(id); if (b) b.innerHTML = isFs ? ICON_COLLAPSE : ICON_EXPAND;
-  });
   renderContent();
 }
 
@@ -5840,7 +5853,7 @@ document.getElementById('sidebar-about-btn').addEventListener('click', showAbout
 document.getElementById('hamburger').addEventListener('click', openSidebar);
 document.getElementById('content-fullscreen-close').addEventListener('click', toggleContentFullscreen);
 document.getElementById('kb-fs-close').addEventListener('click', toggleKbFullscreen);
-document.getElementById('desk-fullscreen-btn').addEventListener('click', toggleContentFullscreen);
+document.getElementById('desk-fullscreen-btn').addEventListener('click', toggleAppFullscreen);
 // ── FAB drag-to-move ─────────────────────────────────────────────────────────
 (function() {
   const fab = document.getElementById('tuner-fab');
