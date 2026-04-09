@@ -435,12 +435,21 @@ function setPitchAGlobal(val) {
   if (dlgInput) dlgInput.value = v;
 }
 
-// Recalcula el La ponderado según temperatura
+// Devuelve el La efectivo: compensado si la opción está activa, pitchA si no
+function getEffectivePitchA() {
+  return tempCompEnabled ? compensatedPitchA : pitchA;
+}
+
+// Recalcula el La ponderado según temperatura y propaga a toda la app
 function updateCompensatedPitch() {
   if (tempCompEnabled) {
     compensatedPitchA = getCompensatedFreq(pitchA, refTemp, currentTemp);
   } else {
     compensatedPitchA = pitchA;
+  }
+  // Propagar al oscilador de referencia del afinador
+  if (TUNER.refOsc) {
+    try { TUNER.refOsc.frequency.setTargetAtTime(TUNER.getTargetFreq(), getCtx().currentTime, 0.01); } catch(_){}
   }
   updateTempDisplay();
 }
@@ -978,13 +987,13 @@ window.addEventListener('touchcancel', () => stopSound(), { passive: true });
 // ══════════════════════════════════════════════
 // FRECUENCIAS (gráficas)  — noteFreq viene de core.js
 // ══════════════════════════════════════════════
-function playNote(ni, off)       { playFreqs([noteFreq(ni, off, pitchA, octaveShift)]); }
+function playNote(ni, off)       { playFreqs([noteFreq(ni, off, getEffectivePitchA(), octaveShift)]); }
 function playFifthAudio(fi, off) { const f=getFifths(off)[fi]; const r=noteFreq(FIFTH_IDX[fi],off,pitchA,octaveShift); playFreqs([r, r*Math.pow(2,f.size/1200)]); }
 function playMaj3Audio(ni, off)  { const t=getMaj3(off)[ni]; const r=noteFreq(ni,off,pitchA,octaveShift); playFreqs([r, r*Math.pow(2,t.size/1200)]); }
 function playMin3Audio(ni, off)  { const t=getMin3(off)[ni]; const r=noteFreq(ni,off,pitchA,octaveShift); playFreqs([r, r*Math.pow(2,t.size/1200)]); }
 function playTriad(triad, temp)  {
   const off = temp.offsets;
-  const r = noteFreq(triad.root, off, pitchA, octaveShift);
+  const r = noteFreq(triad.root, off, getEffectivePitchA(), octaveShift);
   playFreqs([r, r * Math.pow(2, triad.cents3 / 1200), r * Math.pow(2, triad.cents5 / 1200)]);
 }
 
@@ -2171,7 +2180,7 @@ function _panel_lattice(act, el) {
       const edge = _edgeAtPoint(mx, my);
       if (edge) {
         const off = act[0].offsets;
-        const f1 = noteFreq(edge.ni, off, pitchA, octaveShift);
+        const f1 = noteFreq(edge.ni, off, getEffectivePitchA(), octaveShift);
         playFreqs([f1, f1 * Math.pow(2, edge.cents / 1200)]);
       }
     });
@@ -2505,7 +2514,7 @@ function _panel_beats(act, el) {
     const headerCols = IVLS.map(iv => `<th style="padding:3px 6px;font-size:9px;color:var(--accent);text-align:center">${iv.name}</th>`).join('');
     let rows = '';
     for (let start = 0; start < 12; start++) {
-      const f1 = noteFreq(start, temp.offsets, pitchA, octaveShift);
+      const f1 = noteFreq(start, temp.offsets, getEffectivePitchA(), octaveShift);
       let cells = `<td style="padding:2px 6px;font-size:9px;color:var(--muted);font-weight:600;white-space:nowrap">${NOTES[start]}</td>`;
       IVLS.forEach(iv => {
         const end = (start + iv.semi) % 12;
@@ -2771,7 +2780,7 @@ function viewCompare(act) {
 function playHeatCell(ti, start, semi) {
   const off = selected.filter(Boolean)[ti]?.offsets;
   if (!off || semi === 0) return;
-  const f1 = noteFreq(start, off, pitchA, octaveShift);
+  const f1 = noteFreq(start, off, getEffectivePitchA(), octaveShift);
   const end = (start + semi) % 12;
   const actual = semi * 100 + off[end] - off[start];
   playFreqs([f1, f1 * Math.pow(2, actual / 1200)]);
@@ -2853,7 +2862,7 @@ function viewBeats(act) {
     ).join('');
     let rows = '';
     for (let start = 0; start < 12; start++) {
-      const f1 = noteFreq(start, temp.offsets, pitchA, octaveShift);
+      const f1 = noteFreq(start, temp.offsets, getEffectivePitchA(), octaveShift);
       let cells = `<td style="padding:2px 6px;font-size:9px;color:var(--muted);font-weight:600;white-space:nowrap">${NOTES[start]}</td>`;
       IVLS.forEach(iv => {
         const end = (start + iv.semi) % 12;
@@ -3386,9 +3395,9 @@ function _drawConsonance(canvas, cursorCanvas, act) {
 
       // f0 leído en cada frame: respeta cambios de octava y pitchA en tiempo real
       const f0 = contOn
-        ? noteFreq(0, act[0]?.offsets ?? new Array(12).fill(0), pitchA, octaveShift)
+        ? noteFreq(0, act[0]?.offsets ?? new Array(12).fill(0), getEffectivePitchA(), octaveShift)
         : (_clickNi !== null
-            ? noteFreq(_clickNi, _clickT?.offsets ?? act[0]?.offsets ?? new Array(12).fill(0), pitchA, octaveShift)
+            ? noteFreq(_clickNi, _clickT?.offsets ?? act[0]?.offsets ?? new Array(12).fill(0), getEffectivePitchA(), octaveShift)
             : null);
 
       // cents a usar para calcular batimentos:
@@ -3532,8 +3541,8 @@ function _drawConsonance(canvas, cursorCanvas, act) {
     let nearest = null, minD = 14;
     for (const d of dots) { const dist = Math.hypot(d.x - mx, d.y - my); if (dist < minD) { minD = dist; nearest = d; } }
     if (!nearest) return;
-    playFreqs([noteFreq(nearest.ni, nearest.t.offsets, pitchA, octaveShift),
-               noteFreq(nearest.ni, nearest.t.offsets, pitchA, octaveShift) * Math.pow(2, nearest.cents / 1200)]);
+    playFreqs([noteFreq(nearest.ni, nearest.t.offsets, getEffectivePitchA(), octaveShift),
+               noteFreq(nearest.ni, nearest.t.offsets, getEffectivePitchA(), octaveShift) * Math.pow(2, nearest.cents / 1200)]);
     _clickCents = nearest.cents; _clickNi = nearest.ni; _clickT = nearest.t;
   }, { signal: sig });
 
@@ -3557,7 +3566,7 @@ function _drawConsonance(canvas, cursorCanvas, act) {
       }
     }
     if (_swOn('cons-audio-sw') && inPlot) {
-      const fRef = noteFreq(0, act[0]?.offsets ?? new Array(12).fill(0), pitchA, octaveShift);
+      const fRef = noteFreq(0, act[0]?.offsets ?? new Array(12).fill(0), getEffectivePitchA(), octaveShift);
       playFreqs([fRef, fRef * Math.pow(2, cents / 1200)]);
     }
   }, { signal: sig });
@@ -3651,7 +3660,7 @@ function viewLattice(act) {
       if (!node) return;
       // Reproducir la nota del primer temperamento activo
       const t = act[0]; if (!t) return;
-      playFreqs([noteFreq(node.ni, t.offsets, pitchA, octaveShift)]);
+      playFreqs([noteFreq(node.ni, t.offsets, getEffectivePitchA(), octaveShift)]);
     });
   });
 }
@@ -3798,7 +3807,7 @@ function _drawLattice(canvas, act) {
   // ── Tooltip hover ──
   if (canvas._hoverNode && t0) {
     const { ni, px, py } = canvas._hoverNode;
-    const freq = noteFreq(ni, t0.offsets, pitchA, octaveShift);
+    const freq = noteFreq(ni, t0.offsets, getEffectivePitchA(), octaveShift);
     const off  = t0.offsets[ni];
     const txt  = `${NOTES[ni]}  ${freq.toFixed(2)} Hz  ${off >= 0 ? '+' : ''}${off.toFixed(2)}¢`;
     const txW  = ctx.measureText(txt).width + 16;
@@ -3912,7 +3921,7 @@ function viewTriads(act) {
       if (!hit || !act[0]) return;
       const t = act[0];
       const intervals = hit.type === 'M' ? [0,4,7] : [0,3,7];
-      const freqs = intervals.map(semi => noteFreq((hit.root + semi) % 12, t.offsets, pitchA, octaveShift));
+      const freqs = intervals.map(semi => noteFreq((hit.root + semi) % 12, t.offsets, getEffectivePitchA(), octaveShift));
       playFreqs(freqs);
     });
   });
@@ -4312,7 +4321,7 @@ function _initTonnetz(canvas, nfoEl, temp, ti) {
     }
     const tr = tris.find(t => ptInTri(mx, my, t));
     if (tr) {
-      playFreqs(tr.ns.map(n => noteFreq(n, temp.offsets, pitchA, octaveShift)));
+      playFreqs(tr.ns.map(n => noteFreq(n, temp.offsets, getEffectivePitchA(), octaveShift)));
       const rn = NOTES[tr.root], type = tr.isMaj ? 'mayor' : 'menor';
       const dt = (tr.isMaj ? devM3 : devm3)(tr.root), df = devP5(tr.root);
       const s = v => (v >= 0 ? '+' : '') + v.toFixed(1) + '¢';
@@ -4725,7 +4734,7 @@ function viewKeyboard() {
 // Usar const (no function) para no sobrescribir window.findClosestNote con recursión infinita.
 const _appFindNote = (freq) => {
   const off = (lastSelected ?? selected.find(Boolean))?.offsets ?? new Array(12).fill(0);
-  return window.findClosestNote(freq, pitchA, off);
+  return window.findClosestNote(freq, getEffectivePitchA(), off);
 };
 
 // ══════════════════════════════════════════════
@@ -4751,9 +4760,7 @@ const TUNER = {
 
   getTargetFreq() {
     const off = (lastSelected ?? selected.find(Boolean))?.offsets ?? new Array(12).fill(0);
-    // Usar compensatedPitchA si está activa la compensación térmica
-    const baseFreq = tempCompEnabled ? compensatedPitchA : pitchA;
-    return baseFreq * Math.pow(2, (ET_FROM_A[this.targetNi] + off[this.targetNi] + (this.targetOct - 4) * 1200) / 1200);
+    return getEffectivePitchA() * Math.pow(2, (ET_FROM_A[this.targetNi] + off[this.targetNi] + (this.targetOct - 4) * 1200) / 1200);
   },
 
   setMode(m) {

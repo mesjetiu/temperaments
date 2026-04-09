@@ -245,18 +245,20 @@ export function parseTempMarkdown(text) {
 
 /**
  * Compensa la frecuencia de referencia según la temperatura.
- * Usa la fórmula precisa para tubos metálicos (estaño-plomo, típico en órganos).
+ *
+ * En un tubo de órgano la frecuencia es proporcional a la velocidad del sonido
+ * en el aire: v(T) = 331.3 × √(1 + T/273.15).
+ * Por tanto:  f(T) = f_ref × √((273.15 + T_actual) / (273.15 + T_ref))
+ *
+ * Ejemplo: 440 Hz a 20 °C → a 30 °C ≈ 447.5 Hz (+29.3 ¢).
  *
  * @param {number} refFreq      - frecuencia de referencia (La4 objetivo) en Hz
- * @param {number} refTemp      - temperatura de referencia en °C (típicamente 20°C)
+ * @param {number} refTemp      - temperatura de referencia en °C
  * @param {number} currentTemp  - temperatura actual en °C
- * @param {number} alpha        - coeficiente de expansión térmica (defecto 0.000184/°C para estaño-plomo)
  * @returns {number} frecuencia compensada en Hz
  */
-export function getCompensatedFreq(refFreq, refTemp = 20, currentTemp = 20, alpha = 0.000184) {
-  const deltaT = currentTemp - refTemp;
-  // f(T) = f_ref * (1 + α * ΔT)
-  return refFreq * (1 + alpha * deltaT);
+export function getCompensatedFreq(refFreq, refTemp = 20, currentTemp = 20) {
+  return refFreq * Math.sqrt((273.15 + currentTemp) / (273.15 + refTemp));
 }
 
 /**
