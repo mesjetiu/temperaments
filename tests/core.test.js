@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {
   noteFreq, getFifths, getMaj3, getMin3,
   PURE_FIFTH, PURE_MAJ3, PURE_MIN3, NOTES, FIFTH_LBL, FIFTH_IDX
-} from '../docs/core.js';
+} from '../src/core.js';
 
 const ET = new Array(12).fill(0);
 

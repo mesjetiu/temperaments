@@ -14,10 +14,10 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import * as core from '../docs/core.js';
+import * as core from '../src/core.js';
 
 const appSrc = readFileSync(
-  fileURLToPath(new URL('../docs/app.js', import.meta.url)),
+  fileURLToPath(new URL('../src/app.js', import.meta.url)),
   'utf8'
 );
 

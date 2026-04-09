@@ -1,4 +1,4 @@
-const CACHE = 'temp-db74adb';const STATIC = [
+const CACHE = 'temp-__HASH__';const STATIC = [
   './icon-192.png',
   './icon-512.png',
   './ruuvi.js',

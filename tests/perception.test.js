@@ -25,7 +25,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { detectPitch } from '../docs/core.js';
+import { detectPitch } from '../src/core.js';
 import { makeSine, makeRichTone, addNoise, freqToCents } from './helpers.js';
 
 const SR = 44100;

@@ -4,7 +4,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { getCompensatedFreq, getFreqOffsetInCents } from '../docs/core.js';
+import { getCompensatedFreq, getFreqOffsetInCents } from '../src/core.js';
 
 // Función auxiliar: valor esperado con la fórmula exacta
 const expected = (f, tRef, tCurr) => f * Math.sqrt((273.15 + tCurr) / (273.15 + tRef));

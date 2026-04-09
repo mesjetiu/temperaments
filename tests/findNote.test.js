@@ -2,7 +2,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { findClosestNote } from '../docs/core.js';
+import { findClosestNote } from '../src/core.js';
 import { ET_OFFSETS } from './helpers.js';
 
 describe('findClosestNote', () => {

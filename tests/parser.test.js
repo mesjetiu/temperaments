@@ -5,10 +5,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
-import { parseTempMarkdown } from '../docs/core.js';
+import { parseTempMarkdown } from '../src/core.js';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
-const TEMPS_MD = join(__dir, '../docs/temperaments.md');
+const TEMPS_MD = join(__dir, '../src/temperaments.md');
 
 // ─── Fixtures inline ──────────────────────────────────────────────────────────
 

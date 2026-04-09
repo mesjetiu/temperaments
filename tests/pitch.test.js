@@ -2,7 +2,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { detectPitch, _refineFFT } from '../docs/core.js';
+import { detectPitch, _refineFFT } from '../src/core.js';
 import { makeSine, mixSines, makeFFTBuf, freqToCents } from './helpers.js';
 
 const SR = 44100;

@@ -10,9 +10,9 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const files = [
-  'docs/app.js',
-  'docs/core.js',
-  'docs/sw.js',
+  'src/app.js',
+  'src/core.js',
+  'src/sw.js',
 ];
 
 describe('sintaxis JS', () => {

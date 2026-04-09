@@ -2,7 +2,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { _computeHarmonics } from '../docs/core.js';
+import { _computeHarmonics } from '../src/core.js';
 
 const N = 8; // potencia de 2 manejable para tests
 

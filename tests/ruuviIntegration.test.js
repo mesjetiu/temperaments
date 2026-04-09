@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 // ── Cargar core.js como módulo ES ────────────────────────────────────────────
-import { getCompensatedFreq, getFreqOffsetInCents, noteFreq } from '../docs/core.js';
+import { getCompensatedFreq, getFreqOffsetInCents, noteFreq } from '../src/core.js';
 
 // ── Simulación mínima del estado global de app.js ────────────────────────────
 // Replicamos solo la lógica relevante sin DOM ni AudioContext.
