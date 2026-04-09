@@ -122,6 +122,19 @@
     #audio-bar .ab-sep { display: none; }
   }
 
+  /* ═══ LANDSCAPE MÓVIL (pantallas pequeñas en horizontal) ═══ */
+  @media (max-height: 600px) and (orientation: landscape) {
+    #app { flex-direction: column; height: 100dvh; }
+    #sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: min(85vw,320px); transform: translateX(-105%); box-shadow: 4px 0 24px rgba(0,0,0,.5); z-index: 600; }
+    #sidebar.open { transform: translateX(0); }
+    #overlay.open { display: block; opacity: 1; }
+    #main { flex: 1; overflow: hidden; }
+    #mob-header { display: flex !important; }
+    #desk-header { display: none; }
+    #content { flex-direction: row !important; flex-wrap: wrap !important; padding: 8px !important; gap: 8px !important; }
+    .panel { min-width: min(340px, 100%) !important; }
+  }
+
   /* ═══ MOB HEADER ═══ */
   #mob-header { display: none; background: var(--surface); border-bottom: 1px solid var(--border); padding: 6px 10px; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
   #hamburger { background: none; border: none; color: var(--accent); cursor: pointer; padding: 4px; flex-shrink: 0; display: flex; align-items: center; }
@@ -528,6 +541,15 @@
 </div>
 
 <script type="module" src="./core.js"></script>
+<script>
+// En Capacitor el SW no tiene sentido — desregistrarlo para evitar cache stale
+if (window.Capacitor?.getPlatform?.() !== 'web' && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    for (const r of regs) r.unregister();
+  });
+  caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+}
+</script>
 <script defer src="./ruuvi.js"></script>
 <script defer src="./workspace.js"></script>
 <script defer src="./app.js"></script>

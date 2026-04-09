@@ -4,7 +4,7 @@
 #   --logs  muestra logcat filtrado por la app tras instalar
 set -e
 
-export JAVA_HOME="/usr/lib/jvm/java-25-openjdk"
+export JAVA_HOME="/usr/lib/jvm/java-21-openjdk"
 export ANDROID_HOME="$HOME/Android/Sdk"
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/35.0.0:$PATH"
 

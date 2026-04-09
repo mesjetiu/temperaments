@@ -893,11 +893,7 @@ const SensorDlg = {
 
   async toggleConnect() {
     if (typeof RuuviScanner === 'undefined' || typeof window.RuuviScanner === 'undefined') {
-      // Diagnóstico: listar scripts cargados
-      const scripts = Array.from(document.scripts).map(s => s.src || '[inline]').join('\n');
-      alert('DIAGNÓSTICO:\ntypeof RuuviScanner = ' + typeof RuuviScanner +
-            '\ntypeof window.RuuviScanner = ' + typeof window.RuuviScanner +
-            '\n\nScripts cargados:\n' + scripts);
+      alert('Sensor no disponible.');
       return;
     }
     if (RuuviScanner.streaming) {
