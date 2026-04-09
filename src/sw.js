@@ -1,8 +1,13 @@
 const CACHE = 'temp-__HASH__';const STATIC = [
   './icon-192.png',
   './icon-512.png',
+  './app.js',
+  './core.js',
+  './workspace.js',
   './ruuvi.js',
-  'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
+  'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
+  'https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js',
+  'https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js',
 ];
 
 const DYNAMIC = [
@@ -16,6 +21,9 @@ self.addEventListener('message', e => {
 });
 
 self.addEventListener('install', e => {
+  // skipWaiting inmediato: el SW nuevo se activa en cuanto termina de cachear,
+  // sin esperar a que el usuario cierre la pestaña.
+  self.skipWaiting();
   e.waitUntil(
     caches.open(CACHE).then(c =>
       Promise.allSettled(
