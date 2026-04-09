@@ -451,6 +451,10 @@ function updateCompensatedPitch() {
   if (TUNER.refOsc) {
     try { TUNER.refOsc.frequency.setTargetAtTime(TUNER.getTargetFreq(), getCtx().currentTime, 0.01); } catch(_){}
   }
+  // Mostrar/ocultar indicadores de termómetro en toda la app
+  document.querySelectorAll('.temp-indicator').forEach(el => {
+    el.classList.toggle('active', tempCompEnabled);
+  });
   updateTempDisplay();
 }
 
@@ -2376,7 +2380,7 @@ function _panel_keyboard(act, el) {
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:#4b5563;margin-bottom:10px">
         <span style="color:var(--muted)">La =</span>
-        <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${pitchA} Hz</span>
+        <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${pitchA} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" onclick="PitchADlg.open()" title="Compensación térmica activa">🌡️</span>
         <span style="color:var(--border)">·</span>
         Temperamento: <span style="color:var(--c0)">${tempName}</span>
         ${!selected.find(Boolean) ? '<span style="color:#f87171"> — selecciona uno en la lista</span>' : ''}
@@ -4704,7 +4708,7 @@ function viewKeyboard() {
       <!-- La + Temperamento en la misma fila -->
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:#4b5563;margin-bottom:10px">
         <span style="color:var(--muted)">La =</span>
-        <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${pitchA} Hz</span>
+        <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${pitchA} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" onclick="PitchADlg.open()" title="Compensación térmica activa">🌡️</span>
         <span style="color:var(--border)">·</span>
         Temperamento: <span style="color:var(--c0)">${tempName}</span>
         ${!selected.find(Boolean) ? '<span style="color:#f87171"> — selecciona uno en la lista</span>' : ''}
@@ -5445,7 +5449,7 @@ function buildTunerScreen() {
         <div style="border-top:1px solid #334155;padding-top:8px;margin-top:2px">
           <div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="closeTunerMenu();PitchADlg.open()">
             <span style="font-size:10px;color:#64748b">La =</span>
-            <span class="pitchA-label" style="color:#93c5fd;font-size:13px;border-bottom:1px dashed #93c5fd;padding:2px 4px">${pitchA} Hz</span>
+            <span class="pitchA-label" style="color:#93c5fd;font-size:13px;border-bottom:1px dashed #93c5fd;padding:2px 4px">${pitchA} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" title="Compensación térmica activa">🌡️</span>
           </div>
         </div>
         ${!window.matchMedia('(display-mode: standalone)').matches ? `<div style="border-top:1px solid #334155;padding-top:8px;margin-top:2px">
@@ -5583,7 +5587,7 @@ const DT = {
     const canNorm = this.notes[9] !== null && this.notes[9] !== 0;
     el.innerHTML =
       `<span style="font-size:11px;color:var(--muted)">La ref:</span>
-       <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${pitchA} Hz</span>`
+       <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${pitchA} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" onclick="PitchADlg.open()" title="Compensación térmica activa">🌡️</span>`
       + (canNorm ? `<button class="icon-btn" onclick="DT.normalize()" style="font-size:10px;margin-left:4px;color:#fcd34d;border-color:#b45309">Normalizar A→0</button>` : '');
   },
 

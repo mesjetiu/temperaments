@@ -86,6 +86,17 @@
   }
   #update-toast-dismiss:hover { background: #1f2937 !important; }
 
+  /* ═══ INDICADOR TÉRMICO ═══ */
+  .temp-indicator {
+    display: none; font-size: 13px; cursor: pointer;
+    animation: temp-pulse 2s ease-in-out infinite;
+  }
+  .temp-indicator.active { display: inline; }
+  @keyframes temp-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
   /* ═══ SHARE DIALOG ═══ */
   #share-dialog { display:none; position:fixed; inset:0; z-index:2000; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; padding:16px; }
   #share-dialog.open { display:flex; }
