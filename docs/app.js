@@ -1,4 +1,4 @@
-const APP_VERSION = '5fa27bb · 2026-04-09';
+const APP_VERSION = '7cdd3f3 · 2026-04-09';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2627,9 +2627,8 @@ function _panel_consonance(act, el) {
 
 function _panel_keyboard(act, el) {
   const tempName = selected.find(Boolean)?.name ?? '—';
-  el.innerHTML = `
-    <div class="panel" style="width:100%">
-      <div id="kb-controls">
+  const bodyHtml =
+    `<div id="kb-controls">
         <div style="display:flex;gap:4px">
           <button class="kb-mode${KB.mode==='normal'?' sel':''}" data-mode="normal" onclick="KB.setMode('normal')">Normal</button>
           <button class="kb-mode${KB.mode==='legato'?' sel':''}" data-mode="legato" onclick="KB.setMode('legato')">Legato</button>
@@ -2666,8 +2665,8 @@ function _panel_keyboard(act, el) {
         <b style="color:#6b7280">Normal</b> — suena solo mientras se pulsa &nbsp;·&nbsp;
         <b style="color:#6b7280">Legato</b> — la nota sigue hasta que se pulsa otra &nbsp;·&nbsp;
         <b style="color:#6b7280">Acorde</b> — las notas se acumulan; pulsa de nuevo para quitar
-      </div>
-    </div>`;
+      </div>`;
+  el.innerHTML = panel('Teclado', bodyHtml, 'width:100%');
   KB.render();
 }
 
