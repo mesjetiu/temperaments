@@ -101,7 +101,10 @@ function createWindow() {
 }
 
 // ── Arranque ──────────────────────────────────────────────────────────────────
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+
+  // Limpiar caché HTTP al arrancar: garantiza que siempre se cargan los ficheros actuales de docs/
+  await session.defaultSession.clearCache();
 
   // Intercepción de CDN → vendor local (soporte offline)
   session.defaultSession.webRequest.onBeforeRequest(
