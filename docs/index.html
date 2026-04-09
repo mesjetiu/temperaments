@@ -89,9 +89,11 @@
   /* ═══ INDICADOR TÉRMICO ═══ */
   .temp-indicator {
     display: none; font-size: 13px; cursor: pointer;
-    animation: temp-pulse 2s ease-in-out infinite;
   }
+  /* Temperatura puntual (manual o lectura única): visible, sin animación */
   .temp-indicator.active { display: inline; }
+  /* Sensor continuo activo: visible + pulso */
+  .temp-indicator.streaming { display: inline; animation: temp-pulse 2s ease-in-out infinite; }
   @keyframes temp-pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.35; }
@@ -437,7 +439,7 @@
 
       <!-- La / Pitch A -->
       <label>La =</label>
-      <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">440 Hz</span><span class="temp-indicator" onclick="PitchADlg.open()" title="Compensación térmica activa">🌡️</span>
+      <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">440 Hz</span><span class="temp-indicator" onclick="PitchADlg.open()" title="Compensación térmica activa">🌡️</span><span class="temp-indicator" id="compensated-hz-bar" onclick="PitchADlg.open()" style="font-size:11px;color:var(--accent);margin-left:2px">= <span id="compensated-hz-val">440.00</span> Hz</span>
 
       <div class="ab-sep"></div>
 
@@ -453,7 +455,7 @@
 
       <label id="chart-play-mode-label" style="display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none" title="Sustain: la nota sigue sonando al soltar">
         <div id="play-mode-track" style="position:relative;width:28px;height:15px;background:#334155;border-radius:8px;flex-shrink:0;transition:background 0.2s">
-          <div id="play-mode-thumb" style="position:absolute;top:2px;left:2px;width:11px;height:11px;background:#fff;border-radius:50%;transition:left 0.2s"></div>
+          <div id="play-mode-thumb" style="position:absolute;top:2px;left:2px;width:11px;height:11px;background:#fff;border-radius:50%;transition:lefºt 0.2s"></div>
         </div>
         <span style="font-size:11px;color:var(--muted)">Sustain</span>
       </label>
@@ -520,6 +522,7 @@
 </div>
 
 <script type="module" src="./core.js"></script>
+<script defer src="./ruuvi.js"></script>
 <script defer src="./workspace.js"></script>
 <script defer src="./app.js"></script>
 </body>

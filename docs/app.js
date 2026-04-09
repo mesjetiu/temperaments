@@ -1,4 +1,4 @@
-const APP_VERSION = 'cb80036 · 2026-04-09';
+const APP_VERSION = '977f244 · 2026-04-09';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -449,18 +449,33 @@ function updateCompensatedPitch() {
   }
   // Propagar al oscilador de referencia del afinador
   try { if (TUNER.refOsc) TUNER.refOsc.frequency.setTargetAtTime(TUNER.getTargetFreq(), getCtx().currentTime, 0.01); } catch(_){}
-  // Mostrar/ocultar indicadores de termómetro en toda la app
-  document.querySelectorAll('.temp-indicator').forEach(el => {
-    el.classList.toggle('active', tempCompEnabled);
-  });
+  // Mostrar/ocultar indicadores de termómetro en toda la app (gestiona clases active/streaming)
+  ruuviApplyStreamingClass();
+  // Actualizar Hz compensados en la barra principal
+  const hzVal = document.getElementById('compensated-hz-val');
+  if (hzVal) hzVal.textContent = compensatedPitchA.toFixed(2);
   updateTempDisplay();
 }
 // Inicializar compensación al arrancar (aplica prefs guardadas)
 // Se difiere a DOMContentLoaded porque TUNER (const) aún no existe en este punto.
 document.addEventListener('DOMContentLoaded', () => updateCompensatedPitch());
 
-// Actualiza el display del diálogo de temperatura
+// Actualiza el display del diálogo de temperatura (y badge del sensor)
 function updateTempDisplay() {
+  // Badge del sensor en el diálogo de referencia (siempre, esté abierto o no)
+  const sensorBadge = document.getElementById('pitchA-sensor-badge');
+  if (sensorBadge) {
+    const streaming = (typeof RuuviScanner !== 'undefined') && RuuviScanner.streaming;
+    if (streaming) {
+      const name = RuuviScanner.deviceName ?? 'Sensor';
+      sensorBadge.textContent = '● ' + name;
+      sensorBadge.style.color = '#4ade80';
+    } else {
+      sensorBadge.textContent = '—';
+      sensorBadge.style.color = '#64748b';
+    }
+  }
+
   const dlg = document.getElementById('pitchA-dlg');
   if (!dlg) return;
 
@@ -524,6 +539,13 @@ const PitchADlg = {
 
         <!-- Separador -->
         <div style="height:1px;background:#334155;margin:14px 0"></div>
+
+        <!-- Sensor BLE -->
+        <button onclick="SensorDlg.open()"
+          style="width:100%;display:flex;align-items:center;justify-content:space-between;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:8px;padding:9px 12px;cursor:pointer;font-size:12px;margin-bottom:14px">
+          <span>🔵 Sensor de temperatura BLE</span>
+          <span id="pitchA-sensor-badge" style="font-size:11px;color:#64748b">—</span>
+        </button>
 
         <!-- Compensación térmica -->
         <div style="margin-bottom:14px">
@@ -709,6 +731,216 @@ const PitchADlg = {
     });
   }
 };
+
+// ── Diálogo de gestión del sensor BLE (RuuviTag) ──────────────────────────
+const SensorDlg = {
+
+  open() {
+    if (document.getElementById('sensor-dlg')) return;
+    const connected  = (typeof RuuviScanner !== 'undefined') && RuuviScanner.streaming;
+    const devName    = (typeof RuuviScanner !== 'undefined') && RuuviScanner.deviceName;
+    const offset     = (typeof RuuviScanner !== 'undefined') ? RuuviScanner.offset : (_prefs.ruuviOffset ?? 0);
+    const contMode   = _prefs.ruuviContinuous ?? false;
+
+    const dlg = document.createElement('div');
+    dlg.id = 'sensor-dlg';
+    dlg.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.65)';
+    dlg.innerHTML = `
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px;width:320px;max-width:90vw;color:#e2e8f0;font-family:system-ui">
+        <div style="font-size:14px;font-weight:600;margin-bottom:14px">Sensor de temperatura BLE</div>
+
+        <!-- Estado de conexión -->
+        <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;margin-bottom:14px;font-size:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span style="color:#9ca3af">Estado</span>
+            <span id="sensor-status-badge" style="font-weight:600;color:${connected ? '#4ade80' : '#f87171'}">${connected ? '● Conectado' : '○ Desconectado'}</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="color:#9ca3af">Dispositivo</span>
+            <span id="sensor-dev-name" style="color:#94a3b8;font-size:11px">${devName || '—'}</span>
+          </div>
+          <div id="sensor-temp-live" style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;${connected ? '' : 'display:none!important'}">
+            <span style="color:#9ca3af">Temperatura</span>
+            <span id="sensor-temp-val" style="color:#60a5fa;font-weight:600">— °C</span>
+          </div>
+        </div>
+
+        <!-- Botón conectar/desconectar -->
+        <button id="sensor-connect-btn" onclick="SensorDlg.toggleConnect()"
+          style="width:100%;background:${connected ? '#7f1d1d' : '#1e3a5f'};border:1px solid ${connected ? '#ef4444' : '#3b82f6'};color:${connected ? '#fca5a5' : '#93c5fd'};border-radius:8px;padding:10px;cursor:pointer;font-size:13px;margin-bottom:14px">
+          ${connected ? 'Desconectar sensor' : 'Conectar sensor…'}
+        </button>
+
+        <!-- Separador -->
+        <div style="height:1px;background:#334155;margin-bottom:14px"></div>
+
+        <!-- Offset de calibración -->
+        <div style="margin-bottom:14px">
+          <div style="font-size:11px;color:#9ca3af;margin-bottom:6px">Offset de calibración (°C)</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input id="sensor-offset" type="number" value="${offset}" min="-10" max="10" step="0.1"
+              oninput="SensorDlg.onOffsetChange()"
+              style="flex:1;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:8px 10px;font-size:14px;text-align:center;outline:none">
+            <span style="font-size:13px;color:#94a3b8">°C</span>
+          </div>
+          <div style="font-size:10px;color:#64748b;margin-top:4px">Suma este valor a cada lectura del sensor.</div>
+        </div>
+
+        <!-- Modo continuo -->
+        <div style="margin-bottom:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-size:11px;color:#9ca3af">Actualización continua</div>
+              <div style="font-size:10px;color:#64748b;margin-top:2px">Actualiza la temp. actual en tiempo real</div>
+            </div>
+            <label style="display:flex;align-items:center;cursor:pointer;gap:6px">
+              <input type="checkbox" id="sensor-continuous" onchange="SensorDlg.onContinuousChange()"
+                ${contMode ? 'checked' : ''}
+                style="cursor:pointer;width:18px;height:18px">
+            </label>
+          </div>
+        </div>
+
+        <!-- Botón cerrar -->
+        <button onclick="SensorDlg.close()" style="width:100%;background:#334155;border:none;color:#94a3b8;border-radius:6px;padding:8px;cursor:pointer;font-size:13px">Cerrar</button>
+      </div>`;
+    dlg.addEventListener('click', e => { if (e.target === dlg) SensorDlg.close(); });
+    document.body.appendChild(dlg);
+
+    // Suscribir lectura en vivo en el diálogo
+    this._prevCb = (typeof RuuviScanner !== 'undefined') ? RuuviScanner.onTemperature : null;
+    if (typeof RuuviScanner !== 'undefined') {
+      RuuviScanner.onTemperature = (t) => {
+        if (typeof this._prevCb === 'function') this._prevCb(t);
+        this._updateLive(t);
+      };
+    }
+  },
+
+  close() {
+    // Restaurar callback anterior (el de app.js)
+    if (typeof RuuviScanner !== 'undefined' && this._prevCb !== undefined) {
+      RuuviScanner.onTemperature = this._prevCb;
+    }
+    document.getElementById('sensor-dlg')?.remove();
+  },
+
+  _updateLive(t) {
+    const el = document.getElementById('sensor-temp-val');
+    if (el) el.textContent = t.toFixed(2) + ' °C';
+    const row = document.getElementById('sensor-temp-live');
+    if (row) row.style.removeProperty('display');
+  },
+
+  _updateStatusUI(connected) {
+    const badge = document.getElementById('sensor-status-badge');
+    if (badge) {
+      badge.textContent = connected ? '● Conectado' : '○ Desconectado';
+      badge.style.color = connected ? '#4ade80' : '#f87171';
+    }
+    const btn = document.getElementById('sensor-connect-btn');
+    if (btn) {
+      btn.textContent = connected ? 'Desconectar sensor' : 'Conectar sensor…';
+      btn.style.background  = connected ? '#7f1d1d' : '#1e3a5f';
+      btn.style.borderColor = connected ? '#ef4444' : '#3b82f6';
+      btn.style.color       = connected ? '#fca5a5' : '#93c5fd';
+    }
+    const nameEl = document.getElementById('sensor-dev-name');
+    if (nameEl && typeof RuuviScanner !== 'undefined') {
+      nameEl.textContent = RuuviScanner.deviceName || '—';
+    }
+  },
+
+  async toggleConnect() {
+    if (typeof RuuviScanner === 'undefined') {
+      alert('RuuviScanner no disponible.');
+      return;
+    }
+    if (RuuviScanner.streaming) {
+      RuuviScanner.disconnect();
+      ruuviApplyStatus('disconnected');
+      this._updateStatusUI(false);
+    } else {
+      const btn = document.getElementById('sensor-connect-btn');
+      if (btn) { btn.textContent = 'Conectando…'; btn.disabled = true; }
+      try {
+        await RuuviScanner.connect();
+        ruuviApplyStatus('connected');
+        this._updateStatusUI(true);
+      } catch (e) {
+        alert('No se pudo conectar:\n' + e.message);
+        this._updateStatusUI(false);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+  },
+
+  onOffsetChange() {
+    const inp = document.getElementById('sensor-offset');
+    if (!inp || typeof RuuviScanner === 'undefined') return;
+    const v = parseFloat(inp.value);
+    RuuviScanner.setOffset(isFinite(v) ? v : 0);
+    savePrefs({ ruuviOffset: RuuviScanner.offset });
+  },
+
+  onContinuousChange() {
+    const chk = document.getElementById('sensor-continuous');
+    if (!chk) return;
+    savePrefs({ ruuviContinuous: chk.checked });
+    // Actualizar clases del indicador térmico
+    ruuviApplyStreamingClass();
+  },
+};
+
+// ── Integración RuuviScanner → app ────────────────────────────────────────
+
+/** Aplica la temperatura recibida del sensor a la app. */
+function ruuviOnTemperature(tempC) {
+  currentTemp = tempC;
+  savePrefs({ currentTemp });
+  updateCompensatedPitch();
+  // Actualizar campo del diálogo de referencia si está abierto
+  const inp = document.getElementById('pitchA-curr-temp');
+  if (inp) inp.value = tempC.toFixed(2);
+}
+
+/** Actualiza las clases CSS del indicador térmico según estado del sensor. */
+function ruuviApplyStreamingClass() {
+  const continuous = _prefs.ruuviContinuous ?? false;
+  const streaming  = (typeof RuuviScanner !== 'undefined') && RuuviScanner.streaming;
+  document.querySelectorAll('.temp-indicator').forEach(el => {
+    el.classList.toggle('streaming', tempCompEnabled && streaming && continuous);
+    el.classList.toggle('active',    tempCompEnabled && !(streaming && continuous));
+  });
+}
+
+/** Responde a cambios de estado BLE (conectado / desconectado / reconectando). */
+function ruuviApplyStatus(status) {
+  if (status === 'connected') {
+    if (typeof RuuviScanner !== 'undefined') {
+      // Aplicar offset guardado
+      RuuviScanner.setOffset(_prefs.ruuviOffset ?? 0);
+      // Solo instalar callback continuo si el modo continuo está activado
+      if (_prefs.ruuviContinuous) {
+        RuuviScanner.onTemperature = ruuviOnTemperature;
+      }
+    }
+    ruuviApplyStreamingClass();
+  } else {
+    ruuviApplyStreamingClass();
+  }
+}
+
+// Inicializar callbacks de RuuviScanner al arrancar
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof RuuviScanner === 'undefined') return;
+  RuuviScanner.onStatus = ruuviApplyStatus;
+  // Restaurar offset guardado
+  RuuviScanner.setOffset(_prefs.ruuviOffset ?? 0);
+  // Si había modo continuo activo y el sensor ya estaba conectado (reconexión automática),
+  // el callback se instala en ruuviApplyStatus al recibir 'connected'.
+});
 
 // ── Persiana móvil ──
 function toggleTopBar(forceHide) {
