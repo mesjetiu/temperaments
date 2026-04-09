@@ -1,4 +1,4 @@
-const APP_VERSION = '0c52ba6 · 2026-04-09';
+const APP_VERSION = '5fa27bb · 2026-04-09';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2863,34 +2863,26 @@ function _panel_hero(act, el) {
        <div style="font-size:12px;color:#94a3b8;margin-bottom:4px">${note}</div>
        <div style="font-size:15px;font-weight:700;color:${color}">${value}</div>
      </div>`;
-  el.innerHTML =
-    `<div style="width:100%;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);border:1px solid #1e293b;border-radius:12px;padding:20px 24px;box-sizing:border-box">
-       <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
-         <div style="flex:1;min-width:200px">
-           <div style="font-size:22px;font-weight:700;color:#e2e8f0;line-height:1.2;margin-bottom:6px">${t.name}</div>
-           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-             <span style="font-size:11px;background:#1e3a5f;color:#60a5fa;border-radius:4px;padding:2px 8px">${t.source}</span>
-             <span style="font-size:11px;color:#475569">${fif.filter(x=>Math.abs(x.dev)<0.5).length} quintas puras</span>
-             <span style="font-size:11px;color:#475569">·</span>
-             <span style="font-size:11px;color:#475569">avg quinta ${f(avgF)}</span>
-           </div>
-         </div>
-         <button onclick="openTempMenu(${all.indexOf(t)},event)" title="Opciones"
-           style="background:none;border:none;color:#475569;cursor:pointer;font-size:22px;line-height:1;padding:0 4px;flex-shrink:0;-webkit-tap-highlight-color:transparent">···</button>
-       </div>
-       <div style="margin-top:14px">
-         <div style="font-size:11px;color:#64748b;margin-bottom:5px">Notas</div>
-         <textarea id="overview-notes" rows="3" placeholder="Descripción, origen histórico, características…"
-           style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;color:#cbd5e1;border-radius:6px;padding:8px 10px;font-size:12px;outline:none;resize:vertical;font-family:inherit"
-           onblur="saveTempNotes('${t.name.replace(/'/g,"\\'")}', this.value)">${getTempNotes(t.name)}</textarea>
-       </div>
+  const bodyHtml =
+    `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+       <span style="font-size:11px;background:#1e3a5f;color:#60a5fa;border-radius:4px;padding:2px 8px">${t.source}</span>
+       <span style="font-size:11px;color:#475569">${fif.filter(x=>Math.abs(x.dev)<0.5).length} quintas puras</span>
+       <span style="font-size:11px;color:#475569">·</span>
+       <span style="font-size:11px;color:#475569">avg quinta ${f(avgF)}</span>
      </div>
-     <div style="width:100%;display:flex;gap:8px;flex-wrap:wrap">
+     <div style="margin-bottom:14px">
+       <div style="font-size:11px;color:#64748b;margin-bottom:5px">Notas</div>
+       <textarea id="overview-notes" rows="3" placeholder="Descripción, origen histórico, características…"
+         style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;color:#cbd5e1;border-radius:6px;padding:8px 10px;font-size:12px;outline:none;resize:vertical;font-family:inherit"
+         onblur="saveTempNotes('${t.name.replace(/'/g,"\\'")}', this.value)">${getTempNotes(t.name)}</textarea>
+     </div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap">
        ${statCard('Quinta más pura',   bf.from+'→'+bf.to, bf.size.toFixed(2)+'¢ ('+f(bf.dev)+')', cc(bf.dev))}
        ${statCard('Quinta más impura', wf.from+'→'+wf.to, wf.size.toFixed(2)+'¢ ('+f(wf.dev)+')', cc(wf.dev))}
        ${statCard('3ª mayor más pura',   bm.from+'→'+bm.to, bm.size.toFixed(2)+'¢ ('+f(bm.dev)+')', '#4ade80')}
        ${statCard('3ª mayor más impura', wm.from+'→'+wm.to, wm.size.toFixed(2)+'¢ ('+f(wm.dev)+')', '#f87171')}
      </div>`;
+  el.innerHTML = panel(t.name, bodyHtml, isMobile() ? '' : 'width:100%;box-sizing:border-box');
 }
 
 // Registrar todos los paneles atómicos
