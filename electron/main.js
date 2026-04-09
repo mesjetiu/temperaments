@@ -62,34 +62,34 @@ function createWindow() {
   });
 
   // ── Handler BLE: selector de dispositivos ────────────────────────────────
-  // Sin este handler, requestDevice() se queda esperando indefinidamente.
-  // Auto-seleccionamos el primer RuuviTag que aparezca en el scan.
+  // Electron llama a este evento repetidamente mientras el scan actualiza la lista.
+  // Hay que responder con callback() exactamente UNA vez.
+  // Estrategia: esperar hasta 10 s acumulando la lista; en cuanto aparezca un
+  // RuuviTag, resolver. Solo el primer callback recibido es el válido.
+  let bleCallback  = null;
+  let bleTimeout   = null;
+
+  const pickRuuvi  = (list) => list.find(d => d.deviceName?.startsWith('Ruuvi'));
+
+  const resolveble = (deviceId) => {
+    if (!bleCallback) return;           // ya resuelto
+    clearTimeout(bleTimeout);
+    const cb  = bleCallback;
+    bleCallback = null;
+    cb(deviceId);
+  };
+
   win.webContents.on('select-bluetooth-device', (event, deviceList, callback) => {
     event.preventDefault();
 
-    const pickRuuvi = (list) => list.find(d => d.deviceName?.startsWith('Ruuvi'));
-
-    const ruuvi = pickRuuvi(deviceList);
-    if (ruuvi) {
-      callback(ruuvi.deviceId);
-      return;
+    // Cada nueva llamada Electron trae un callback nuevo — solo guardamos el primero
+    if (!bleCallback) {
+      bleCallback = callback;
+      bleTimeout  = setTimeout(() => resolveble(''), 10_000);
     }
 
-    // Lista vacía al inicio del scan — esperar hasta 10 s a que aparezca
-    const timeout = setTimeout(() => {
-      win.webContents.removeAllListeners('select-bluetooth-device');
-      callback('');
-    }, 10_000);
-
-    win.webContents.on('select-bluetooth-device', (ev2, list2, cb2) => {
-      ev2.preventDefault();
-      const r = pickRuuvi(list2);
-      if (r) {
-        clearTimeout(timeout);
-        win.webContents.removeAllListeners('select-bluetooth-device');
-        cb2(r.deviceId);
-      }
-    });
+    const ruuvi = pickRuuvi(deviceList);
+    if (ruuvi) resolveble(ruuvi.deviceId);
   });
 
   // ── Pairing automático (Electron 20+) ────────────────────────────────────
