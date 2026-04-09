@@ -1,4 +1,4 @@
-const APP_VERSION = 'dd5b4dd · 2026-04-09';
+const APP_VERSION = '6fe723f · 2026-04-09';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -915,12 +915,25 @@ const SensorDlg = {
 
 /** Aplica la temperatura recibida del sensor a la app. */
 function ruuviOnTemperature(tempC) {
+  const prevEffective = getEffectivePitchA();
   currentTemp = tempC;
   savePrefs({ currentTemp });
   updateCompensatedPitch();
   // Actualizar campo del diálogo de referencia si está abierto
   const inp = document.getElementById('pitchA-curr-temp');
   if (inp) inp.value = tempC.toFixed(2);
+  // Actualizar osciladores activos del teclado (notas que están sonando ahora)
+  // Escalamos por el ratio nuevo/anterior — preserva el intervalo del temperamento
+  const newEffective = getEffectivePitchA();
+  if (activeOscs.length && prevEffective > 0 && newEffective !== prevEffective) {
+    const ratio = newEffective / prevEffective;
+    const now = audioCtx?.currentTime ?? 0;
+    activeOscs.forEach(osc => {
+      const f = osc.frequency.value * ratio;
+      osc.frequency.cancelScheduledValues(now);
+      osc.frequency.setTargetAtTime(f, now, 0.05);
+    });
+  }
 }
 
 /** Actualiza las clases CSS del indicador térmico según estado del sensor. */
