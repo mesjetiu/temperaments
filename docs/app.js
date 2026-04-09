@@ -457,6 +457,8 @@ function updateCompensatedPitch() {
   });
   updateTempDisplay();
 }
+// Inicializar compensación al arrancar (aplica prefs guardadas)
+updateCompensatedPitch();
 
 // Actualiza el display del diálogo de temperatura
 function updateTempDisplay() {
