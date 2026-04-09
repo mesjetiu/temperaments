@@ -1,4 +1,4 @@
-const APP_VERSION = '0978510 · 2026-04-09';
+const APP_VERSION = 'ef5da67 · 2026-04-09';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -462,18 +462,35 @@ document.addEventListener('DOMContentLoaded', () => updateCompensatedPitch());
 
 // Actualiza el display del diálogo de temperatura (y badge del sensor)
 function updateTempDisplay() {
-  // Badge del sensor en el diálogo de referencia (siempre, esté abierto o no)
+  const streaming = (typeof RuuviScanner !== 'undefined') && RuuviScanner.streaming;
+
+  // Badge del sensor junto al label "Temp. actual"
   const sensorBadge = document.getElementById('pitchA-sensor-badge');
   if (sensorBadge) {
-    const streaming = (typeof RuuviScanner !== 'undefined') && RuuviScanner.streaming;
     if (streaming) {
       const name = RuuviScanner.deviceName ?? 'Sensor';
-      sensorBadge.textContent = '● ' + name;
+      sensorBadge.textContent = '🔵 ' + name;
       sensorBadge.style.color = '#4ade80';
     } else {
-      sensorBadge.textContent = '—';
-      sensorBadge.style.color = '#64748b';
+      sensorBadge.textContent = '🔵 Sensor';
+      sensorBadge.style.color = '#475569';
     }
+  }
+
+  // Campo temp actual: si hay sensor conectado, actualizar con valor actual
+  const currTempInp = document.getElementById('pitchA-curr-temp');
+  if (currTempInp && streaming) {
+    currTempInp.value = currentTemp.toFixed(2);
+    currTempInp.style.borderColor = '#4ade80';
+  } else if (currTempInp) {
+    currTempInp.style.borderColor = '#334155';
+  }
+
+  // Row actualización continua: habilitado solo si sensor conectado
+  const contRow = document.getElementById('pitchA-continuous-row');
+  if (contRow) {
+    contRow.style.opacity = streaming ? '1' : '0.4';
+    contRow.style.pointerEvents = streaming ? 'auto' : 'none';
   }
 
   const dlg = document.getElementById('pitchA-dlg');
@@ -540,16 +557,9 @@ const PitchADlg = {
         <!-- Separador -->
         <div style="height:1px;background:#334155;margin:14px 0"></div>
 
-        <!-- Sensor BLE -->
-        <button onclick="SensorDlg.open()"
-          style="width:100%;display:flex;align-items:center;justify-content:space-between;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:8px;padding:9px 12px;cursor:pointer;font-size:12px;margin-bottom:14px">
-          <span>🔵 Sensor de temperatura BLE</span>
-          <span id="pitchA-sensor-badge" style="font-size:11px;color:#64748b">—</span>
-        </button>
-
         <!-- Compensación térmica -->
         <div style="margin-bottom:14px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
             <div style="font-size:11px;color:#9ca3af">Compensar por temperatura</div>
             <label style="display:flex;align-items:center;cursor:pointer;gap:6px">
               <input type="checkbox" id="pitchA-temp-toggle"
@@ -568,12 +578,27 @@ const PitchADlg = {
               style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:8px 10px;font-size:14px;text-align:center;outline:none">
           </div>
 
-          <!-- Temp actual -->
+          <!-- Temp actual: manual o del sensor -->
           <div style="margin-bottom:10px">
-            <div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Temp. actual (°C)</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+              <div style="font-size:11px;color:#9ca3af">Temp. actual (°C)</div>
+              <span id="pitchA-sensor-badge" style="font-size:11px;color:#64748b;cursor:pointer" onclick="SensorDlg.open()">🔵 Sensor</span>
+            </div>
             <input id="pitchA-curr-temp" type="number" value="${currentTemp}" min="-50" max="50" step="0.1"
               onchange="PitchADlg.onCurrTempChange()"
               style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:8px 10px;font-size:14px;text-align:center;outline:none">
+          </div>
+
+          <!-- Actualización continua desde sensor -->
+          <div id="pitchA-continuous-row" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;${(typeof RuuviScanner !== 'undefined' && RuuviScanner.streaming) ? '' : 'opacity:0.4;pointer-events:none'}">
+            <div>
+              <div style="font-size:11px;color:#9ca3af">Actualización continua</div>
+              <div style="font-size:10px;color:#64748b">Sensor actualiza temp. en tiempo real</div>
+            </div>
+            <input type="checkbox" id="pitchA-continuous"
+              onchange="PitchADlg.onContinuousChange()"
+              ${(_prefs.ruuviContinuous ?? false) ? 'checked' : ''}
+              style="cursor:pointer;width:18px;height:18px">
           </div>
 
           <!-- Información ponderada -->
@@ -632,6 +657,17 @@ const PitchADlg = {
       currentTemp = parseFloat(inp.value);
       savePrefs({ currentTemp });
       updateCompensatedPitch();
+    }
+  },
+
+  onContinuousChange() {
+    const chk = document.getElementById('pitchA-continuous');
+    if (!chk) return;
+    savePrefs({ ruuviContinuous: chk.checked });
+    ruuviApplyStreamingClass();
+    // Instalar o retirar callback del sensor
+    if (typeof RuuviScanner !== 'undefined' && RuuviScanner.streaming) {
+      RuuviScanner.onTemperature = chk.checked ? ruuviOnTemperature : null;
     }
   },
 
@@ -786,21 +822,6 @@ const SensorDlg = {
           <div style="font-size:10px;color:#64748b;margin-top:4px">Suma este valor a cada lectura del sensor.</div>
         </div>
 
-        <!-- Modo continuo -->
-        <div style="margin-bottom:16px">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <div>
-              <div style="font-size:11px;color:#9ca3af">Actualización continua</div>
-              <div style="font-size:10px;color:#64748b;margin-top:2px">Actualiza la temp. actual en tiempo real</div>
-            </div>
-            <label style="display:flex;align-items:center;cursor:pointer;gap:6px">
-              <input type="checkbox" id="sensor-continuous" onchange="SensorDlg.onContinuousChange()"
-                ${contMode ? 'checked' : ''}
-                style="cursor:pointer;width:18px;height:18px">
-            </label>
-          </div>
-        </div>
-
         <!-- Botón cerrar -->
         <button onclick="SensorDlg.close()" style="width:100%;background:#334155;border:none;color:#94a3b8;border-radius:6px;padding:8px;cursor:pointer;font-size:13px">Cerrar</button>
       </div>`;
@@ -888,13 +909,6 @@ const SensorDlg = {
     savePrefs({ ruuviOffset: RuuviScanner.offset });
   },
 
-  onContinuousChange() {
-    const chk = document.getElementById('sensor-continuous');
-    if (!chk) return;
-    savePrefs({ ruuviContinuous: chk.checked });
-    // Actualizar clases del indicador térmico
-    ruuviApplyStreamingClass();
-  },
 };
 
 // ── Integración RuuviScanner → app ────────────────────────────────────────
