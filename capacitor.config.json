@@ -1,0 +1,8 @@
+{
+  "appId": "es.carlosguerra.salinas",
+  "appName": "Salinas",
+  "webDir": "docs",
+  "android": {
+    "backgroundColor": "#111827"
+  }
+}

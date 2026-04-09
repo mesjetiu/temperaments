@@ -1,2 +1,13 @@
 TETExportedTemperament ExportFiles (4)/
 scales/
+
+# Dependencias
+node_modules/
+package-lock.json
+
+# Android - generado por Gradle
+android/app/build/
+android/.gradle/
+android/build/
+android/local.properties
+
