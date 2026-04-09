@@ -5,6 +5,9 @@ scales/
 node_modules/
 package-lock.json
 
+# Artefactos de depuración
+docs/ble-plugin.js
+
 # Android - generado por Gradle
 android/app/build/
 android/.gradle/
