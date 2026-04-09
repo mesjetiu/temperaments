@@ -957,6 +957,7 @@ function ruuviOnTemperature(tempC) {
 function ruuviApplyStreamingClass() {
   const continuous = _prefs.ruuviContinuous ?? false;
   const streaming  = (typeof RuuviScanner !== 'undefined') && RuuviScanner.streaming;
+  console.log('[UI] applyStreamingClass — tempCompEnabled:', tempCompEnabled, 'streaming:', streaming, 'continuous:', continuous);
   document.querySelectorAll('.temp-indicator').forEach(el => {
     el.classList.toggle('streaming', tempCompEnabled && streaming && continuous);
     el.classList.toggle('active',    tempCompEnabled && !(streaming && continuous));

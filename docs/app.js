@@ -1,4 +1,4 @@
-const APP_VERSION = 'c2a099d · 2026-04-09';
+const APP_VERSION = '2e847b4 · 2026-04-09';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -957,6 +957,7 @@ function ruuviOnTemperature(tempC) {
 function ruuviApplyStreamingClass() {
   const continuous = _prefs.ruuviContinuous ?? false;
   const streaming  = (typeof RuuviScanner !== 'undefined') && RuuviScanner.streaming;
+  console.log('[UI] applyStreamingClass — tempCompEnabled:', tempCompEnabled, 'streaming:', streaming, 'continuous:', continuous);
   document.querySelectorAll('.temp-indicator').forEach(el => {
     el.classList.toggle('streaming', tempCompEnabled && streaming && continuous);
     el.classList.toggle('active',    tempCompEnabled && !(streaming && continuous));
