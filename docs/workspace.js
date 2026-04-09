@@ -179,6 +179,28 @@ const WS = {
     this.save(ws);
   },
 
+  reorderCards(orderedIds) {
+    const ws = this.current();
+    const tab = ws.tabs.find(t => t.id === ws.activeTabId);
+    if (!tab) return;
+    const map = Object.fromEntries(tab.cards.map(c => [c.id, c]));
+    tab.cards = orderedIds.map(id => map[id]).filter(Boolean);
+    this.save(ws);
+  },
+
+  moveCardInTab(cardId, dir) {
+    const ws = this.current();
+    for (const tab of ws.tabs) {
+      const idx = tab.cards.findIndex(c => c.id === cardId);
+      if (idx === -1) continue;
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= tab.cards.length) break;
+      [tab.cards[idx], tab.cards[newIdx]] = [tab.cards[newIdx], tab.cards[idx]];
+      this.save(ws);
+      break;
+    }
+  },
+
   moveCardToTab(cardId, targetTabId) {
     const ws = this.current();
     let card = null;
@@ -217,14 +239,25 @@ const WS = {
 
   makeCardToolbar(card) {
     const ws = this.current();
+    const tab = ws.tabs.find(t => t.id === ws.activeTabId);
+    const idx = tab ? tab.cards.findIndex(c => c.id === card.id) : -1;
+    const len = tab ? tab.cards.length : 0;
     const otherTabs = ws.tabs.filter(t => t.id !== ws.activeTabId);
     const moveBtn = otherTabs.length > 0
       ? `<button onclick="event.stopPropagation();WS.openMoveCardMenu('${card.id}',event)" title="Mover a pestaña">⇒</button>`
+      : '';
+    const upBtn   = idx > 0
+      ? `<button onclick="event.stopPropagation();WS.moveCardInTab('${card.id}',-1)" title="Subir tarjeta">↑</button>`
+      : '';
+    const downBtn = idx < len - 1
+      ? `<button onclick="event.stopPropagation();WS.moveCardInTab('${card.id}',+1)" title="Bajar tarjeta">↓</button>`
       : '';
     const div = document.createElement('div');
     div.className = 'card-toolbar';
     div.setAttribute('onclick', 'event.stopPropagation()');
     div.innerHTML =
+      upBtn +
+      downBtn +
       `<button onclick="event.stopPropagation();WS.duplicateCard('${card.id}')" title="Duplicar tarjeta">⧉</button>` +
       moveBtn +
       `<button onclick="event.stopPropagation();WS.removeCard('${card.id}')" title="Quitar tarjeta">✕</button>`;

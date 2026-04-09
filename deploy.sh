@@ -19,7 +19,7 @@ sed -i "s/const APP_VERSION = '[^']*'/const APP_VERSION = '$VERSION'/" docs/app.
 # Actualizar version.json (mecanismo de detección de versión independiente del SW)
 printf '{"v":"%s"}\n' "$VERSION" > docs/version.json
 
-git add docs/sw.js docs/app.js docs/index.html docs/version.json
+git add docs/sw.js docs/app.js docs/index.html docs/version.json docs/ruuvi.js
 git commit -m "$MSG
 
 CACHE: temp-$HASH
