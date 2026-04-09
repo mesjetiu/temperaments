@@ -448,7 +448,7 @@ function updateCompensatedPitch() {
     compensatedPitchA = pitchA;
   }
   // Propagar al oscilador de referencia del afinador
-  if (TUNER.refOsc) {
+  if (typeof TUNER !== 'undefined' && TUNER.refOsc) {
     try { TUNER.refOsc.frequency.setTargetAtTime(TUNER.getTargetFreq(), getCtx().currentTime, 0.01); } catch(_){}
   }
   // Mostrar/ocultar indicadores de termómetro en toda la app
