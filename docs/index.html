@@ -438,8 +438,10 @@
       </select>
 
       <!-- La / Pitch A -->
-      <label>La =</label>
-      <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">440 Hz</span><span class="temp-indicator" onclick="PitchADlg.open()" style="font-size:11px;margin-left:3px;white-space:nowrap">🌡️<span id="temp-ref-display" style="color:#64748b"></span><span id="temp-curr-display" style="color:#94a3b8"></span> = <span id="compensated-hz-val" style="color:var(--accent)">440.00</span> Hz</span>
+      <span style="display:inline-flex;align-items:center;gap:2px;white-space:nowrap;flex-shrink:0">
+        <label style="margin:0">La =</label>
+        <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">440 Hz</span><span class="temp-indicator" onclick="PitchADlg.open()" style="font-size:11px;margin-left:1px">🌡️<span id="temp-ref-display" style="color:#64748b"></span><span id="temp-curr-display" style="color:#94a3b8"></span> = <span id="compensated-hz-val" style="color:var(--accent)">440.00</span> Hz</span>
+      </span>
 
       <div class="ab-sep"></div>
 
