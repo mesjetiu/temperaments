@@ -12,7 +12,7 @@ VERSION=$(node -e "import('./docs/version.json', {assert:{type:'json'}}).then(m=
 
 echo "→ Versión: $VERSION"
 
-git add docs/ src/
+git add docs/ src/ electron/main.js
 git commit -m "$MSG
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
