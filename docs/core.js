@@ -239,6 +239,37 @@ export function parseTempMarkdown(text) {
   return temps;
 }
 
+// ══════════════════════════════════════════════
+// COMPENSACIÓN TÉRMICA (órgano)
+// ══════════════════════════════════════════════
+
+/**
+ * Compensa la frecuencia de referencia según la temperatura.
+ * Usa la fórmula precisa para tubos metálicos (estaño-plomo, típico en órganos).
+ *
+ * @param {number} refFreq      - frecuencia de referencia (La4 objetivo) en Hz
+ * @param {number} refTemp      - temperatura de referencia en °C (típicamente 20°C)
+ * @param {number} currentTemp  - temperatura actual en °C
+ * @param {number} alpha        - coeficiente de expansión térmica (defecto 0.000184/°C para estaño-plomo)
+ * @returns {number} frecuencia compensada en Hz
+ */
+export function getCompensatedFreq(refFreq, refTemp = 20, currentTemp = 20, alpha = 0.000184) {
+  const deltaT = currentTemp - refTemp;
+  // f(T) = f_ref * (1 + α * ΔT)
+  return refFreq * (1 + alpha * deltaT);
+}
+
+/**
+ * Calcula la diferencia en cents entre dos frecuencias.
+ * @param {number} freq1 - primera frecuencia en Hz
+ * @param {number} freq2 - segunda frecuencia en Hz
+ * @returns {number} diferencia en cents (positivo si freq1 > freq2)
+ */
+export function getFreqOffsetInCents(freq1, freq2) {
+  if (!freq1 || !freq2 || freq1 <= 0 || freq2 <= 0) return 0;
+  return 1200 * Math.log2(freq1 / freq2);
+}
+
 // Exponer al scope global cuando se carga como módulo en el browser,
 // para que los scripts clásicos (app.js) puedan usar estas funciones.
 if (typeof window !== 'undefined') {
@@ -248,5 +279,6 @@ if (typeof window !== 'undefined') {
     noteFreq, getFifths, getMaj3, getMin3,
     detectPitch, _refineFFT, findClosestNote,
     parseTempMarkdown, _computeHarmonics,
+    getCompensatedFreq, getFreqOffsetInCents,
   });
 }
