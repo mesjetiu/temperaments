@@ -50,7 +50,7 @@ window.RuuviScanner = (() => {
     console.log('[Ruuvi] notification bytes:', hex);
 
     const tempC = _parseRawV5(buf);
-    console.log('[Ruuvi] tempC parsed:', tempC);
+    console.log('[Ruuvi] tempC parsed:', tempC, '| _cb:', typeof _cb);
 
     if (tempC === null) return;
     if (typeof _cb === 'function') _cb(tempC + _offset);
