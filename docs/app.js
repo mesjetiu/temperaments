@@ -1,4 +1,4 @@
-const APP_VERSION = '61d7c88 · 2026-04-09';
+const APP_VERSION = 'caeb838 · 2026-04-09';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -852,8 +852,12 @@ const SensorDlg = {
   },
 
   async toggleConnect() {
-    if (typeof RuuviScanner === 'undefined') {
-      alert('El módulo Ruuvi no está cargado.\nSi la app está instalada como PWA, puede estar ejecutando una versión en caché antigua. Recarga la página para instalar la actualización.');
+    if (typeof RuuviScanner === 'undefined' || typeof window.RuuviScanner === 'undefined') {
+      // Diagnóstico: listar scripts cargados
+      const scripts = Array.from(document.scripts).map(s => s.src || '[inline]').join('\n');
+      alert('DIAGNÓSTICO:\ntypeof RuuviScanner = ' + typeof RuuviScanner +
+            '\ntypeof window.RuuviScanner = ' + typeof window.RuuviScanner +
+            '\n\nScripts cargados:\n' + scripts);
       return;
     }
     if (RuuviScanner.streaming) {
