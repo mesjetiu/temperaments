@@ -1,4 +1,4 @@
-const APP_VERSION = '9b30a84 · 2026-04-09';
+const APP_VERSION = 'e1b946e · 2026-04-09';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -856,9 +856,11 @@ const SensorDlg = {
   },
 
   close() {
-    // Restaurar callback anterior (el de app.js)
-    if (typeof RuuviScanner !== 'undefined' && this._prevCb !== undefined) {
-      RuuviScanner.onTemperature = this._prevCb;
+    // Restaurar callback según estado actual (continuo activo o no)
+    if (typeof RuuviScanner !== 'undefined') {
+      RuuviScanner.onTemperature = (_prefs.ruuviContinuous && RuuviScanner.streaming)
+        ? ruuviOnTemperature
+        : null;
     }
     document.getElementById('sensor-dlg')?.remove();
   },
