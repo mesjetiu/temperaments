@@ -1,4 +1,4 @@
-const APP_VERSION = '7cdd3f3 · 2026-04-09';
+const APP_VERSION = 'f17057a · 2026-04-09';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2329,6 +2329,90 @@ function renderContent() {
       }
     }
   }
+
+  _bindCardDrag(el);
+}
+
+// ── Drag & drop para reordenar tarjetas ──────────────────────────────────────
+function _bindCardDrag(container) {
+  // El handle es el .panel dentro del wrap[data-card-id].
+  // Como wrap tiene display:contents, el .panel es el elemento visual.
+  // Arrastramos el .panel pero reordenamos los wraps en el DOM.
+  let dragSrcWrap = null;
+  const placeholder = document.createElement('div');
+  placeholder.className = 'card-drag-placeholder';
+
+  function getWrap(el) {
+    const panel = el.closest('.panel');
+    if (!panel) return null;
+    return panel.closest('[data-card-id]');
+  }
+
+  function getPanelOf(wrap) {
+    return wrap?.querySelector('.panel') || null;
+  }
+
+  // Encontrar el wrap más cercano a la posición Y del puntero
+  function getDropTarget(clientY) {
+    const wraps = [...container.querySelectorAll('[data-card-id]')]
+      .filter(w => w !== dragSrcWrap);
+    for (const w of wraps) {
+      const panel = getPanelOf(w);
+      if (!panel) continue;
+      const rect = panel.getBoundingClientRect();
+      if (clientY < rect.top + rect.height / 2) return { before: w };
+    }
+    return { before: null }; // al final
+  }
+
+  container.addEventListener('pointerdown', e => {
+    const hdr = e.target.closest('.panel-h3-row, .panel-hdr');
+    if (!hdr) return;
+    // No iniciar si el clic es sobre un botón de la toolbar
+    if (e.target.closest('.card-toolbar, .panel-zoom-btn, .panel-fs-close')) return;
+
+    const wrap = getWrap(hdr);
+    if (!wrap) return;
+    const panel = getPanelOf(wrap);
+    if (!panel) return;
+
+    dragSrcWrap = wrap;
+    let dragging = false;
+    const startX = e.clientX, startY = e.clientY;
+
+    hdr.setPointerCapture(e.pointerId);
+    e.preventDefault();
+
+    function onMove(ev) {
+      if (!dragging) {
+        if (Math.abs(ev.clientY - startY) < 6 && Math.abs(ev.clientX - startX) < 6) return;
+        dragging = true;
+        panel.classList.add('card-dragging');
+        placeholder.style.height = panel.offsetHeight + 'px';
+      }
+      const { before } = getDropTarget(ev.clientY);
+      if (before) container.insertBefore(placeholder, before);
+      else container.appendChild(placeholder);
+    }
+
+    function onUp() {
+      hdr.removeEventListener('pointermove', onMove);
+      hdr.removeEventListener('pointerup', onUp);
+      hdr.removeEventListener('pointercancel', onUp);
+      if (!dragging) return;
+      panel.classList.remove('card-dragging');
+      placeholder.remove();
+
+      // Calcular nuevo índice en base al orden actual de wraps en el DOM
+      const wraps = [...container.querySelectorAll('[data-card-id]')];
+      const newOrder = wraps.map(w => w.dataset.cardId);
+      WS.reorderCards(newOrder);
+    }
+
+    hdr.addEventListener('pointermove', onMove);
+    hdr.addEventListener('pointerup', onUp);
+    hdr.addEventListener('pointercancel', onUp);
+  });
 }
 
 // ══════════════════════════════════════════════
