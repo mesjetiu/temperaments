@@ -1,4 +1,4 @@
-const APP_VERSION = '6fe723f · 2026-04-09';
+const APP_VERSION = 'cd51aed · 2026-04-09';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -451,9 +451,20 @@ function updateCompensatedPitch() {
   try { if (TUNER.refOsc) TUNER.refOsc.frequency.setTargetAtTime(TUNER.getTargetFreq(), getCtx().currentTime, 0.01); } catch(_){}
   // Mostrar/ocultar indicadores de termómetro en toda la app (gestiona clases active/streaming)
   ruuviApplyStreamingClass();
-  // Actualizar Hz compensados en la barra principal
+  // Actualizar barra principal: Hz compensados + temperaturas
   const hzVal = document.getElementById('compensated-hz-val');
   if (hzVal) hzVal.textContent = compensatedPitchA.toFixed(2);
+  const refDisp  = document.getElementById('temp-ref-display');
+  const currDisp = document.getElementById('temp-curr-display');
+  if (refDisp && currDisp) {
+    if (tempCompEnabled) {
+      refDisp.textContent  = refTemp.toFixed(0) + '°→';
+      currDisp.textContent = currentTemp.toFixed(1) + '°';
+    } else {
+      refDisp.textContent  = '';
+      currDisp.textContent = '';
+    }
+  }
   updateTempDisplay();
 }
 // Inicializar compensación al arrancar (aplica prefs guardadas)
