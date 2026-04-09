@@ -129,7 +129,8 @@ app.whenReady().then(() => {
     if (urlPath === '/') urlPath = '/index.html';
 
     const filePath = path.join(DOCS_ROOT, urlPath);
-    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    const exists = fs.existsSync(filePath) && fs.statSync(filePath).isFile();
+    if (exists) {
       return new Response(
         fs.readFileSync(filePath),
         { headers: { 'Content-Type': mime(filePath) } }

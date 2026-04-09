@@ -1,4 +1,4 @@
-const APP_VERSION = '1da84bc · 2026-04-09';
+const APP_VERSION = '5e3d63a · 2026-04-09';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -17,8 +17,14 @@ function applyUpdate() {
   }
 }
 
-// ── Service Worker ──
-if ('serviceWorker' in navigator) {
+// ── Service Worker — no usar en Electron (sin red que cachear) ──
+if ('serviceWorker' in navigator && window.__ELECTRON__) {
+  // Desregistrar cualquier SW previo que pudiera haber quedado
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    for (const r of regs) r.unregister();
+  });
+}
+if ('serviceWorker' in navigator && !window.__ELECTRON__) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     window.location.reload();
   });
