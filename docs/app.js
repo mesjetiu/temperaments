@@ -1,4 +1,4 @@
-const APP_VERSION = '830f162 · 2026-04-08';
+const APP_VERSION = '489df67 · 2026-04-09';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -415,19 +415,154 @@ document.getElementById('wave-sel').addEventListener('change', function() {
 const ICON_EXPAND   = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`;
 const ICON_COLLAPSE = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>`;
 
-document.getElementById('pitch-input').addEventListener('input', function() {
-  const v = parseFloat(this.value);
-  if (v > 0) { pitchA = v; savePrefs({ pitchA: v }); }
-  document.querySelectorAll('#tuner-pitch-input,#kb-pitch-input,#dt-pitch-input').forEach(el => { if (el !== this) el.value = this.value; });
-});
+// (pitch-input listener eliminado — ahora usa PitchADlg unificado)
 
 function setPitchAGlobal(val) {
-  const v = parseFloat(val);
+  const v = Math.round(parseFloat(val) * 100) / 100;
   if (!v || v <= 0) return;
   pitchA = v; savePrefs({ pitchA: v });
-  document.querySelectorAll('#pitch-input,#tuner-pitch-input,#kb-pitch-input,#dt-pitch-input').forEach(el => el.value = v);
+  document.querySelectorAll('.pitchA-label').forEach(el => el.textContent = v + ' Hz');
   if (TUNER.refOsc) TUNER.refOsc.frequency.setTargetAtTime(TUNER.getTargetFreq(), getCtx().currentTime, 0.01);
+  // Actualizar input del dialog si está abierto
+  const dlgInput = document.getElementById('pitchA-dlg-input');
+  if (dlgInput) dlgInput.value = v;
 }
+
+// ── Dialog unificado para definir La de referencia ──
+const PitchADlg = {
+  _mic: null, _analyser: null, _raf: null, _buf: null, _freqBuf: null,
+  _stableFreq: 0, _stableCount: 0, FRAMES: 18,
+
+  open() {
+    if (document.getElementById('pitchA-dlg')) return;
+    const dlg = document.createElement('div');
+    dlg.id = 'pitchA-dlg';
+    dlg.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6)';
+    dlg.innerHTML = `
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px;width:280px;max-width:90vw;color:#e2e8f0;font-family:system-ui">
+        <div style="font-size:14px;font-weight:600;margin-bottom:14px">La de referencia</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+          <input id="pitchA-dlg-input" type="number" value="${pitchA}" min="1" max="9999" step="0.01"
+            style="flex:1;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:8px 10px;font-size:16px;text-align:center;outline:none">
+          <span style="font-size:13px;color:#94a3b8">Hz</span>
+        </div>
+        <button id="pitchA-dlg-mic" onclick="PitchADlg.toggleMic()"
+          style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:8px;padding:10px;cursor:pointer;font-size:13px;margin-bottom:6px">
+          <span id="pitchA-dlg-mic-icon">🎤</span>
+          <span id="pitchA-dlg-mic-label">Tomar del instrumento</span>
+        </button>
+        <div id="pitchA-dlg-status" style="text-align:center;font-size:12px;color:#64748b;min-height:18px;margin-bottom:10px"></div>
+        <div id="pitchA-dlg-bar" style="height:3px;background:#334155;border-radius:2px;margin-bottom:14px;overflow:hidden">
+          <div id="pitchA-dlg-bar-fill" style="height:100%;width:0%;background:#3b82f6;border-radius:2px;transition:width 0.1s"></div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="PitchADlg.cancel()" style="flex:1;background:#334155;border:none;color:#94a3b8;border-radius:6px;padding:8px;cursor:pointer;font-size:13px">Cancelar</button>
+          <button onclick="PitchADlg.accept()" style="flex:1;background:#3b82f6;border:none;color:#fff;border-radius:6px;padding:8px;cursor:pointer;font-size:13px;font-weight:600">Aceptar</button>
+        </div>
+      </div>`;
+    // Cerrar al pulsar backdrop
+    dlg.addEventListener('click', e => { if (e.target === dlg) PitchADlg.cancel(); });
+    document.body.appendChild(dlg);
+    const inp = document.getElementById('pitchA-dlg-input');
+    inp.focus(); inp.select();
+  },
+
+  accept() {
+    const inp = document.getElementById('pitchA-dlg-input');
+    if (inp) {
+      const v = parseFloat(inp.value);
+      if (v > 0) setPitchAGlobal(v);
+    }
+    this.close();
+  },
+  cancel() { this.close(); },
+
+  close() {
+    this.stopMic();
+    document.getElementById('pitchA-dlg')?.remove();
+  },
+
+  async toggleMic() {
+    this._mic ? this.stopMic() : await this.startMic();
+  },
+
+  async startMic() {
+    try {
+      getCtx();
+      const stream = await navigator.mediaDevices.getUserMedia(
+        { audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+      this._mic = stream;
+      const ctx = getCtx();
+      this._analyser = ctx.createAnalyser();
+      this._analyser.fftSize = 4096;
+      this._analyser.smoothingTimeConstant = 0;
+      ctx.createMediaStreamSource(stream).connect(this._analyser);
+      this._stableCount = 0; this._stableFreq = 0;
+      const btn = document.getElementById('pitchA-dlg-mic');
+      if (btn) btn.style.borderColor = '#3b82f6';
+      const lbl = document.getElementById('pitchA-dlg-mic-label');
+      if (lbl) lbl.textContent = 'Escuchando…';
+      this._loop();
+    } catch (e) { alert('Sin acceso al micrófono:\n' + e.message); }
+  },
+
+  stopMic() {
+    if (this._mic) { this._mic.getTracks().forEach(t => t.stop()); this._mic = null; }
+    if (this._analyser) { try { this._analyser.disconnect(); } catch(_){} this._analyser = null; }
+    if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
+    this._stableCount = 0;
+    const btn = document.getElementById('pitchA-dlg-mic');
+    if (btn) btn.style.borderColor = '#334155';
+    const lbl = document.getElementById('pitchA-dlg-mic-label');
+    if (lbl) lbl.textContent = 'Tomar del instrumento';
+    const st = document.getElementById('pitchA-dlg-status');
+    if (st) st.textContent = '';
+    const bar = document.getElementById('pitchA-dlg-bar-fill');
+    if (bar) bar.style.width = '0%';
+  },
+
+  _loop() {
+    this._raf = requestAnimationFrame(() => {
+      if (!this._analyser || !document.getElementById('pitchA-dlg')) { this.stopMic(); return; }
+      this._loop();
+      const bufLen = this._analyser.fftSize;
+      if (!this._buf || this._buf.length !== bufLen) {
+        this._buf = new Float32Array(bufLen);
+        this._freqBuf = new Float32Array(this._analyser.frequencyBinCount);
+      }
+      this._analyser.getFloatTimeDomainData(this._buf);
+      this._analyser.getFloatFrequencyData(this._freqBuf);
+      const res = detectPitch(this._buf, this._analyser.context.sampleRate);
+      if (!res || res.clarity < 0.15) {
+        const st = document.getElementById('pitchA-dlg-status');
+        if (st) st.textContent = 'Toca una nota…';
+        return;
+      }
+      res.freq = _refineFFT(res.freq, this._freqBuf, this._analyser.context.sampleRate);
+      const freq = res.freq;
+      if (this._stableCount === 0) {
+        this._stableFreq = freq;
+      } else {
+        this._stableFreq = this._stableFreq * 0.75 + freq * 0.25;
+      }
+      this._stableCount++;
+      const prog = Math.min(1, this._stableCount / this.FRAMES);
+      const st = document.getElementById('pitchA-dlg-status');
+      if (st) st.textContent = `🎤 ${this._stableFreq.toFixed(2)} Hz`;
+      const bar = document.getElementById('pitchA-dlg-bar-fill');
+      if (bar) bar.style.width = (prog * 100) + '%';
+      // Actualizar input en tiempo real
+      const inp = document.getElementById('pitchA-dlg-input');
+      if (inp) inp.value = this._stableFreq.toFixed(2);
+      if (this._stableCount >= this.FRAMES) {
+        setPitchAGlobal(this._stableFreq);
+        this.stopMic();
+        const st2 = document.getElementById('pitchA-dlg-status');
+        if (st2) st2.textContent = `✓ ${pitchA} Hz`;
+      }
+    });
+  }
+};
 
 // ── Persiana móvil ──
 function toggleTopBar(forceHide) {
@@ -1331,7 +1466,7 @@ function restoreSession() {
   // Restaurar pitch A
   if (p.pitchA && p.pitchA > 0) {
     pitchA = p.pitchA;
-    document.getElementById('pitch-input').value = p.pitchA;
+    document.querySelectorAll('.pitchA-label').forEach(el => el.textContent = p.pitchA + ' Hz');
   }
   // Restaurar onda
   if (p.wave) {
@@ -2100,10 +2235,7 @@ function _panel_keyboard(act, el) {
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:#4b5563;margin-bottom:10px">
         <span style="color:var(--muted)">La =</span>
-        <input id="kb-pitch-input" type="number" value="${pitchA}" min="1" max="9999" step="0.1"
-          style="width:58px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:11px;text-align:center;outline:none"
-          onchange="setPitchAGlobal(this.value)" onkeydown="if(event.key==='Enter')setPitchAGlobal(this.value)">
-        <span style="color:var(--muted)">Hz</span>
+        <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${pitchA} Hz</span>
         <span style="color:var(--border)">·</span>
         Temperamento: <span style="color:var(--c0)">${tempName}</span>
         ${!selected.find(Boolean) ? '<span style="color:#f87171"> — selecciona uno en la lista</span>' : ''}
@@ -4431,11 +4563,7 @@ function viewKeyboard() {
       <!-- La + Temperamento en la misma fila -->
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:#4b5563;margin-bottom:10px">
         <span style="color:var(--muted)">La =</span>
-        <input id="kb-pitch-input" type="number" value="${pitchA}" min="1" max="9999" step="0.1"
-          style="width:58px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:11px;text-align:center;outline:none"
-          onchange="setPitchAGlobal(this.value)"
-          onkeydown="if(event.key==='Enter')setPitchAGlobal(this.value)">
-        <span style="color:var(--muted)">Hz</span>
+        <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${pitchA} Hz</span>
         <span style="color:var(--border)">·</span>
         Temperamento: <span style="color:var(--c0)">${tempName}</span>
         ${!selected.find(Boolean) ? '<span style="color:#f87171"> — selecciona uno en la lista</span>' : ''}
@@ -5174,11 +5302,9 @@ function buildTunerScreen() {
           </label>
         </div>
         <div style="border-top:1px solid #334155;padding-top:8px;margin-top:2px">
-          <div style="font-size:10px;color:#64748b;margin-bottom:4px">La (Hz)</div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <input type="number" id="tuner-pitch-input" value="${pitchA}" min="1" max="9999" step="0.1"
-              style="flex:1;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:5px 8px;font-size:13px;text-align:center;outline:none"
-              oninput="const _v=parseFloat(this.value);if(_v>0){pitchA=_v;savePrefs({pitchA:_v});}document.getElementById('pitch-input').value=this.value;if(TUNER.refOsc)TUNER.refOsc.frequency.setTargetAtTime(TUNER.getTargetFreq(),getCtx().currentTime,0.01)">
+          <div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="closeTunerMenu();PitchADlg.open()">
+            <span style="font-size:10px;color:#64748b">La =</span>
+            <span class="pitchA-label" style="color:#93c5fd;font-size:13px;border-bottom:1px dashed #93c5fd;padding:2px 4px">${pitchA} Hz</span>
           </div>
         </div>
         ${!window.matchMedia('(display-mode: standalone)').matches ? `<div style="border-top:1px solid #334155;padding-top:8px;margin-top:2px">
@@ -5269,7 +5395,6 @@ const DT = {
   micOn: false, micStream: null, analyser: null,
   rafId: null, lastAnalysis: 0,
   _stableNi: -1, _stableCount: 0, _stableCents: 0, _stableFreq: 0, _buf: null,
-  _captureA: false,      // auto mode: capturando La para calibrar pitchA
   _suggSources: null,    // Set de fuentes activas para sugerencias (null = todas)
   _statusLock: 0,        // timestamp hasta el que no sobreescribir el status
   STABLE_FRAMES: 18,     // ~1.8 s a ≈100 ms/análisis
@@ -5279,7 +5404,6 @@ const DT = {
 
   setMode(m) {
     this.mode = m;
-    this._captureA = false;
     this._targetNi = -1; this._stableNi = -1; this._stableCount = 0;
     document.querySelectorAll('.dt-mode-btn').forEach(b =>
       b.classList.toggle('sel', b.dataset.m === m));
@@ -5312,36 +5436,13 @@ const DT = {
     this._updateStatus(`✓ Normalizado — La: ${pitchA} Hz`);
   },
 
-  async startCaptureA() {
-    this._captureA = true;
-    this._stableNi = -1; this._stableCount = 0;
-    this._updatePitchRow();
-    this._updateStatus('Toca La en tu instrumento…');
-    if (!this.micOn) await this.startMic();
-  },
-  stopCaptureA() {
-    this._captureA = false;
-    this._stableNi = -1; this._stableCount = 0;
-    this._updatePitchRow();
-    this._updateStatus('—');
-  },
-
   _updatePitchRow() {
     const el = document.getElementById('dt-pitch-row');
     if (!el) return;
     const canNorm = this.notes[9] !== null && this.notes[9] !== 0;
-    const captureBtn = this.mode === 'auto'
-      ? (this._captureA
-          ? `<button class="icon-btn" onclick="DT.stopCaptureA()" style="font-size:10px;color:#f87171;border-color:#b91c1c;margin-left:4px">✕ Cancelar</button>`
-          : `<button class="icon-btn" onclick="DT.startCaptureA()" style="font-size:10px;margin-left:4px">🎤 Tomar La</button>`)
-      : '';
     el.innerHTML =
       `<span style="font-size:11px;color:var(--muted)">La ref:</span>
-       <input id="dt-pitch-input" type="number" value="${pitchA}" step="0.01" min="1" max="9999"
-         style="width:64px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:11px;text-align:center;outline:none"
-         onchange="DT.setPitchA(this.value)" onkeydown="if(event.key==='Enter')DT.setPitchA(this.value)">
-       <span style="font-size:11px;color:var(--muted)">Hz</span>`
-      + captureBtn
+       <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${pitchA} Hz</span>`
       + (canNorm ? `<button class="icon-btn" onclick="DT.normalize()" style="font-size:10px;margin-left:4px;color:#fcd34d;border-color:#b45309">Normalizar A→0</button>` : '');
   },
 
@@ -5372,7 +5473,6 @@ const DT = {
     if (this.rafId) { cancelAnimationFrame(this.rafId); this.rafId = null; }
     document.querySelectorAll('.dt-mic-track').forEach(e => e.style.background='#334155');
     document.querySelectorAll('.dt-mic-thumb').forEach(e => e.style.left='2px');
-    this._captureA = false;
     this._stableNi = -1; this._stableCount = 0;
     this._renderKeyboard(); this._updateStatus('—');
   },
@@ -5402,14 +5502,14 @@ const DT = {
     const rms = Math.sqrt(rmsSum / Math.min(1024, bufLen));
     const res = detectPitch(this._buf, this.analyser.context.sampleRate);
     if (!res || res.clarity < 0.15) {
-      if (this._stableNi !== -1 && !this._captureA) { this._stableNi = -1; this._stableCount = 0; this._renderKeyboard(); }
+      if (this._stableNi !== -1) { this._stableNi = -1; this._stableCount = 0; this._renderKeyboard(); }
       // En manual sin nota seleccionada: mostrar instrucción, no "escuchando"
       if (this.mode === 'manual' && this._targetNi < 0) {
         this._updateStatus('Pulsa una tecla para seleccionar nota');
         return;
       }
       const lvl = Math.min(100, Math.round(rms * 1000));
-      this._updateStatus(lvl > 1 ? `🎤 ${lvl}% — escuchando…` : (this._captureA ? 'Toca La en tu instrumento…' : '—'));
+      this._updateStatus(lvl > 1 ? `🎤 ${lvl}% — escuchando…` : '—');
       return;
     }
     // Refinar frecuencia con interpolación parabólica sobre FFT nativa
@@ -5421,29 +5521,6 @@ const DT = {
     // En manual: solo medir si hay nota seleccionada
     if (this.mode === 'manual' && this._targetNi < 0) {
       this._updateStatus('Pulsa una tecla para seleccionar nota');
-      return;
-    }
-    // captureA: acumular EMA de frecuencia sin filtros — al completar → nuevo pitchA
-    if (this._captureA) {
-      if (this._stableCount === 0) {
-        this._stableFreq = freq;
-      } else {
-        this._stableFreq = this._stableFreq * 0.75 + freq * 0.25;
-      }
-      this._stableCount++;
-      const prog = Math.min(1, this._stableCount / this.STABLE_FRAMES);
-      this._updateStatus(`🎤 ${this._stableFreq.toFixed(2)} Hz`, prog);
-      if (this._stableCount >= this.STABLE_FRAMES) {
-        const oldPitchA = pitchA;
-        setPitchAGlobal(Math.round(this._stableFreq * 100) / 100);
-        if (this.notes[9] !== null) this.notes[9] = 0;
-        this._captureA = false;
-        this._stableNi = -1; this._stableCount = 0;
-        this._updateStatus(`✓ La: ${oldPitchA.toFixed(2)} → ${pitchA.toFixed(2)} Hz`);
-        this._statusLock = Date.now() + 3000;
-        this._updatePitchRow();
-        this._renderKeyboard();
-      }
       return;
     }
     const measureNi = (this.mode === 'manual') ? this._targetNi : ni;
@@ -5608,7 +5685,6 @@ const DT = {
 
   reset() {
     this.notes = new Array(12).fill(null);
-    this._captureA = false;
     this._targetNi = -1; this._stableNi = -1; this._stableCount = 0;
     this._renderKeyboard(); this._updatePitchRow(); this._updateStatus('—');
     this._clearExport();
@@ -6081,7 +6157,7 @@ document.getElementById('share-cancel-btn').addEventListener('click', closeShare
 document.getElementById('share-confirm-btn').addEventListener('click', confirmShare);
 document.getElementById('update-apply-btn').addEventListener('click', applyUpdate);
 document.getElementById('update-toast-dismiss').addEventListener('click', dismissUpdateToast);
-document.getElementById('pitch-input').addEventListener('change', e => setPitchAGlobal(e.target.value));
+// (pitch-input change listener eliminado — ahora usa PitchADlg unificado)
 
 // ══════════════════════════════════════════════
 // ARRANQUE
