@@ -1,4 +1,4 @@
-const APP_VERSION = '489df67 · 2026-04-09';
+const APP_VERSION = 'ef2864a · 2026-04-09';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -267,6 +267,12 @@ let pitchA        = _prefs.pitchA ?? 440;
 let octaveShift   = _prefs.octaveShift ?? 0;
 let chartPlayMode = 'normal'; // 'normal' | 'legato'
 
+// ── Compensación térmica (órgano) ──
+let tempCompEnabled = _prefs.tempCompEnabled ?? false;
+let refTemp         = _prefs.refTemp ?? 20;      // temperatura de referencia en °C
+let currentTemp     = _prefs.currentTemp ?? 20;  // temperatura actual en °C
+let compensatedPitchA = pitchA;                   // La ponderado recalculado en tiempo real
+
 // ══════════════════════════════════════════════
 // AUDIO ENGINE (gráficas)
 // ══════════════════════════════════════════════
@@ -421,11 +427,49 @@ function setPitchAGlobal(val) {
   const v = Math.round(parseFloat(val) * 100) / 100;
   if (!v || v <= 0) return;
   pitchA = v; savePrefs({ pitchA: v });
+  updateCompensatedPitch();
   document.querySelectorAll('.pitchA-label').forEach(el => el.textContent = v + ' Hz');
   if (TUNER.refOsc) TUNER.refOsc.frequency.setTargetAtTime(TUNER.getTargetFreq(), getCtx().currentTime, 0.01);
   // Actualizar input del dialog si está abierto
   const dlgInput = document.getElementById('pitchA-dlg-input');
   if (dlgInput) dlgInput.value = v;
+}
+
+// Recalcula el La ponderado según temperatura
+function updateCompensatedPitch() {
+  if (tempCompEnabled) {
+    compensatedPitchA = getCompensatedFreq(pitchA, refTemp, currentTemp);
+  } else {
+    compensatedPitchA = pitchA;
+  }
+  updateTempDisplay();
+}
+
+// Actualiza el display del diálogo de temperatura
+function updateTempDisplay() {
+  const dlg = document.getElementById('pitchA-dlg');
+  if (!dlg) return;
+
+  // Mostrar La ponderado
+  const ponderadoEl = document.getElementById('pitchA-ponderado');
+  if (ponderadoEl) {
+    ponderadoEl.textContent = compensatedPitchA.toFixed(2);
+  }
+
+  // Mostrar offset en cents
+  const centsEl = document.getElementById('pitchA-offset-cents');
+  if (centsEl) {
+    const offset = getFreqOffsetInCents(compensatedPitchA, pitchA);
+    const sign = offset > 0 ? '+' : '';
+    centsEl.textContent = sign + offset.toFixed(1);
+  }
+
+  // Mostrar estado de compensación
+  const stateEl = document.getElementById('pitchA-temp-state');
+  if (stateEl) {
+    stateEl.textContent = tempCompEnabled ? '✓ Activa' : '○ Inactiva';
+    stateEl.style.color = tempCompEnabled ? '#4ade80' : '#9ca3af';
+  }
 }
 
 // ── Dialog unificado para definir La de referencia ──
@@ -439,13 +483,21 @@ const PitchADlg = {
     dlg.id = 'pitchA-dlg';
     dlg.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6)';
     dlg.innerHTML = `
-      <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px;width:280px;max-width:90vw;color:#e2e8f0;font-family:system-ui">
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px;width:320px;max-width:90vw;color:#e2e8f0;font-family:system-ui;max-height:90vh;overflow-y:auto">
         <div style="font-size:14px;font-weight:600;margin-bottom:14px">La de referencia</div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
-          <input id="pitchA-dlg-input" type="number" value="${pitchA}" min="1" max="9999" step="0.01"
-            style="flex:1;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:8px 10px;font-size:16px;text-align:center;outline:none">
-          <span style="font-size:13px;color:#94a3b8">Hz</span>
+
+        <!-- La objetivo (siempre manual) -->
+        <div style="margin-bottom:12px">
+          <div style="font-size:11px;color:#9ca3af;margin-bottom:4px">La objetivo</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input id="pitchA-dlg-input" type="number" value="${pitchA}" min="1" max="9999" step="0.01"
+              onchange="PitchADlg.onInputChange()"
+              style="flex:1;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:8px 10px;font-size:16px;text-align:center;outline:none">
+            <span style="font-size:13px;color:#94a3b8">Hz</span>
+          </div>
         </div>
+
+        <!-- Botón micrófono -->
         <button id="pitchA-dlg-mic" onclick="PitchADlg.toggleMic()"
           style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:8px;padding:10px;cursor:pointer;font-size:13px;margin-bottom:6px">
           <span id="pitchA-dlg-mic-icon">🎤</span>
@@ -455,6 +507,53 @@ const PitchADlg = {
         <div id="pitchA-dlg-bar" style="height:3px;background:#334155;border-radius:2px;margin-bottom:14px;overflow:hidden">
           <div id="pitchA-dlg-bar-fill" style="height:100%;width:0%;background:#3b82f6;border-radius:2px;transition:width 0.1s"></div>
         </div>
+
+        <!-- Separador -->
+        <div style="height:1px;background:#334155;margin:14px 0"></div>
+
+        <!-- Compensación térmica -->
+        <div style="margin-bottom:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-size:11px;color:#9ca3af">Compensar por temperatura</div>
+            <label style="display:flex;align-items:center;cursor:pointer;gap:6px">
+              <input type="checkbox" id="pitchA-temp-toggle"
+                onchange="PitchADlg.onTempToggle()"
+                ${tempCompEnabled ? 'checked' : ''}
+                style="cursor:pointer;width:18px;height:18px">
+              <span id="pitchA-temp-state" style="font-size:12px;color:#9ca3af">○ Inactiva</span>
+            </label>
+          </div>
+
+          <!-- Temp de referencia -->
+          <div style="margin-bottom:10px">
+            <div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Temp. ref. (°C)</div>
+            <input id="pitchA-ref-temp" type="number" value="${refTemp}" min="-50" max="50" step="1"
+              onchange="PitchADlg.onRefTempChange()"
+              style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:8px 10px;font-size:14px;text-align:center;outline:none">
+          </div>
+
+          <!-- Temp actual -->
+          <div style="margin-bottom:10px">
+            <div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Temp. actual (°C)</div>
+            <input id="pitchA-curr-temp" type="number" value="${currentTemp}" min="-50" max="50" step="0.1"
+              onchange="PitchADlg.onCurrTempChange()"
+              style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:8px 10px;font-size:14px;text-align:center;outline:none">
+          </div>
+
+          <!-- Información ponderada -->
+          <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px;font-size:12px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <span style="color:#9ca3af">La ponderado:</span>
+              <span id="pitchA-ponderado" style="color:#60a5fa;font-weight:600">${compensatedPitchA.toFixed(2)} Hz</span>
+            </div>
+            <div style="display:flex;justify-content:space-between">
+              <span style="color:#9ca3af">Offset:</span>
+              <span id="pitchA-offset-cents" style="color:#f87171;font-weight:600">0.0 ¢</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Botones -->
         <div style="display:flex;gap:8px">
           <button onclick="PitchADlg.cancel()" style="flex:1;background:#334155;border:none;color:#94a3b8;border-radius:6px;padding:8px;cursor:pointer;font-size:13px">Cancelar</button>
           <button onclick="PitchADlg.accept()" style="flex:1;background:#3b82f6;border:none;color:#fff;border-radius:6px;padding:8px;cursor:pointer;font-size:13px;font-weight:600">Aceptar</button>
@@ -463,8 +562,41 @@ const PitchADlg = {
     // Cerrar al pulsar backdrop
     dlg.addEventListener('click', e => { if (e.target === dlg) PitchADlg.cancel(); });
     document.body.appendChild(dlg);
+    updateTempDisplay();
     const inp = document.getElementById('pitchA-dlg-input');
     inp.focus(); inp.select();
+  },
+
+  onInputChange() {
+    const inp = document.getElementById('pitchA-dlg-input');
+    if (inp) setPitchAGlobal(parseFloat(inp.value));
+  },
+
+  onTempToggle() {
+    const toggle = document.getElementById('pitchA-temp-toggle');
+    if (toggle) {
+      tempCompEnabled = toggle.checked;
+      savePrefs({ tempCompEnabled });
+      updateCompensatedPitch();
+    }
+  },
+
+  onRefTempChange() {
+    const inp = document.getElementById('pitchA-ref-temp');
+    if (inp) {
+      refTemp = parseFloat(inp.value);
+      savePrefs({ refTemp });
+      updateCompensatedPitch();
+    }
+  },
+
+  onCurrTempChange() {
+    const inp = document.getElementById('pitchA-curr-temp');
+    if (inp) {
+      currentTemp = parseFloat(inp.value);
+      savePrefs({ currentTemp });
+      updateCompensatedPitch();
+    }
   },
 
   accept() {
@@ -4619,7 +4751,9 @@ const TUNER = {
 
   getTargetFreq() {
     const off = (lastSelected ?? selected.find(Boolean))?.offsets ?? new Array(12).fill(0);
-    return pitchA * Math.pow(2, (ET_FROM_A[this.targetNi] + off[this.targetNi] + (this.targetOct - 4) * 1200) / 1200);
+    // Usar compensatedPitchA si está activa la compensación térmica
+    const baseFreq = tempCompEnabled ? compensatedPitchA : pitchA;
+    return baseFreq * Math.pow(2, (ET_FROM_A[this.targetNi] + off[this.targetNi] + (this.targetOct - 4) * 1200) / 1200);
   },
 
   setMode(m) {
