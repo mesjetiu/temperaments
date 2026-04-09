@@ -1,0 +1,40 @@
+{
+  "name": "salinas-electron",
+  "version": "1.0.0",
+  "description": "Salinas — colección de temperamentos musicales (desktop)",
+  "main": "main.js",
+  "scripts": {
+    "start": "env -u ELECTRON_RUN_AS_NODE electron .",
+    "vendor": "node fetch-vendor.js",
+    "build:linux": "electron-builder --linux AppImage",
+    "build:windows": "electron-builder --win nsis",
+    "build:mac": "electron-builder --mac dmg"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.salinas.app",
+    "productName": "Salinas",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "../docs/**/*",
+      "vendor/**/*"
+    ],
+    "linux": {
+      "target": "AppImage",
+      "category": "Audio"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    }
+  }
+}
