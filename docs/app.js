@@ -1,4 +1,4 @@
-const APP_VERSION = '977f244 · 2026-04-09';
+const APP_VERSION = '2d1fffa · 2026-04-09';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -853,7 +853,7 @@ const SensorDlg = {
 
   async toggleConnect() {
     if (typeof RuuviScanner === 'undefined') {
-      alert('RuuviScanner no disponible.');
+      alert('El módulo Ruuvi no está cargado.\nSi la app está instalada como PWA, puede estar ejecutando una versión en caché antigua. Recarga la página para instalar la actualización.');
       return;
     }
     if (RuuviScanner.streaming) {

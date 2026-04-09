@@ -1,6 +1,7 @@
-const CACHE = 'temp-977f244';const STATIC = [
+const CACHE = 'temp-2d1fffa';const STATIC = [
   './icon-192.png',
   './icon-512.png',
+  './ruuvi.js',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
 ];
 
