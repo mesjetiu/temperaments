@@ -448,9 +448,7 @@ function updateCompensatedPitch() {
     compensatedPitchA = pitchA;
   }
   // Propagar al oscilador de referencia del afinador
-  if (typeof TUNER !== 'undefined' && TUNER.refOsc) {
-    try { TUNER.refOsc.frequency.setTargetAtTime(TUNER.getTargetFreq(), getCtx().currentTime, 0.01); } catch(_){}
-  }
+  try { if (TUNER.refOsc) TUNER.refOsc.frequency.setTargetAtTime(TUNER.getTargetFreq(), getCtx().currentTime, 0.01); } catch(_){}
   // Mostrar/ocultar indicadores de termómetro en toda la app
   document.querySelectorAll('.temp-indicator').forEach(el => {
     el.classList.toggle('active', tempCompEnabled);
@@ -458,7 +456,8 @@ function updateCompensatedPitch() {
   updateTempDisplay();
 }
 // Inicializar compensación al arrancar (aplica prefs guardadas)
-updateCompensatedPitch();
+// Se difiere a DOMContentLoaded porque TUNER (const) aún no existe en este punto.
+document.addEventListener('DOMContentLoaded', () => updateCompensatedPitch());
 
 // Actualiza el display del diálogo de temperatura
 function updateTempDisplay() {
