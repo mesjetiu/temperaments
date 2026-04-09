@@ -124,7 +124,8 @@ app.whenReady().then(() => {
     let urlPath = new URL(request.url).pathname;
 
     // El manifest.json usa /temperaments/ como scope → normalizar a /
-    urlPath = urlPath.replace(/^\/temperaments/, '') || '/';
+    // Ojo: solo quitar el prefijo si va seguido de / o es el path completo
+    urlPath = urlPath.replace(/^\/temperaments(\/|$)/, '/') || '/';
     if (urlPath === '/') urlPath = '/index.html';
 
     const filePath = path.join(DOCS_ROOT, urlPath);
