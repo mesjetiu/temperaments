@@ -115,6 +115,7 @@
     #add-card-btn { display: none !important; }
     #tuner-fab { display: none !important; }
     #mob-nav { display: flex !important; }
+    #audio-bar-pitch-a { display: none !important; }
     .panel { width: 100% !important; max-width: 100% !important; min-width: unset !important; flex: none !important; box-sizing: border-box !important; }
     .card-toolbar button { font-size: 15px; padding: 3px 7px; }
     .panel:not(.panel-resized) canvas { max-height: 220px; }
@@ -250,6 +251,10 @@
   .mob-nav-btn:active { color: #f1f5f9; background: rgba(255,255,255,0.05); }
   .mob-nav-btn.active { color: #3b82f6; }
   .mob-nav-btn svg { flex-shrink: 0; }
+  .mob-nav-pitch-top { display: flex; align-items: center; gap: 2px; height: 22px; }
+  .mob-nav-pitch .temp-indicator { display: none; font-size: 15px; }
+  .mob-nav-pitch .temp-indicator.active,
+  .mob-nav-pitch .temp-indicator.streaming { display: inline; }
   .tools-fab-item:hover { background: #334155; }
 
   /* ═══ AUDIO BAR ═══ */
@@ -450,7 +455,7 @@
       </select>
 
       <!-- La / Pitch A -->
-      <span style="display:inline-flex;align-items:center;gap:2px;white-space:nowrap;flex-shrink:0">
+      <span id="audio-bar-pitch-a" style="display:inline-flex;align-items:center;gap:2px;white-space:nowrap;flex-shrink:0">
         <label style="margin:0">La =</label>
         <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">440 Hz</span><span class="temp-indicator" onclick="PitchADlg.open()" style="font-size:11px;margin-left:1px">🌡️<span id="temp-ref-display" style="color:#64748b"></span><span id="temp-curr-display" style="color:#94a3b8"></span> = <span id="compensated-hz-val" style="color:var(--accent)">440.00</span> Hz</span>
       </span>
@@ -503,6 +508,10 @@
   <button class="mob-nav-btn" onclick="openMedidor()" id="mob-nav-medidor">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 12l4-4"/><circle cx="12" cy="12" r="2"/></svg>
     <span>Medidor</span>
+  </button>
+  <button class="mob-nav-btn mob-nav-pitch" onclick="PitchADlg.open()" id="mob-nav-pitch">
+    <span class="mob-nav-pitch-top"><span class="pitchA-label" style="font-size:13px;font-weight:600;color:var(--accent)">440 Hz</span><span class="temp-indicator" style="font-size:14px;margin-left:2px">🌡️</span></span>
+    <span>La</span>
   </button>
 </nav>
 
