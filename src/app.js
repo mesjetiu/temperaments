@@ -1134,6 +1134,9 @@ function startPanelDragResize(e, panel) {
   function onEnd() {
     bar.removeEventListener('pointermove', onMove);
     bar.removeEventListener('pointerup', onEnd);
+    // Persistir altura en workspace
+    const cardWrap = panel.closest('[data-card-id]');
+    if (cardWrap) WS.saveCardSize(cardWrap.dataset.cardId, null, panel.offsetHeight);
   }
   bar.addEventListener('pointermove', onMove, { passive: true });
   bar.addEventListener('pointerup', onEnd);

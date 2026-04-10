@@ -342,6 +342,13 @@
     cursor: nwse-resize; z-index: 11; touch-action: none;
     -webkit-tap-highlight-color: transparent;
   }
+  /* Indicador visual permanente en desktop */
+  .panel-resize-e  { border-right: 2px solid transparent; transition: border-color 0.15s, background 0.15s; }
+  .panel-resize-s  { border-bottom: 2px solid transparent; transition: border-color 0.15s, background 0.15s; }
+  .panel-resize-se::after { content:''; position:absolute; bottom:3px; right:3px; width:6px; height:6px; border-right:2px solid #2d3f55; border-bottom:2px solid #2d3f55; border-radius:1px; }
+  .panel:hover .panel-resize-e  { border-right-color: #2d3f55; }
+  .panel:hover .panel-resize-s  { border-bottom-color: #2d3f55; }
+  .panel:hover .panel-resize-se::after { border-color: #4b5563; }
   .panel-resize-e:hover, .panel-resize-se:hover { background: rgba(59,130,246,0.25); border-radius: 3px; }
   .panel-resize-s:hover { background: rgba(59,130,246,0.15); }
   /* En móvil: ocultar handles de ancho (width siempre 100%); hacer visible el handle inferior */
