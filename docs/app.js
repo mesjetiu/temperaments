@@ -1,4 +1,4 @@
-const APP_VERSION = 'b03f42a · 2026-04-10';
+const APP_VERSION = '115e8e2 · 2026-04-10';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2332,9 +2332,22 @@ function renderContent() {
         hdrMob.insertBefore(WS.makeCardToolbar(card), hdrMob.lastElementChild);
       }
     }
+
+    // Restaurar tamaño guardado (solo desktop; en móvil el ancho es siempre 100%)
+    if (!isMobile()) {
+      const panelEl = wrap.querySelector('.panel');
+      if (panelEl) {
+        if (card.w) { panelEl.style.width = card.w + 'px'; panelEl.style.flex = 'none'; }
+        if (card.h) panelEl.style.height = card.h + 'px';
+      }
+    } else if (card.h) {
+      const panelEl = wrap.querySelector('.panel');
+      if (panelEl) panelEl.style.height = card.h + 'px';
+    }
   }
 
   _bindCardDrag(el);
+  _bindCardResize(el);
 }
 
 // ── Drag & drop para reordenar tarjetas ──────────────────────────────────────
@@ -2372,8 +2385,8 @@ function _bindCardDrag(container) {
   container.addEventListener('pointerdown', e => {
     const hdr = e.target.closest('.panel-h3-row, .panel-hdr');
     if (!hdr) return;
-    // No iniciar si el clic es sobre un botón de la toolbar
-    if (e.target.closest('.card-toolbar, .panel-zoom-btn, .panel-fs-close')) return;
+    // No iniciar si el clic es sobre un botón de la toolbar o un handle de resize
+    if (e.target.closest('.card-toolbar, .panel-zoom-btn, .panel-fs-close, .panel-resize-e, .panel-resize-s, .panel-resize-se')) return;
 
     const wrap = getWrap(hdr);
     if (!wrap) return;
@@ -2416,6 +2429,65 @@ function _bindCardDrag(container) {
     hdr.addEventListener('pointermove', onMove);
     hdr.addEventListener('pointerup', onUp);
     hdr.addEventListener('pointercancel', onUp);
+  });
+}
+
+// ── Resize de tarjetas ───────────────────────────────────────────────────────
+function _bindCardResize(container) {
+  container.querySelectorAll('[data-card-id]').forEach(wrap => {
+    const cardId = wrap.dataset.cardId;
+    const panel  = wrap.querySelector('.panel');
+    if (!panel) return;
+
+    // Handle: borde derecho (ancho)
+    const rh = document.createElement('div');
+    rh.className = 'panel-resize-e';
+    panel.appendChild(rh);
+
+    // Handle: esquina inferior-derecha (ancho + alto)
+    const brh = document.createElement('div');
+    brh.className = 'panel-resize-se';
+    panel.appendChild(brh);
+
+    // Handle: borde inferior (alto) — solo si no hay ya panel-drag-bar
+    if (!panel.querySelector('.panel-drag-bar')) {
+      const sh = document.createElement('div');
+      sh.className = 'panel-resize-s';
+      panel.appendChild(sh);
+    }
+
+    function startResize(ev, mode) {
+      // No redimensionar en fullscreen
+      if (document.fullscreenElement === panel) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      ev.target.setPointerCapture(ev.pointerId);
+      const startX = ev.clientX, startY = ev.clientY;
+      const startW = panel.offsetWidth,  startH = panel.offsetHeight;
+      panel.style.width  = startW + 'px';
+      panel.style.height = startH + 'px';
+      panel.style.flex   = 'none';
+
+      function onMove(e) {
+        const dX = e.clientX - startX, dY = e.clientY - startY;
+        if (mode === 'e'  || mode === 'se') panel.style.width  = Math.max(200, startW + dX) + 'px';
+        if (mode === 's'  || mode === 'se') panel.style.height = Math.max(80,  startH + dY) + 'px';
+        // Chart.js (responsive:true) y _panelRO (ResizeObserver) reaccionan automáticamente
+      }
+      function onUp() {
+        ev.target.removeEventListener('pointermove', onMove);
+        ev.target.removeEventListener('pointerup',   onUp);
+        const newW = (mode === 'e' || mode === 'se') ? panel.offsetWidth  : null;
+        const newH = (mode === 's' || mode === 'se') ? panel.offsetHeight : null;
+        WS.saveCardSize(cardId, newW, newH);
+      }
+      ev.target.addEventListener('pointermove', onMove, { passive: true });
+      ev.target.addEventListener('pointerup',   onUp);
+    }
+
+    rh.addEventListener('pointerdown',  e => startResize(e, 'e'));
+    brh.addEventListener('pointerdown', e => startResize(e, 'se'));
+    panel.querySelector('.panel-resize-s')?.addEventListener('pointerdown', e => startResize(e, 's'));
   });
 }
 

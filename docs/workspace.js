@@ -30,7 +30,7 @@ const CARD_REGISTRY = {
 };
 
 const DEFAULT_WORKSPACE = {
-  version: 1,
+  version: 2,
   activeTabId: 'tab-default',
   tabs: [{
     id: 'tab-default',
@@ -64,6 +64,20 @@ const WS = {
     localStorage.setItem(WS_KEY, JSON.stringify(ws));
     this.renderTabBar();
     if (typeof renderContent === 'function') renderContent();
+  },
+
+  // Persiste el tamaño de una tarjeta SIN re-renderizar (para uso durante drag-resize)
+  saveCardSize(cardId, w, h) {
+    const ws = this.current();
+    for (const tab of ws.tabs) {
+      const card = tab.cards.find(c => c.id === cardId);
+      if (card) {
+        if (w != null) card.w = Math.round(w); else delete card.w;
+        if (h != null) card.h = Math.round(h); else delete card.h;
+        localStorage.setItem(WS_KEY, JSON.stringify(ws));
+        return;
+      }
+    }
   },
 
   // Crea workspace por defecto si no existe todavía, o si contiene tipos obsoletos
@@ -252,6 +266,9 @@ const WS = {
     const downBtn = idx < len - 1
       ? `<button onclick="event.stopPropagation();WS.moveCardInTab('${card.id}',+1)" title="Bajar tarjeta">↓</button>`
       : '';
+    const resetSizeBtn = (card.w || card.h)
+      ? `<button onclick="event.stopPropagation();WS.saveCardSize('${card.id}',null,null);renderContent()" title="Restablecer tamaño">⊡</button>`
+      : '';
     const div = document.createElement('div');
     div.className = 'card-toolbar';
     div.setAttribute('onclick', 'event.stopPropagation()');
@@ -260,6 +277,7 @@ const WS = {
       downBtn +
       `<button onclick="event.stopPropagation();WS.duplicateCard('${card.id}')" title="Duplicar tarjeta">⧉</button>` +
       moveBtn +
+      resetSizeBtn +
       `<button onclick="event.stopPropagation();WS.removeCard('${card.id}')" title="Quitar tarjeta">✕</button>`;
     return div;
   },

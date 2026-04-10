@@ -314,6 +314,36 @@
     /* En móvil el panel-drag-bar ya hace de asa; ocultar el handle interno del canvas */
     .panel-resizable .chart-resize-handle { display:none; }
   }
+  /* ═══ HANDLES DE REDIMENSIONADO DE TARJETA ═══ */
+  .panel-resize-e {
+    position: absolute; top: 0; right: -3px; bottom: 0; width: 8px;
+    cursor: ew-resize; z-index: 10; touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .panel-resize-s {
+    position: absolute; bottom: -3px; left: 8px; right: 8px; height: 8px;
+    cursor: ns-resize; z-index: 10; touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .panel-resize-se {
+    position: absolute; bottom: 0; right: 0; width: 16px; height: 16px;
+    cursor: nwse-resize; z-index: 11; touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .panel-resize-e:hover, .panel-resize-se:hover { background: rgba(59,130,246,0.25); border-radius: 3px; }
+  .panel-resize-s:hover { background: rgba(59,130,246,0.15); }
+  /* En móvil: ocultar handles de ancho (width siempre 100%) */
+  @media (max-width: 767px) {
+    .panel-resize-e, .panel-resize-se { display: none; }
+  }
+  /* En fullscreen: ocultar todos los handles */
+  .panel:fullscreen .panel-resize-e,
+  .panel:fullscreen .panel-resize-s,
+  .panel:fullscreen .panel-resize-se,
+  .panel:-webkit-full-screen .panel-resize-e,
+  .panel:-webkit-full-screen .panel-resize-s,
+  .panel:-webkit-full-screen .panel-resize-se { display: none !important; }
+
   .empty-state { color: #4b5563; font-style: italic; padding: 60px; text-align: center; width: 100%; }
   .playable { cursor: crosshair; }
   table td[onpointerdown] { user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
