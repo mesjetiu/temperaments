@@ -97,8 +97,10 @@ window.RuuviScanner = (() => {
     const notifListener = await BLE.addListener(notifKey, (event) => {
       // El valor llega como hex string desde el plugin nativo
       const raw = event?.value;
+      console.log('[Ruuvi] notif raw:', raw, 'typeof:', typeof raw, '_cb:', typeof _cb);
       const buf = (typeof raw === 'string') ? _hexToBuffer(raw) : (raw?.buffer ?? raw);
       const tempC = _parseRawV5(buf);
+      console.log('[Ruuvi] tempC:', tempC);
       if (tempC === null) return;
       if (typeof _cb === 'function') _cb(tempC + _offset);
     });
