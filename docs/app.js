@@ -1,4 +1,4 @@
-const APP_VERSION = 'c31516b · 2026-04-10';
+const APP_VERSION = '98d04d8 · 2026-04-10';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -5748,11 +5748,7 @@ function tunerTempName() {
 function exitTuner() {
   TUNER.stop();
   document.getElementById('tuner-screen')?.remove();
-  // Forzar repaint del layer compositor — el canvas del afinador deja un ghost layer
-  requestAnimationFrame(() => {
-    const m = document.getElementById('main');
-    if (m) { m.style.transform = 'translateZ(0)'; requestAnimationFrame(() => { m.style.transform = ''; }); }
-  });
+  renderContent();
 }
 
 function buildTunerScreen() {
@@ -6600,10 +6596,7 @@ function openMobHome() {
   TUNER.stop();
   document.getElementById('tuner-screen')?.remove();
   exitMedidor();
-  requestAnimationFrame(() => {
-    const m = document.getElementById('main');
-    if (m) { m.style.transform = 'translateZ(0)'; requestAnimationFrame(() => { m.style.transform = ''; }); }
-  });
+  renderContent();
 }
 window.openMobHome = openMobHome;
 
