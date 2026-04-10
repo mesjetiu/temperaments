@@ -111,8 +111,10 @@
     #overlay.open { display: block; opacity: 1; }
     #main { flex: 1; overflow: hidden; }
     #mob-header { display: flex !important; }
-    #content { flex-direction: column !important; flex-wrap: nowrap !important; padding: 12px !important; padding-bottom: 64px !important; gap: 12px !important; }
-    #add-card-btn { position: fixed !important; bottom: 0; left: 0; right: 0; width: auto; z-index: 100; }
+    #content { flex-direction: column !important; flex-wrap: nowrap !important; padding: 12px !important; padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important; gap: 12px !important; }
+    #add-card-btn { display: none !important; }
+    #tuner-fab { display: none !important; }
+    #mob-nav { display: flex; }
     .panel { width: 100% !important; max-width: 100% !important; min-width: unset !important; flex: none !important; box-sizing: border-box !important; }
     .card-toolbar button { font-size: 15px; padding: 3px 7px; }
     .panel:not(.panel-resized) canvas { max-height: 220px; }
@@ -242,6 +244,12 @@
   #tuner-fab.fab-dragging { box-shadow: 0 8px 32px rgba(29,78,216,0.7); opacity: 0.92; }
   #tools-fab-menu { display: none; position: fixed; z-index: 801; background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
   .tools-fab-item { padding: 9px 16px; font-size: 13px; color: #cbd5e1; cursor: pointer; border-radius: 7px; white-space: nowrap; }
+  /* ── Barra de navegación móvil ── */
+  #mob-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 500; background: #1e293b; border-top: 1px solid #334155; padding-bottom: env(safe-area-inset-bottom, 0px); -webkit-tap-highlight-color: transparent; }
+  .mob-nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px 0; background: none; border: none; color: #6b7280; font-size: 11px; cursor: pointer; transition: color 0.15s; }
+  .mob-nav-btn:active { color: #f1f5f9; background: rgba(255,255,255,0.05); }
+  .mob-nav-btn.active { color: #3b82f6; }
+  .mob-nav-btn svg { flex-shrink: 0; }
   .tools-fab-item:hover { background: #334155; }
 
   /* ═══ AUDIO BAR ═══ */
@@ -481,6 +489,22 @@
     <div id="add-card-btn" onclick="WS.openAddCardMenu(event,this)">＋ Añadir tarjeta</div>
   </div>
 </div>
+
+<!-- Barra de navegación móvil (solo móvil) -->
+<nav id="mob-nav">
+  <button class="mob-nav-btn" onclick="WS.openAddCardMenu(event,this)" id="mob-nav-add">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <span>Añadir</span>
+  </button>
+  <button class="mob-nav-btn" onclick="openTuner()" id="mob-nav-tuner">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    <span>Afinar</span>
+  </button>
+  <button class="mob-nav-btn" onclick="openMedidor()" id="mob-nav-medidor">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 12l4-4"/><circle cx="12" cy="12" r="2"/></svg>
+    <span>Medidor</span>
+  </button>
+</nav>
 
 <!-- About modal -->
 <div id="about-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);align-items:center;justify-content:center">
