@@ -1227,12 +1227,12 @@ describe('RuuviScanner.autoConnect — reintento con backoff', () => {
     assert.ok(scanner.hasLastDevice(), 'El storage debe conservarse para el próximo arranque');
   });
 
-  it('app.js: usa autoConnect en DOMContentLoaded, no connect directo', async () => {
+  it('app.js: no reconecta automáticamente al arranque (conexión solo manual)', async () => {
     const { readFileSync } = await import('node:fs');
     const { URL: _URL } = await import('node:url');
     const src = readFileSync(new _URL('../src/app.js', import.meta.url), 'utf8');
-    assert.ok(src.includes('autoConnect'), 'app.js debe usar autoConnect en el arranque');
     assert.ok(!src.includes('RuuviScanner.connect().catch'), 'app.js no debe usar connect().catch directo');
+    assert.ok(!src.match(/hasLastDevice\(\)[\s\S]{0,100}autoConnect/), 'app.js no debe reconectar automáticamente al arranque');
   });
 
 });
