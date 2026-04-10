@@ -134,10 +134,12 @@ window.RuuviScanner = (() => {
     });
     _capListeners.push(notifListener);
 
-    await BLE.startNotifications({ deviceId: _savedId, service: RUUVI_SERVICE, characteristic: RUUVI_CHAR_TX });
-
+    // Marcar como conectado ANTES de startNotifications para que _cb esté asignado
+    // cuando llegue la primera notificación (en APK nativa pueden llegar inmediatamente)
     _streaming = true;
     _notifyStatus('connected');
+
+    await BLE.startNotifications({ deviceId: _savedId, service: RUUVI_SERVICE, characteristic: RUUVI_CHAR_TX });
     console.log('[Ruuvi] Capacitor BLE connected, notifications started');
   }
 
