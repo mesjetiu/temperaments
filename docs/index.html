@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
 <title>Salinas</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#111827">
@@ -110,14 +110,15 @@
     #sidebar.open { transform: translateX(0); }
     #overlay.open { display: block; opacity: 1; }
     #main { flex: 1; overflow: hidden; }
-    #mob-header { display: flex !important; }
+    #mob-header { display: flex !important; padding-top: calc(6px + env(safe-area-inset-top, 0px)) !important; }
+    #sidebar { padding-top: calc(14px + env(safe-area-inset-top, 0px)) !important; }
     #content { flex-direction: column !important; flex-wrap: nowrap !important; padding: 12px !important; padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important; gap: 12px !important; }
     #add-card-btn { display: none !important; }
     #tuner-fab { display: none !important; }
     #mob-nav { display: flex !important; }
     #audio-bar-pitch-a { display: none !important; }
-    #tuner-screen { height: calc(100% - 56px - env(safe-area-inset-bottom, 0px)) !important; }
-    #medidor-screen { height: calc(100% - 56px - env(safe-area-inset-bottom, 0px)) !important; }
+    #tuner-screen { top: env(safe-area-inset-top, 0px) !important; height: calc(100% - env(safe-area-inset-top, 0px) - 56px - env(safe-area-inset-bottom, 0px)) !important; }
+    #medidor-screen { top: env(safe-area-inset-top, 0px) !important; height: calc(100% - env(safe-area-inset-top, 0px) - 56px - env(safe-area-inset-bottom, 0px)) !important; }
     .panel { width: 100% !important; max-width: 100% !important; min-width: unset !important; flex: none !important; box-sizing: border-box !important; }
     .card-toolbar button { font-size: 15px; padding: 3px 7px; }
     .panel:not(.panel-resized) canvas { max-height: 220px; }
