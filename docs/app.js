@@ -1,4 +1,4 @@
-const APP_VERSION = 'de131b6 · 2026-04-10';
+const APP_VERSION = 'f3256d5 · 2026-04-10';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1844,8 +1844,8 @@ const KB = {
 // MÓVIL
 // ══════════════════════════════════════════════
 const isMobile = () => window.innerWidth < 768;
-function openSidebar()  { document.getElementById('sidebar').classList.add('open'); document.getElementById('overlay').classList.add('open'); document.body.classList.add('sb-open'); }
-function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('overlay').classList.remove('open'); document.body.classList.remove('sb-open'); }
+function openSidebar()  { document.getElementById('sidebar').classList.add('open'); document.getElementById('overlay').classList.add('open'); }
+function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('overlay').classList.remove('open'); }
 
 // Swipe izquierda en el sidebar para cerrarlo (móvil)
 (function() {
@@ -6480,21 +6480,17 @@ document.getElementById('overlay').addEventListener('touchend', closeSidebar, { 
 
 // ── Sidebar ancho toggle ──────────────────────────────────────────────────────
 {
-  const WIDTHS = [320, 420, 520];
-  const KEY    = 'sidebarWidthIdx';
-  let idx = 0;
-  try { idx = Math.min(parseInt(localStorage.getItem(KEY)) || 0, WIDTHS.length - 1); } catch (_) {}
+  let wide = false;
 
   function _applySbWidth() {
-    const w = WIDTHS[idx];
+    const w = wide ? window.innerWidth : 320;
     document.documentElement.style.setProperty('--sb-w', w + 'px');
-    document.getElementById('sidebar-widen-btn').textContent = idx === WIDTHS.length - 1 ? '‹' : '›';
+    document.getElementById('sidebar-widen-btn').textContent = wide ? '‹' : '›';
   }
   _applySbWidth();
 
   window.sidebarWiden = function() {
-    idx = (idx + 1) % WIDTHS.length;
-    try { localStorage.setItem(KEY, idx); } catch (_) {}
+    wide = !wide;
     _applySbWidth();
   };
 }

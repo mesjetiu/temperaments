@@ -38,16 +38,6 @@
   }
   #sidebar h2 { font-size: 14px; color: var(--accent); margin-bottom: 10px; }
   #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 190; opacity: 0; transition: opacity 0.25s; }
-  #sidebar-widen-btn {
-    display: none; position: fixed; top: 50%; z-index: 650;
-    left: calc(var(--sb-w, 320px) - 1px);
-    transform: translateY(-50%);
-    background: var(--surface); border: 1px solid var(--border); border-left: none;
-    border-radius: 0 8px 8px 0; padding: 16px 10px;
-    color: var(--accent); font-size: 22px; cursor: pointer; line-height: 1;
-    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
-  }
-  body.sb-open #sidebar-widen-btn { display: block; }
   #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 
   /* ═══ MOBILE ═══ */
@@ -117,7 +107,7 @@
 
   @media (max-width: 767px) {
     #app { flex-direction: column; height: 100dvh; }
-    #sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: var(--sb-w, min(85vw,320px)); transform: translateX(-105%); box-shadow: 4px 0 24px rgba(0,0,0,.5); }
+    #sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: var(--sb-w, min(85vw,320px)); transform: translateX(-105%); box-shadow: 4px 0 24px rgba(0,0,0,.5); transition: transform 0.28s ease, width 0.25s ease; }
     #sidebar.open { transform: translateX(0); }
     #overlay.open { display: block; opacity: 1; }
     #main { flex: 1; overflow: hidden; }
@@ -400,7 +390,7 @@
     #app { flex-direction: column; height: 100dvh; }
     #desk-header { display: none; }
     #mob-header { display: flex !important; padding-top: calc(6px + env(safe-area-inset-top, 0px)) !important; }
-    #sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: var(--sb-w, min(85vw,320px)); transform: translateX(-105%); box-shadow: 4px 0 24px rgba(0,0,0,.5); z-index: 600; padding-top: calc(14px + env(safe-area-inset-top, 0px)) !important; }
+    #sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: var(--sb-w, min(85vw,320px)); transform: translateX(-105%); box-shadow: 4px 0 24px rgba(0,0,0,.5); z-index: 600; padding-top: calc(14px + env(safe-area-inset-top, 0px)) !important; transition: transform 0.28s ease, width 0.25s ease; }
     #sidebar.open { transform: translateX(0); }
     #overlay.open { display: block; opacity: 1; }
     #main { flex: 1; overflow: hidden; }
@@ -420,9 +410,11 @@
   <div id="overlay"></div>
 
   <!-- ═══ SIDEBAR ═══ -->
-  <button id="sidebar-widen-btn" onclick="sidebarWiden()" title="Ampliar/reducir lista">›</button>
   <div id="sidebar">
-    <h2>Temperamentos</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h2 style="margin:0">Temperamentos</h2>
+      <button id="sidebar-widen-btn" onclick="sidebarWiden()" title="Ampliar/reducir lista" style="background:none;border:1px solid var(--border);border-radius:6px;padding:6px 14px;color:var(--accent);font-size:20px;cursor:pointer;line-height:1;-webkit-tap-highlight-color:transparent;flex-shrink:0">›</button>
+    </div>
     <div style="display:flex;gap:4px;align-items:center">
       <input id="search" type="text" placeholder="Buscar..." autocomplete="off" style="flex:1">
       <button id="fav-btn" title="Mostrar solo favoritos" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 7px;cursor:pointer;font-size:12px;color:#9ca3af;white-space:nowrap">★ Fav.</button>
