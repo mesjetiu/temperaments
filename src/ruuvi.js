@@ -254,6 +254,23 @@ window.RuuviScanner = (() => {
 
     hasLastDevice() { return !!_loadDevice(); },
 
+    // Intenta connect() hasta `retries` veces con `delay` ms entre intentos.
+    // Diseñado para el arranque automático, donde el BLE puede no estar listo aún.
+    // Si todos los intentos fallan, llama a onFail() sin lanzar.
+    async autoConnect({ retries = 4, delay = 2000, onFail = () => {} } = {}) {
+      for (let i = 0; i < retries; i++) {
+        try {
+          await this.connect();
+          return;
+        } catch (_) {
+          console.log(`[Ruuvi] autoConnect intento ${i + 1}/${retries} fallido`);
+          if (i < retries - 1) await new Promise(r => setTimeout(r, delay));
+        }
+      }
+      console.log('[Ruuvi] autoConnect: todos los intentos fallaron');
+      onFail();
+    },
+
     async connect() {
       if (_isCapacitor()) {
         await _connectCapacitor();

@@ -1,4 +1,4 @@
-const APP_VERSION = '19793ba · 2026-04-10';
+const APP_VERSION = '6f77729 · 2026-04-10';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -987,9 +987,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Restaurar offset guardado
   RuuviScanner.setOffset(_prefs.ruuviOffset ?? 0);
   // Reconexión automática: si había un dispositivo conectado en la sesión anterior,
-  // intentar reconectar silenciosamente (sin picker). El éxito/fallo llega por onStatus.
+  // reintentar hasta 4 veces con 2 s de espera (el BLE puede tardar en arrancar).
+  // El éxito/fallo llega por onStatus; los errores se absorben silenciosamente.
   if (RuuviScanner.hasLastDevice()) {
-    RuuviScanner.connect().catch(() => {});
+    RuuviScanner.autoConnect({ retries: 4, delay: 2000 });
   }
 });
 
