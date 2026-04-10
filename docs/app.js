@@ -1,4 +1,4 @@
-const APP_VERSION = '370e00e · 2026-04-10';
+const APP_VERSION = '33660c0 · 2026-04-10';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2400,12 +2400,15 @@ function _bindCardDrag(container) {
     dragSrcWrap = wrap;
     let dragging = false;
     const startX = e.clientX, startY = e.clientY;
+    const isTouch = e.pointerType === 'touch';
+    const dragThreshold = isTouch ? 12 : 6;
 
     hdr.setPointerCapture(e.pointerId);
-    e.preventDefault();
+    // No preventDefault aquí — dejar que el click de collapse funcione si no hay drag
 
     function startDrag(ev) {
       dragging = true;
+      ev.preventDefault(); // ahora sí, cancelar scroll y click pendiente
       const rect = panel.getBoundingClientRect();
       ghostOffX = ev.clientX - rect.left;
       ghostOffY = ev.clientY - rect.top;
@@ -2429,7 +2432,7 @@ function _bindCardDrag(container) {
 
     function onMove(ev) {
       if (!dragging) {
-        if (Math.abs(ev.clientY - startY) < 6 && Math.abs(ev.clientX - startX) < 6) return;
+        if (Math.abs(ev.clientY - startY) < dragThreshold && Math.abs(ev.clientX - startX) < dragThreshold) return;
         startDrag(ev);
       }
       // Mover ghost con el puntero
@@ -2451,6 +2454,10 @@ function _bindCardDrag(container) {
       panel.classList.remove('card-dragging');
       ghost?.remove();
       ghost = null;
+
+      // Bloquar el click sintético de touch que dispararía togglePanelCollapse
+      const absorbClick = ev => { ev.stopPropagation(); ev.preventDefault(); };
+      hdr.addEventListener('click', absorbClick, { once: true, capture: true });
 
       // Mover wrap al lugar del placeholder y persistir
       if (placeholder.parentNode) container.insertBefore(dragSrcWrap, placeholder);
