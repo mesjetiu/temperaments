@@ -1,4 +1,4 @@
-const APP_VERSION = '9916f0f · 2026-04-10';
+const APP_VERSION = '74d7e56 · 2026-04-10';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2418,9 +2418,14 @@ function _bindCardDrag(container) {
       hdr.removeEventListener('pointercancel', onUp);
       if (!dragging) return;
       panel.classList.remove('card-dragging');
+
+      // Mover el wrap a la posición del placeholder antes de quitarlo
+      if (placeholder.parentNode) {
+        container.insertBefore(dragSrcWrap, placeholder);
+      }
       placeholder.remove();
 
-      // Calcular nuevo índice en base al orden actual de wraps en el DOM
+      // Calcular nuevo orden tras haber movido el wrap
       const wraps = [...container.querySelectorAll('[data-card-id]')];
       const newOrder = wraps.map(w => w.dataset.cardId);
       WS.reorderCards(newOrder);
