@@ -383,6 +383,23 @@
   #signal-bar { width: 48px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
   #signal-fill { height: 100%; width: 0%; background: #4ade80; border-radius: 3px; transition: width 0.15s, background 0.3s; }
   @media (max-width: 767px) { #tuner-big-note { font-size: 36px; } }
+
+  /* ── Móvil en landscape (ancho > 767px pero dispositivo táctil) ── */
+  @media (pointer: coarse) and (min-width: 768px) and (orientation: landscape) {
+    #app { flex-direction: column; height: 100dvh; }
+    #desk-header { display: none; }
+    #mob-header { display: flex !important; padding-top: calc(6px + env(safe-area-inset-top, 0px)) !important; }
+    #sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: min(85vw,320px); transform: translateX(-105%); box-shadow: 4px 0 24px rgba(0,0,0,.5); z-index: 600; padding-top: calc(14px + env(safe-area-inset-top, 0px)) !important; }
+    #sidebar.open { transform: translateX(0); }
+    #overlay.open { display: block; opacity: 1; }
+    #add-card-btn { display: none !important; }
+    #tuner-fab { display: none !important; }
+    #mob-nav { display: flex !important; }
+    #audio-bar-pitch-a { display: none !important; }
+    #tuner-screen { top: env(safe-area-inset-top, 0px) !important; height: calc(100% - env(safe-area-inset-top, 0px) - 56px - env(safe-area-inset-bottom, 0px)) !important; }
+    #medidor-screen { top: env(safe-area-inset-top, 0px) !important; height: calc(100% - env(safe-area-inset-top, 0px) - 56px - env(safe-area-inset-bottom, 0px)) !important; }
+    #tuner-big-note { font-size: 36px; }
+  }
 </style>
 </head>
 <body>
