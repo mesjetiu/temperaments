@@ -5748,8 +5748,11 @@ function tunerTempName() {
 function exitTuner() {
   TUNER.stop();
   document.getElementById('tuner-screen')?.remove();
-  const c = document.getElementById('content');
-  if (c) { c.style.display = 'none'; c.offsetHeight; c.style.display = ''; }
+  // Forzar repaint del layer compositor — el canvas del afinador deja un ghost layer
+  requestAnimationFrame(() => {
+    const m = document.getElementById('main');
+    if (m) { m.style.transform = 'translateZ(0)'; requestAnimationFrame(() => { m.style.transform = ''; }); }
+  });
 }
 
 function buildTunerScreen() {
@@ -6597,9 +6600,10 @@ function openMobHome() {
   TUNER.stop();
   document.getElementById('tuner-screen')?.remove();
   exitMedidor();
-  // Forzar repaint — Chrome/WebKit no invalida el layer compositor al eliminar fixed
-  const c = document.getElementById('content');
-  if (c) { c.style.display = 'none'; c.offsetHeight; c.style.display = ''; }
+  requestAnimationFrame(() => {
+    const m = document.getElementById('main');
+    if (m) { m.style.transform = 'translateZ(0)'; requestAnimationFrame(() => { m.style.transform = ''; }); }
+  });
 }
 window.openMobHome = openMobHome;
 
