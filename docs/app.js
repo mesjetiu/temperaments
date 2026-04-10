@@ -1,4 +1,4 @@
-const APP_VERSION = '74d7e56 · 2026-04-10';
+const APP_VERSION = 'f0c854f · 2026-04-10';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -2352,10 +2352,9 @@ function renderContent() {
 
 // ── Drag & drop para reordenar tarjetas ──────────────────────────────────────
 function _bindCardDrag(container) {
-  // El handle es el .panel dentro del wrap[data-card-id].
-  // Como wrap tiene display:contents, el .panel es el elemento visual.
-  // Arrastramos el .panel pero reordenamos los wraps en el DOM.
   let dragSrcWrap = null;
+  let ghost = null;
+  let ghostOffX = 0, ghostOffY = 0;
   const placeholder = document.createElement('div');
   placeholder.className = 'card-drag-placeholder';
 
@@ -2369,23 +2368,22 @@ function _bindCardDrag(container) {
     return wrap?.querySelector('.panel') || null;
   }
 
-  // Encontrar el wrap más cercano a la posición Y del puntero
-  function getDropTarget(clientY) {
+  function getDropTarget(clientX, clientY) {
     const wraps = [...container.querySelectorAll('[data-card-id]')]
       .filter(w => w !== dragSrcWrap);
     for (const w of wraps) {
       const panel = getPanelOf(w);
       if (!panel) continue;
       const rect = panel.getBoundingClientRect();
+      // Usar mitad horizontal para decidir en layouts flex-wrap
       if (clientY < rect.top + rect.height / 2) return { before: w };
     }
-    return { before: null }; // al final
+    return { before: null };
   }
 
   container.addEventListener('pointerdown', e => {
     const hdr = e.target.closest('.panel-h3-row, .panel-hdr');
     if (!hdr) return;
-    // No iniciar si el clic es sobre un botón de la toolbar o un handle de resize
     if (e.target.closest('.card-toolbar, .panel-zoom-btn, .panel-fs-close, .panel-resize-e, .panel-resize-s, .panel-resize-se')) return;
 
     const wrap = getWrap(hdr);
@@ -2400,39 +2398,64 @@ function _bindCardDrag(container) {
     hdr.setPointerCapture(e.pointerId);
     e.preventDefault();
 
+    function startDrag(ev) {
+      dragging = true;
+      const rect = panel.getBoundingClientRect();
+      ghostOffX = ev.clientX - rect.left;
+      ghostOffY = ev.clientY - rect.top;
+
+      // Placeholder: hueco del mismo tamaño
+      placeholder.style.width  = rect.width  + 'px';
+      placeholder.style.height = rect.height + 'px';
+
+      // Ghost: clon visual que sigue el puntero
+      ghost = panel.cloneNode(true);
+      ghost.className = 'card-ghost';
+      ghost.style.width  = rect.width  + 'px';
+      ghost.style.height = rect.height + 'px';
+      ghost.style.left   = (ev.clientX - ghostOffX) + 'px';
+      ghost.style.top    = (ev.clientY - ghostOffY)  + 'px';
+      document.body.appendChild(ghost);
+
+      // Ocultar la tarjeta original
+      panel.classList.add('card-dragging');
+    }
+
     function onMove(ev) {
       if (!dragging) {
         if (Math.abs(ev.clientY - startY) < 6 && Math.abs(ev.clientX - startX) < 6) return;
-        dragging = true;
-        panel.classList.add('card-dragging');
-        placeholder.style.height = panel.offsetHeight + 'px';
+        startDrag(ev);
       }
-      const { before } = getDropTarget(ev.clientY);
+      // Mover ghost con el puntero
+      ghost.style.left = (ev.clientX - ghostOffX) + 'px';
+      ghost.style.top  = (ev.clientY - ghostOffY)  + 'px';
+
+      // Mover placeholder al destino
+      const { before } = getDropTarget(ev.clientX, ev.clientY);
       if (before) container.insertBefore(placeholder, before);
       else container.appendChild(placeholder);
     }
 
     function onUp() {
       hdr.removeEventListener('pointermove', onMove);
-      hdr.removeEventListener('pointerup', onUp);
+      hdr.removeEventListener('pointerup',   onUp);
       hdr.removeEventListener('pointercancel', onUp);
       if (!dragging) return;
-      panel.classList.remove('card-dragging');
 
-      // Mover el wrap a la posición del placeholder antes de quitarlo
-      if (placeholder.parentNode) {
-        container.insertBefore(dragSrcWrap, placeholder);
-      }
+      panel.classList.remove('card-dragging');
+      ghost?.remove();
+      ghost = null;
+
+      // Mover wrap al lugar del placeholder y persistir
+      if (placeholder.parentNode) container.insertBefore(dragSrcWrap, placeholder);
       placeholder.remove();
 
-      // Calcular nuevo orden tras haber movido el wrap
       const wraps = [...container.querySelectorAll('[data-card-id]')];
-      const newOrder = wraps.map(w => w.dataset.cardId);
-      WS.reorderCards(newOrder);
+      WS.reorderCards(wraps.map(w => w.dataset.cardId));
     }
 
     hdr.addEventListener('pointermove', onMove);
-    hdr.addEventListener('pointerup', onUp);
+    hdr.addEventListener('pointerup',   onUp);
     hdr.addEventListener('pointercancel', onUp);
   });
 }
