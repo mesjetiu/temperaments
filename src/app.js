@@ -986,8 +986,11 @@ document.addEventListener('DOMContentLoaded', () => {
   RuuviScanner.onStatus = ruuviApplyStatus;
   // Restaurar offset guardado
   RuuviScanner.setOffset(_prefs.ruuviOffset ?? 0);
-  // Si había modo continuo activo y el sensor ya estaba conectado (reconexión automática),
-  // el callback se instala en ruuviApplyStatus al recibir 'connected'.
+  // Reconexión automática: si había un dispositivo conectado en la sesión anterior,
+  // intentar reconectar silenciosamente (sin picker). El éxito/fallo llega por onStatus.
+  if (RuuviScanner.hasLastDevice()) {
+    RuuviScanner.connect().catch(() => {});
+  }
 });
 
 // ── Persiana móvil ──

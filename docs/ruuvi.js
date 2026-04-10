@@ -15,6 +15,7 @@ window.RuuviScanner = (() => {
   const RUUVI_SERVICE     = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
   const RUUVI_CHAR_TX     = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
   const RUUVI_NAME_PREFIX = 'Ruuvi';
+  const STORAGE_KEY       = 'ruuviLastDevice'; // { id, name }
 
   let _streaming  = false;
   let _savedName  = null;
@@ -28,6 +29,17 @@ window.RuuviScanner = (() => {
   function _isCapacitor() {
     const platform = window.Capacitor?.getPlatform?.();
     return platform === 'android' || platform === 'ios';
+  }
+
+  // ── Persistencia del último dispositivo ─────────────────────────────────
+  function _saveDevice(id, name) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ id, name })); } catch (_) {}
+  }
+  function _clearDevice() {
+    try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+  }
+  function _loadDevice() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (_) { return null; }
   }
 
   // ── Parser RAW v5 ────────────────────────────────────────────────────────
@@ -73,13 +85,31 @@ window.RuuviScanner = (() => {
 
     await BLE.initialize({ androidNeverForLocation: true });
 
-    const device = await BLE.requestDevice({
-      services: [RUUVI_SERVICE],
-      namePrefix: RUUVI_NAME_PREFIX,
-    });
+    // Intentar reconectar al último dispositivo conocido sin mostrar picker
+    const last = _loadDevice();
+    let device;
+    if (last?.id) {
+      try {
+        await BLE.connect({ deviceId: last.id });
+        device = { deviceId: last.id, name: last.name ?? last.id };
+        console.log('[Ruuvi] reconectado al último dispositivo:', last.id);
+      } catch (_) {
+        console.log('[Ruuvi] reconexión fallida, abriendo picker');
+        device = null;
+      }
+    }
+
+    if (!device) {
+      device = await BLE.requestDevice({
+        services: [RUUVI_SERVICE],
+        namePrefix: RUUVI_NAME_PREFIX,
+      });
+      await BLE.connect({ deviceId: device.deviceId });
+    }
 
     _savedId   = device.deviceId;
     _savedName = device.name ?? device.deviceId;
+    _saveDevice(_savedId, _savedName);
 
     // Escuchar desconexión inesperada
     const disconnectKey = `disconnected|${_savedId}`;
@@ -89,8 +119,6 @@ window.RuuviScanner = (() => {
       console.log('[Ruuvi] disconnected (Capacitor BLE)');
     });
     _capListeners.push(disconnectListener);
-
-    await BLE.connect({ deviceId: _savedId });
 
     // Suscribir notificaciones
     const notifKey = `notification|${_savedId}|${RUUVI_SERVICE}|${RUUVI_CHAR_TX}`;
@@ -123,6 +151,7 @@ window.RuuviScanner = (() => {
     _capListeners = [];
     _streaming = false;
     _savedId = null;
+    _clearDevice();
     _notifyStatus('disconnected');
   }
 
@@ -174,6 +203,7 @@ window.RuuviScanner = (() => {
         if (ruuvi) {
           _wbDevice = ruuvi;
           _savedName = ruuvi.name;
+          _saveDevice(ruuvi.id ?? ruuvi.name, _savedName);
           _wbDevice.addEventListener('gattserverdisconnected', _onWbDisconnected);
           await _connectGatt();
           return;
@@ -186,6 +216,7 @@ window.RuuviScanner = (() => {
       optionalServices: [RUUVI_SERVICE],
     });
     _savedName = _wbDevice.name;
+    _saveDevice(_wbDevice.id ?? _wbDevice.name, _savedName);
     _wbDevice.addEventListener('gattserverdisconnected', _onWbDisconnected);
     await _connectGatt();
   }
@@ -201,6 +232,7 @@ window.RuuviScanner = (() => {
       try { _wbDevice.gatt.disconnect(); } catch (_) {}
     }
     _wbServer = null;
+    _clearDevice();
     _notifyStatus('disconnected');
   }
 
@@ -219,6 +251,8 @@ window.RuuviScanner = (() => {
 
     get offset() { return _offset; },
     setOffset(n) { _offset = isFinite(n) ? n : 0; },
+
+    hasLastDevice() { return !!_loadDevice(); },
 
     async connect() {
       if (_isCapacitor()) {
