@@ -2468,6 +2468,9 @@ function _bindCardDrag(container) {
 
 // ── Resize de tarjetas ───────────────────────────────────────────────────────
 function _bindCardResize(container) {
+  // Limpiar handles previos para evitar duplicados al re-renderizar
+  container.querySelectorAll('.panel-resize-e, .panel-resize-s, .panel-resize-se').forEach(h => h.remove());
+
   container.querySelectorAll('[data-card-id]').forEach(wrap => {
     const cardId = wrap.dataset.cardId;
     const panel  = wrap.querySelector('.panel');
