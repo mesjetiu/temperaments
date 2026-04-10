@@ -4,7 +4,7 @@ A collection of **1649 twelve-note historical and microtonal temperaments**, der
 
 Each entry lists the deviation from 12-TET for all 12 notes, in cents, with A = 0 as reference.
 
-**https://mesjetiu.github.io/temperaments/**
+**https://mesjetiu.github.io/salinas/**
 
 ---
 
