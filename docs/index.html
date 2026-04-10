@@ -116,6 +116,8 @@
     #tuner-fab { display: none !important; }
     #mob-nav { display: flex !important; }
     #audio-bar-pitch-a { display: none !important; }
+    #tuner-screen { height: calc(100% - 56px - env(safe-area-inset-bottom, 0px)) !important; }
+    #medidor-screen { height: calc(100% - 56px - env(safe-area-inset-bottom, 0px)) !important; }
     .panel { width: 100% !important; max-width: 100% !important; min-width: unset !important; flex: none !important; box-sizing: border-box !important; }
     .card-toolbar button { font-size: 15px; padding: 3px 7px; }
     .panel:not(.panel-resized) canvas { max-height: 220px; }
@@ -246,7 +248,7 @@
   #tools-fab-menu { display: none; position: fixed; z-index: 801; background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
   .tools-fab-item { padding: 9px 16px; font-size: 13px; color: #cbd5e1; cursor: pointer; border-radius: 7px; white-space: nowrap; }
   /* ── Barra de navegación móvil ── */
-  #mob-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 500; background: #1e293b; border-top: 1px solid #334155; padding-bottom: env(safe-area-inset-bottom, 0px); -webkit-tap-highlight-color: transparent; }
+  #mob-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 550; background: #1e293b; border-top: 1px solid #334155; padding-bottom: env(safe-area-inset-bottom, 0px); -webkit-tap-highlight-color: transparent; }
   .mob-nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px 0; background: none; border: none; color: #6b7280; font-size: 11px; cursor: pointer; transition: color 0.15s; }
   .mob-nav-btn:active { color: #f1f5f9; background: rgba(255,255,255,0.05); }
   .mob-nav-btn.active { color: #3b82f6; }
