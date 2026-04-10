@@ -309,6 +309,7 @@ const WS = {
   },
 
   openAddCardMenu(event, anchorEl) {
+    if (document.querySelector('.ws-popover')) { this._closePopovers(); return; }
     // Agrupar por group
     const groups = {};
     for (const [type, desc] of Object.entries(CARD_REGISTRY)) {
