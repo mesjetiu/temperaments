@@ -117,6 +117,8 @@
     #add-card-btn { display: none !important; }
     #tuner-fab { display: none !important; }
     #mob-nav { display: flex !important; }
+    #mob-nav-temps { display: flex !important; }
+    #sidebar-widen-btn { display: flex !important; }
     #audio-bar-pitch-a { display: none !important; }
     #tuner-screen { top: env(safe-area-inset-top, 0px) !important; height: calc(100% - env(safe-area-inset-top, 0px) - 56px - env(safe-area-inset-bottom, 0px)) !important; }
     #medidor-screen { top: env(safe-area-inset-top, 0px) !important; height: calc(100% - env(safe-area-inset-top, 0px) - 56px - env(safe-area-inset-bottom, 0px)) !important; }
@@ -130,7 +132,7 @@
   }
 
   /* ═══ MOB HEADER ═══ */
-  #mob-header { display: none; background: var(--surface); border-bottom: 1px solid var(--border); padding: 6px 10px; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
+  #mob-header { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); padding: 6px 10px; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
   #hamburger { background: none; border: none; color: var(--accent); cursor: pointer; padding: 4px; flex-shrink: 0; display: flex; align-items: center; }
   #hamburger svg { width: 22px; height: 22px; }
   #mob-branding { display:flex; align-items:center; gap:7px; flex-shrink:0; }
@@ -182,8 +184,11 @@
 
 
   /* ═══ DESK HEADER ═══ */
-  #desk-header { padding: 10px 18px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-height: 46px; flex-shrink: 0; }
-  @media (max-width: 767px) { #desk-header { display: none; } }
+  #desk-header { display: none; padding: 10px 18px; background: var(--surface); border-bottom: 1px solid var(--border); gap: 8px; align-items: center; flex-wrap: wrap; min-height: 46px; flex-shrink: 0; }
+  /* La en audio-bar y botón Temps ocultos en desktop (accesibles por mob-nav y sidebar fija) */
+  #audio-bar-pitch-a { display: none !important; }
+  #mob-nav-temps { display: none; }
+  #sidebar-widen-btn { display: none; }
 
   /* ═══ SIDEBAR LIST ═══ */
   #search { width: 100%; padding: 7px 10px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-size: 12px; margin-bottom: 6px; outline: none; }
@@ -242,15 +247,15 @@
   .ws-popover-icon { font-size: 14px; width: 18px; text-align: center; }
   .ws-popover-sep { height: 1px; background: #334155; margin: 3px 0; }
   /* ── Add-card button ── */
-  #add-card-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px; color: #4b5563; font-size: 13px; cursor: pointer; border-top: 1px solid var(--border); background: var(--surface); transition: color 0.15s; box-sizing: border-box; flex-shrink: 0; }
+  #add-card-btn { display: none; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px; color: #4b5563; font-size: 13px; cursor: pointer; border-top: 1px solid var(--border); background: var(--surface); transition: color 0.15s; box-sizing: border-box; flex-shrink: 0; }
   #add-card-btn:hover { color: #9ca3af; background: #1e293b; }
-  #tuner-fab { position: fixed; bottom: 24px; right: 20px; z-index: 800; background: #1d4ed8; border: none; border-radius: 50px; padding: 14px 22px; color: #fff; font-size: 15px; font-weight: 600; cursor: grab; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 20px rgba(29,78,216,0.5); white-space: nowrap; touch-action: none; user-select: none; -webkit-user-select: none; }
+  #tuner-fab { display: none; position: fixed; bottom: 24px; right: 20px; z-index: 800; background: #1d4ed8; border: none; border-radius: 50px; padding: 14px 22px; color: #fff; font-size: 15px; font-weight: 600; cursor: grab; align-items: center; gap: 8px; box-shadow: 0 4px 20px rgba(29,78,216,0.5); white-space: nowrap; touch-action: none; user-select: none; -webkit-user-select: none; }
   #tuner-fab:active { cursor: grabbing; }
   #tuner-fab.fab-dragging { box-shadow: 0 8px 32px rgba(29,78,216,0.7); opacity: 0.92; }
   #tools-fab-menu { display: none; position: fixed; z-index: 801; background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
   .tools-fab-item { padding: 9px 16px; font-size: 13px; color: #cbd5e1; cursor: pointer; border-radius: 7px; white-space: nowrap; }
   /* ── Barra de navegación móvil ── */
-  #mob-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 550; background: #1e293b; border-top: 1px solid #334155; padding-bottom: env(safe-area-inset-bottom, 0px); -webkit-tap-highlight-color: transparent; }
+  #mob-nav { display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 550; background: #1e293b; border-top: 1px solid #334155; padding-bottom: env(safe-area-inset-bottom, 0px); -webkit-tap-highlight-color: transparent; }
   .mob-nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px 0; background: none; border: none; color: #6b7280; font-size: 11px; cursor: pointer; transition: color 0.15s; }
   .mob-nav-btn:active { color: #f1f5f9; background: rgba(255,255,255,0.05); }
   .mob-nav-btn.active { color: #3b82f6; }
@@ -398,6 +403,8 @@
     #add-card-btn { display: none !important; }
     #tuner-fab { display: none !important; }
     #mob-nav { display: flex !important; }
+    #mob-nav-temps { display: flex !important; }
+    #sidebar-widen-btn { display: flex !important; }
     #audio-bar-pitch-a { display: none !important; }
     #tuner-screen { top: env(safe-area-inset-top, 0px) !important; height: calc(100% - env(safe-area-inset-top, 0px) - 56px - env(safe-area-inset-bottom, 0px)) !important; }
     #medidor-screen { top: env(safe-area-inset-top, 0px) !important; height: calc(100% - env(safe-area-inset-top, 0px) - 56px - env(safe-area-inset-bottom, 0px)) !important; }
