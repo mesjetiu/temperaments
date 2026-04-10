@@ -344,9 +344,20 @@
   }
   .panel-resize-e:hover, .panel-resize-se:hover { background: rgba(59,130,246,0.25); border-radius: 3px; }
   .panel-resize-s:hover { background: rgba(59,130,246,0.15); }
-  /* En móvil: ocultar handles de ancho (width siempre 100%) */
+  /* En móvil: ocultar handles de ancho (width siempre 100%); hacer visible el handle inferior */
   @media (max-width: 767px) {
     .panel-resize-e, .panel-resize-se { display: none; }
+    .panel-resize-s {
+      position: relative; bottom: auto; left: auto; right: auto;
+      height: 18px; width: 100%;
+      margin: 6px -16px -16px; box-sizing: content-box;
+      display: flex; align-items: center; justify-content: center;
+      border-top: 1px solid var(--border); flex-shrink: 0;
+    }
+    .panel-resize-s::after {
+      content: ''; display: block; width: 32px; height: 3px;
+      border-radius: 2px; background: #2d3f55;
+    }
   }
   /* En fullscreen: ocultar todos los handles */
   .panel:fullscreen .panel-resize-e,
