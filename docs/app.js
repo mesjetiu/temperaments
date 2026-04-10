@@ -1,4 +1,4 @@
-const APP_VERSION = '823c53c · 2026-04-09';
+const APP_VERSION = 'aa1785a · 2026-04-10';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -893,7 +893,11 @@ const SensorDlg = {
 
   async toggleConnect() {
     if (typeof RuuviScanner === 'undefined' || typeof window.RuuviScanner === 'undefined') {
-      alert('Sensor no disponible.');
+      // Diagnóstico: listar scripts cargados
+      const scripts = Array.from(document.scripts).map(s => s.src || '[inline]').join('\n');
+      alert('DIAGNÓSTICO:\ntypeof RuuviScanner = ' + typeof RuuviScanner +
+            '\ntypeof window.RuuviScanner = ' + typeof window.RuuviScanner +
+            '\n\nScripts cargados:\n' + scripts);
       return;
     }
     if (RuuviScanner.streaming) {

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 <title>Salinas</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#111827">
@@ -29,7 +29,7 @@
   body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.4; }
 
   /* ═══ LAYOUT ═══ */
-  #app { display: flex; height: 100vh; overflow: hidden; padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  #app { display: flex; height: 100vh; overflow: hidden; }
   #sidebar {
     width: 280px; flex-shrink: 0; background: var(--surface); padding: 14px;
     display: flex; flex-direction: column; border-right: 1px solid var(--border);
@@ -105,7 +105,7 @@
   #share-dialog-box { background:#1e293b; border:1px solid #334155; border-radius:12px; padding:20px; width:100%; max-width:400px; display:flex; flex-direction:column; gap:12px; }
 
   @media (max-width: 767px) {
-    #app { flex-direction: column; height: 100dvh; padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+    #app { flex-direction: column; height: 100dvh; }
     #sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: min(85vw,320px); transform: translateX(-105%); box-shadow: 4px 0 24px rgba(0,0,0,.5); }
     #sidebar.open { transform: translateX(0); }
     #overlay.open { display: block; opacity: 1; }
@@ -120,19 +120,6 @@
     #audio-hint { display: none; }
     #audio-bar { gap: 5px; padding: 6px 10px; }
     #audio-bar .ab-sep { display: none; }
-  }
-
-  /* ═══ LANDSCAPE MÓVIL (pantallas pequeñas en horizontal) ═══ */
-  @media (max-height: 600px) and (orientation: landscape) {
-    #app { flex-direction: column; height: 100dvh; }
-    #sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: min(85vw,320px); transform: translateX(-105%); box-shadow: 4px 0 24px rgba(0,0,0,.5); z-index: 600; }
-    #sidebar.open { transform: translateX(0); }
-    #overlay.open { display: block; opacity: 1; }
-    #main { flex: 1; overflow: hidden; }
-    #mob-header { display: flex !important; }
-    #desk-header { display: none; }
-    #content { flex-direction: row !important; flex-wrap: wrap !important; padding: 8px !important; gap: 8px !important; }
-    .panel { min-width: min(340px, 100%) !important; }
   }
 
   /* ═══ MOB HEADER ═══ */
@@ -541,15 +528,6 @@
 </div>
 
 <script type="module" src="./core.js"></script>
-<script>
-// En Capacitor el SW no tiene sentido — desregistrarlo para evitar cache stale
-if (window.Capacitor?.getPlatform?.() !== 'web' && 'serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(regs => {
-    for (const r of regs) r.unregister();
-  });
-  caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
-}
-</script>
 <script defer src="./ruuvi.js"></script>
 <script defer src="./workspace.js"></script>
 <script defer src="./app.js"></script>

@@ -1,7 +1,8 @@
 // ── RuuviScanner — integración BLE con RuuviTag Data Format 5 ──
+// Web Bluetooth API (Chrome Android / Chrome desktop con flag)
 //
-// En Android (APK Capacitor) usa @capacitor-community/bluetooth-le.
-// En navegador usa Web Bluetooth API (Chrome con flag o Chrome Android).
+// Lee temperatura via notificaciones GATT sobre el servicio UART Nordic.
+// RuuviTag en modo RAW v5 envía el payload por esta característica.
 //
 // Uso:
 //   await RuuviScanner.connect()          → conecta y empieza notificaciones
@@ -16,21 +17,17 @@ window.RuuviScanner = (() => {
   const RUUVI_CHAR_TX     = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
   const RUUVI_NAME_PREFIX = 'Ruuvi';
 
-  let _streaming  = false;
-  let _savedName  = null;
-  let _savedId    = null;   // deviceId para BLEClient
-  let _offset     = 0;
-  let _cb         = null;
-
-  // ── Detección de entorno ─────────────────────────────────────────────────
-  // En la WebView del APK, Capacitor.getPlatform() devuelve "android" o "ios".
-  // En el navegador devuelve "web" o Capacitor no existe.
-  function _isCapacitor() {
-    const platform = window.Capacitor?.getPlatform?.();
-    return platform === 'android' || platform === 'ios';
-  }
+  let _device    = null;
+  let _server    = null;
+  let _char      = null;
+  let _streaming = false;
+  let _savedName = null;
+  let _offset    = 0;
+  let _cb        = null;
 
   // ── Parser RAW v5 ────────────────────────────────────────────────────────
+  // Busca el byte 0x05 en cualquier posición del buffer.
+  // Bytes siguientes: temp int16 big-endian × 0.005 °C
   function _parseRawV5(buffer) {
     const dv = new DataView(buffer);
     for (let i = 0; i <= dv.byteLength - 3; i++) {
@@ -43,178 +40,54 @@ window.RuuviScanner = (() => {
     return null;
   }
 
-  function _hexToBuffer(hex) {
-    const bytes = hex.match(/.{1,2}/g) || [];
-    const buf = new ArrayBuffer(bytes.length);
-    const u8 = new Uint8Array(buf);
-    for (let i = 0; i < bytes.length; i++) u8[i] = parseInt(bytes[i], 16);
-    return buf;
+  // ── Notificación GATT ────────────────────────────────────────────────────
+  function _onNotification(event) {
+    const buf = event.target.value.buffer;
+    const dv  = new DataView(buf);
+
+    // Log para diagnóstico: mostrar bytes en hex
+    const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join(' ');
+    console.log('[Ruuvi] notification bytes:', hex);
+
+    const tempC = _parseRawV5(buf);
+    console.log('[Ruuvi] tempC parsed:', tempC, '| _cb:', typeof _cb);
+
+    if (tempC === null) return;
+    if (typeof _cb === 'function') _cb(tempC + _offset);
+  }
+
+  // ── Conectar GATT ────────────────────────────────────────────────────────
+  async function _connectGatt() {
+    _server = await _device.gatt.connect();
+    const svc = await _server.getPrimaryService(RUUVI_SERVICE);
+    _char = await svc.getCharacteristic(RUUVI_CHAR_TX);
+    _char.addEventListener('characteristicvaluechanged', _onNotification);
+    await _char.startNotifications();
+    _streaming = true;
+    _notifyStatus('connected');
+    console.log('[Ruuvi] GATT connected, notifications started');
+  }
+
+  // ── Desconexión inesperada ────────────────────────────────────────────────
+  async function _onDisconnected() {
+    _streaming = false;
+    _char = null;
+    _server = null;
+    _notifyStatus('disconnected');
+    console.log('[Ruuvi] disconnected, retrying in 2s...');
+    await new Promise(r => setTimeout(r, 2000));
+    if (_device?.gatt) {
+      try { await _connectGatt(); } catch (_) {}
+    }
   }
 
   function _notifyStatus(status) {
     if (typeof window.RuuviScanner?.onStatus === 'function') window.RuuviScanner.onStatus(status);
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // RAMA CAPACITOR (Android nativo)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  function _getBleClient() {
-    // Capacitor registra los plugins en window.Capacitor.Plugins
-    const mod = window.Capacitor?.Plugins?.BluetoothLe;
-    if (!mod) throw new Error('Plugin BLE de Capacitor no disponible.');
-    return mod;
-  }
-
-  let _capListeners = [];
-
-  async function _connectCapacitor() {
-    const BLE = _getBleClient();
-
-    await BLE.initialize({ androidNeverForLocation: true });
-
-    const device = await BLE.requestDevice({
-      services: [RUUVI_SERVICE],
-      namePrefix: RUUVI_NAME_PREFIX,
-    });
-
-    _savedId   = device.deviceId;
-    _savedName = device.name ?? device.deviceId;
-
-    // Escuchar desconexión inesperada
-    const disconnectKey = `disconnected|${_savedId}`;
-    const disconnectListener = await BLE.addListener(disconnectKey, () => {
-      _streaming = false;
-      _notifyStatus('disconnected');
-      console.log('[Ruuvi] disconnected (Capacitor BLE)');
-    });
-    _capListeners.push(disconnectListener);
-
-    await BLE.connect({ deviceId: _savedId });
-
-    // Suscribir notificaciones
-    const notifKey = `notification|${_savedId}|${RUUVI_SERVICE}|${RUUVI_CHAR_TX}`;
-    const notifListener = await BLE.addListener(notifKey, (event) => {
-      // El valor llega como hex string desde el plugin nativo
-      const raw = event?.value;
-      const buf = (typeof raw === 'string') ? _hexToBuffer(raw) : (raw?.buffer ?? raw);
-      const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join(' ');
-      console.log('[Ruuvi] notification bytes:', hex);
-      const tempC = _parseRawV5(buf);
-      console.log('[Ruuvi] tempC parsed:', tempC);
-      if (tempC === null) return;
-      if (typeof _cb === 'function') _cb(tempC + _offset);
-    });
-    _capListeners.push(notifListener);
-
-    await BLE.startNotifications({ deviceId: _savedId, service: RUUVI_SERVICE, characteristic: RUUVI_CHAR_TX });
-
-    _streaming = true;
-    _notifyStatus('connected');
-    console.log('[Ruuvi] Capacitor BLE connected, notifications started');
-  }
-
-  async function _disconnectCapacitor() {
-    const BLE = _getBleClient();
-    if (_savedId) {
-      try { await BLE.stopNotifications({ deviceId: _savedId, service: RUUVI_SERVICE, characteristic: RUUVI_CHAR_TX }); } catch (_) {}
-      try { await BLE.disconnect({ deviceId: _savedId }); } catch (_) {}
-    }
-    for (const l of _capListeners) { try { await l.remove(); } catch (_) {} }
-    _capListeners = [];
-    _streaming = false;
-    _savedId = null;
-    _notifyStatus('disconnected');
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // RAMA WEB BLUETOOTH
-  // ══════════════════════════════════════════════════════════════════════════
-
-  let _wbDevice = null;
-  let _wbChar   = null;
-  let _wbServer = null;
-
-  function _onWbNotification(event) {
-    const buf   = event.target.value.buffer;
-    const hex   = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join(' ');
-    console.log('[Ruuvi] notification bytes:', hex);
-    const tempC = _parseRawV5(buf);
-    console.log('[Ruuvi] tempC parsed:', tempC, '| _cb:', typeof _cb);
-    if (tempC === null) return;
-    if (typeof _cb === 'function') _cb(tempC + _offset);
-  }
-
-  async function _connectGatt() {
-    _wbServer = await _wbDevice.gatt.connect();
-    const svc = await _wbServer.getPrimaryService(RUUVI_SERVICE);
-    _wbChar   = await svc.getCharacteristic(RUUVI_CHAR_TX);
-    _wbChar.addEventListener('characteristicvaluechanged', _onWbNotification);
-    await _wbChar.startNotifications();
-    _streaming = true;
-    _notifyStatus('connected');
-    console.log('[Ruuvi] GATT connected, notifications started');
-  }
-
-  async function _onWbDisconnected() {
-    _streaming = false;
-    _wbChar   = null;
-    _wbServer = null;
-    _notifyStatus('disconnected');
-    console.log('[Ruuvi] disconnected, retrying in 2s...');
-    await new Promise(r => setTimeout(r, 2000));
-    if (_wbDevice?.gatt) {
-      try { await _connectGatt(); } catch (_) {}
-    }
-  }
-
-  async function _connectWebBluetooth() {
-    if (!navigator.bluetooth) throw new Error('Web Bluetooth no disponible en este navegador.');
-
-    if (navigator.bluetooth.getDevices) {
-      try {
-        const devices = await navigator.bluetooth.getDevices();
-        const ruuvi = devices.find(d => d.name?.startsWith(RUUVI_NAME_PREFIX));
-        if (ruuvi) {
-          _wbDevice = ruuvi;
-          _savedName = ruuvi.name;
-          _wbDevice.addEventListener('gattserverdisconnected', _onWbDisconnected);
-          await _connectGatt();
-          return;
-        }
-      } catch (_) {}
-    }
-
-    _wbDevice = await navigator.bluetooth.requestDevice({
-      filters: [{ namePrefix: RUUVI_NAME_PREFIX }],
-      optionalServices: [RUUVI_SERVICE],
-    });
-    _savedName = _wbDevice.name;
-    _wbDevice.addEventListener('gattserverdisconnected', _onWbDisconnected);
-    await _connectGatt();
-  }
-
-  function _disconnectWebBluetooth() {
-    _streaming = false;
-    if (_wbChar) {
-      try { _wbChar.stopNotifications(); } catch (_) {}
-      _wbChar.removeEventListener('characteristicvaluechanged', _onWbNotification);
-      _wbChar = null;
-    }
-    if (_wbDevice?.gatt?.connected) {
-      try { _wbDevice.gatt.disconnect(); } catch (_) {}
-    }
-    _wbServer = null;
-    _notifyStatus('disconnected');
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // API PÚBLICA
-  // ══════════════════════════════════════════════════════════════════════════
-
   return {
-    get streaming()  { return _streaming; },
-    get deviceName() { return _savedName ?? null; },
+    get streaming() { return _streaming; },
+    get deviceName() { return _device?.name ?? _savedName ?? null; },
 
     set onTemperature(cb) { _cb = cb; },
     get onTemperature()   { return _cb; },
@@ -225,19 +98,44 @@ window.RuuviScanner = (() => {
     setOffset(n) { _offset = isFinite(n) ? n : 0; },
 
     async connect() {
-      if (_isCapacitor()) {
-        await _connectCapacitor();
-      } else {
-        await _connectWebBluetooth();
+      if (!navigator.bluetooth) throw new Error('Web Bluetooth no disponible en este navegador.');
+
+      // Intentar reconexión silenciosa
+      if (navigator.bluetooth.getDevices) {
+        try {
+          const devices = await navigator.bluetooth.getDevices();
+          const ruuvi = devices.find(d => d.name?.startsWith(RUUVI_NAME_PREFIX));
+          if (ruuvi) {
+            _device = ruuvi;
+            _savedName = ruuvi.name;
+            _device.addEventListener('gattserverdisconnected', _onDisconnected);
+            await _connectGatt();
+            return;
+          }
+        } catch (_) {}
       }
+
+      _device = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: RUUVI_NAME_PREFIX }],
+        optionalServices: [RUUVI_SERVICE],
+      });
+      _savedName = _device.name;
+      _device.addEventListener('gattserverdisconnected', _onDisconnected);
+      await _connectGatt();
     },
 
     disconnect() {
-      if (_isCapacitor()) {
-        _disconnectCapacitor();
-      } else {
-        _disconnectWebBluetooth();
+      _streaming = false;
+      if (_char) {
+        try { _char.stopNotifications(); } catch (_) {}
+        _char.removeEventListener('characteristicvaluechanged', _onNotification);
+        _char = null;
       }
+      if (_device?.gatt?.connected) {
+        try { _device.gatt.disconnect(); } catch (_) {}
+      }
+      _server = null;
+      _notifyStatus('disconnected');
     },
   };
 })();
