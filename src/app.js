@@ -2352,6 +2352,9 @@ function renderContent() {
 
 // ── Drag & drop para reordenar tarjetas ──────────────────────────────────────
 function _bindCardDrag(container) {
+  // Evitar listeners duplicados al re-renderizar
+  if (container._dragHandler) container.removeEventListener('pointerdown', container._dragHandler);
+
   let dragSrcWrap = null;
   let ghost = null;
   let ghostOffX = 0, ghostOffY = 0;
@@ -2381,7 +2384,7 @@ function _bindCardDrag(container) {
     return { before: null };
   }
 
-  container.addEventListener('pointerdown', e => {
+  const handler = e => {
     const hdr = e.target.closest('.panel-h3-row, .panel-hdr');
     if (!hdr) return;
     if (e.target.closest('.card-toolbar, .panel-zoom-btn, .panel-fs-close, .panel-resize-e, .panel-resize-s, .panel-resize-se')) return;
@@ -2457,7 +2460,10 @@ function _bindCardDrag(container) {
     hdr.addEventListener('pointermove', onMove);
     hdr.addEventListener('pointerup',   onUp);
     hdr.addEventListener('pointercancel', onUp);
-  });
+  };
+
+  container._dragHandler = handler;
+  container.addEventListener('pointerdown', handler);
 }
 
 // ── Resize de tarjetas ───────────────────────────────────────────────────────
