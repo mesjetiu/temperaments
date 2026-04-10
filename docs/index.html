@@ -429,15 +429,12 @@
     </div>
     <div id="count">Cargando...</div>
     <div id="list"><div style="padding:14px;font-size:11px;color:#6b7280">Cargando datos...</div></div>
-    <div style="border-top:1px solid var(--border);padding:10px 4px 4px;margin-top:4px">
-      <button id="sidebar-about-btn" style="width:100%;background:none;border:none;color:#475569;font-size:11px;cursor:pointer;text-align:left;padding:4px 6px;border-radius:4px">ℹ Acerca de Salinas…</button>
-    </div>
   </div>
 
   <!-- ═══ MAIN ═══ -->
   <div id="main">
     <div id="mob-header">
-      <div id="mob-branding">
+      <div id="mob-branding" onclick="showAbout()" style="cursor:pointer;-webkit-tap-highlight-color:transparent">
         <img src="icon.svg" alt="">
         <span id="mob-title">Salinas</span>
       </div>

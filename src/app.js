@@ -6497,7 +6497,6 @@ document.getElementById('overlay').addEventListener('touchend', closeSidebar, { 
   };
 }
 document.getElementById('fav-btn').addEventListener('click', toggleFavFilter);
-document.getElementById('sidebar-about-btn').addEventListener('click', showAbout);
 document.getElementById('content-fullscreen-close').addEventListener('click', toggleContentFullscreen);
 document.getElementById('kb-fs-close').addEventListener('click', toggleKbFullscreen);
 document.getElementById('desk-fullscreen-btn').addEventListener('click', toggleAppFullscreen);
