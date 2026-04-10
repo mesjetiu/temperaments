@@ -342,8 +342,11 @@ const WS = {
     div.style.maxHeight = maxH + 'px';
     div.style.top  = Math.max(4, r.top - maxH - 4) + 'px';
     div.style.left = Math.max(4, Math.min(r.left, window.innerWidth - 224)) + 'px';
-    div.style.right = '4px';  // que se extienda hasta el borde derecho en móvil
-    div.style.minWidth = 'unset';
+    // En móvil/tablet estiramos hasta el borde; en desktop dejamos ancho natural
+    if (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches) {
+      div.style.right = '4px';
+      div.style.minWidth = 'unset';
+    }
     setTimeout(() => {
       document.addEventListener('click', function h(e) {
         if (!div.contains(e.target)) { div.remove(); document.removeEventListener('click', h); }
