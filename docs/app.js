@@ -1,4 +1,4 @@
-const APP_VERSION = '37b1268 · 2026-04-10';
+const APP_VERSION = '79609d2 · 2026-04-10';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -6478,7 +6478,8 @@ document.getElementById('overlay').addEventListener('touchend', closeSidebar, { 
   let wide = false;
 
   function _applySbWidth() {
-    const w = wide ? window.innerWidth : 320;
+    const isTouch = window.matchMedia('(pointer: coarse)').matches;
+    const w = wide ? (isTouch ? window.innerWidth : 480) : 320;
     document.documentElement.style.setProperty('--sb-w', w + 'px');
     document.getElementById('sidebar-widen-btn').textContent = wide ? '‹' : '›';
   }

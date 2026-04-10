@@ -6478,7 +6478,8 @@ document.getElementById('overlay').addEventListener('touchend', closeSidebar, { 
   let wide = false;
 
   function _applySbWidth() {
-    const w = wide ? window.innerWidth : 320;
+    const isTouch = window.matchMedia('(pointer: coarse)').matches;
+    const w = wide ? (isTouch ? window.innerWidth : 480) : 320;
     document.documentElement.style.setProperty('--sb-w', w + 'px');
     document.getElementById('sidebar-widen-btn').textContent = wide ? '‹' : '›';
   }

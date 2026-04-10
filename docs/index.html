@@ -31,9 +31,9 @@
   /* ═══ LAYOUT ═══ */
   #app { display: flex; height: 100vh; overflow: hidden; }
   #sidebar {
-    width: 280px; flex-shrink: 0; background: var(--surface); padding: 14px;
+    width: var(--sb-w, 280px); flex-shrink: 0; background: var(--surface); padding: 14px;
     display: flex; flex-direction: column; border-right: 1px solid var(--border);
-    overflow: hidden; transition: transform 0.28s ease; z-index: 200;
+    overflow: hidden; transition: transform 0.28s ease, width 0.25s ease; z-index: 200;
     position: relative; min-width: 200px; max-width: 92vw; box-sizing: border-box;
   }
   #sidebar h2 { font-size: 14px; color: var(--accent); margin-bottom: 10px; }
@@ -188,7 +188,6 @@
   /* La en audio-bar y botón Temps ocultos en desktop (accesibles por mob-nav y sidebar fija) */
   #audio-bar-pitch-a { display: none !important; }
   #mob-nav-temps { display: none; }
-  #sidebar-widen-btn { display: none; }
 
   /* ═══ SIDEBAR LIST ═══ */
   #search { width: 100%; padding: 7px 10px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-size: 12px; margin-bottom: 6px; outline: none; }
