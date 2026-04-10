@@ -253,10 +253,10 @@
   .mob-nav-btn:active { color: #f1f5f9; background: rgba(255,255,255,0.05); }
   .mob-nav-btn.active { color: #3b82f6; }
   .mob-nav-btn svg { flex-shrink: 0; }
-  .mob-nav-pitch-top { display: flex; align-items: center; gap: 2px; height: 22px; }
-  .mob-nav-pitch .temp-indicator { display: none; font-size: 15px; }
+  .mob-nav-pitch-ref { font-size: 13px; font-weight: 600; color: var(--accent); }
+  .mob-nav-pitch .temp-indicator { display: none; font-size: 11px; color: #94a3b8; }
   .mob-nav-pitch .temp-indicator.active,
-  .mob-nav-pitch .temp-indicator.streaming { display: inline; }
+  .mob-nav-pitch .temp-indicator.streaming { display: block; }
   .tools-fab-item:hover { background: #334155; }
 
   /* ═══ AUDIO BAR ═══ */
@@ -459,7 +459,7 @@
       <!-- La / Pitch A -->
       <span id="audio-bar-pitch-a" style="display:inline-flex;align-items:center;gap:2px;white-space:nowrap;flex-shrink:0">
         <label style="margin:0">La =</label>
-        <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">440 Hz</span><span class="temp-indicator" onclick="PitchADlg.open()" style="font-size:11px;margin-left:1px">🌡️<span id="temp-ref-display" style="color:#64748b"></span><span id="temp-curr-display" style="color:#94a3b8"></span> = <span id="compensated-hz-val" style="color:var(--accent)">440.00</span> Hz</span>
+        <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">440 Hz</span><span class="temp-indicator" onclick="PitchADlg.open()" style="font-size:11px;margin-left:1px">🌡️<span id="temp-ref-display" style="color:#64748b"></span><span id="temp-curr-display" style="color:#94a3b8"></span> = <span id="compensated-hz-val" class="compensated-hz-label" style="color:var(--accent)">440.00</span> Hz</span>
       </span>
 
       <div class="ab-sep"></div>
@@ -499,6 +499,10 @@
 
 <!-- Barra de navegación móvil (solo móvil) -->
 <nav id="mob-nav">
+  <button class="mob-nav-btn" onclick="openMobHome()" id="mob-nav-home">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span>Inicio</span>
+  </button>
   <button class="mob-nav-btn" onclick="WS.openAddCardMenu(event,this)" id="mob-nav-add">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     <span>Añadir</span>
@@ -512,8 +516,8 @@
     <span>Medidor</span>
   </button>
   <button class="mob-nav-btn mob-nav-pitch" onclick="PitchADlg.open()" id="mob-nav-pitch">
-    <span class="mob-nav-pitch-top"><span class="pitchA-label" style="font-size:13px;font-weight:600;color:var(--accent)">440 Hz</span><span class="temp-indicator" style="font-size:14px;margin-left:2px">🌡️</span></span>
-    <span>La</span>
+    <span class="pitchA-label mob-nav-pitch-ref">440 Hz</span>
+    <span class="temp-indicator mob-nav-pitch-comp">🌡️ <span class="compensated-hz-label">440.00</span> Hz</span>
   </button>
 </nav>
 

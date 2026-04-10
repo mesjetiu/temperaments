@@ -458,8 +458,7 @@ function updateCompensatedPitch() {
   // Mostrar/ocultar indicadores de termómetro en toda la app (gestiona clases active/streaming)
   ruuviApplyStreamingClass();
   // Actualizar barra principal: Hz compensados + temperaturas
-  const hzVal = document.getElementById('compensated-hz-val');
-  if (hzVal) hzVal.textContent = compensatedPitchA.toFixed(2);
+  document.querySelectorAll('.compensated-hz-label').forEach(el => el.textContent = compensatedPitchA.toFixed(2));
   const refDisp  = document.getElementById('temp-ref-display');
   const currDisp = document.getElementById('temp-curr-display');
   if (refDisp && currDisp) {
@@ -6574,6 +6573,13 @@ document.getElementById('desk-fullscreen-btn').addEventListener('click', toggleA
     dragged = false;
   });
 })();
+
+function openMobHome() {
+  TUNER.stop();
+  document.getElementById('tuner-screen')?.remove();
+  exitMedidor();
+}
+window.openMobHome = openMobHome;
 
 function openTuner() {
   document.getElementById('tools-fab-menu').style.display = 'none';
