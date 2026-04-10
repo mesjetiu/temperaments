@@ -1,4 +1,4 @@
-const APP_VERSION = '4e7a80c · 2026-04-10';
+const APP_VERSION = 'a403eba · 2026-04-10';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -640,8 +640,6 @@ const PitchADlg = {
     dlg.addEventListener('click', e => { if (e.target === dlg) PitchADlg.cancel(); });
     document.body.appendChild(dlg);
     updateTempDisplay();
-    const inp = document.getElementById('pitchA-dlg-input');
-    inp.focus(); inp.select();
   },
 
   onInputChange() {

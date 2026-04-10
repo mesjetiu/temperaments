@@ -640,8 +640,6 @@ const PitchADlg = {
     dlg.addEventListener('click', e => { if (e.target === dlg) PitchADlg.cancel(); });
     document.body.appendChild(dlg);
     updateTempDisplay();
-    const inp = document.getElementById('pitchA-dlg-input');
-    inp.focus(); inp.select();
   },
 
   onInputChange() {
