@@ -1,4 +1,4 @@
-const APP_VERSION = 'f3256d5 · 2026-04-10';
+const APP_VERSION = '432938b · 2026-04-10';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -5748,6 +5748,8 @@ function tunerTempName() {
 function exitTuner() {
   TUNER.stop();
   document.getElementById('tuner-screen')?.remove();
+  const c = document.getElementById('content');
+  if (c) { c.style.display = 'none'; c.offsetHeight; c.style.display = ''; }
 }
 
 function buildTunerScreen() {
@@ -6596,6 +6598,9 @@ function openMobHome() {
   TUNER.stop();
   document.getElementById('tuner-screen')?.remove();
   exitMedidor();
+  // Forzar repaint — Chrome/WebKit no invalida el layer compositor al eliminar fixed
+  const c = document.getElementById('content');
+  if (c) { c.style.display = 'none'; c.offsetHeight; c.style.display = ''; }
 }
 window.openMobHome = openMobHome;
 
