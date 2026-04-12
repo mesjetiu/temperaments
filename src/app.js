@@ -1156,10 +1156,40 @@ function _availCanvasH(canvas) {
   return Math.max(0, bodyH - siblH);
 }
 
+function togglePanelResizeLock(e, panel) {
+  e.stopPropagation();
+  e.preventDefault();
+  const locked = panel.classList.toggle('panel-resize-locked');
+  const btn = panel.querySelector('.panel-resize-lock');
+  if (btn) btn.textContent = locked ? '🔒' : '🔓';
+  if (!locked) {
+    // Auto-relock tras 4 s de inactividad
+    clearTimeout(panel._relockTimer);
+    panel._relockTimer = setTimeout(() => {
+      panel.classList.add('panel-resize-locked');
+      const b = panel.querySelector('.panel-resize-lock');
+      if (b) b.textContent = '🔒';
+    }, 4000);
+  } else {
+    clearTimeout(panel._relockTimer);
+  }
+}
+
 function startPanelDragResize(e, panel) {
+  // Si el toque es en el botón candado, no arrancar drag
+  if (e.target.closest('.panel-resize-lock')) return;
+  // Bloqueado por defecto: no resize salvo que esté desbloqueado
+  if (panel.classList.contains('panel-resize-locked')) return;
   e.preventDefault();
   const bar = e.target.closest('.panel-drag-bar') || e.target;
   bar.setPointerCapture(e.pointerId);
+  // Reiniciar auto-relock cada vez que se usa el drag
+  clearTimeout(panel._relockTimer);
+  panel._relockTimer = setTimeout(() => {
+    panel.classList.add('panel-resize-locked');
+    const b = panel.querySelector('.panel-resize-lock');
+    if (b) b.textContent = '🔒';
+  }, 4000);
   panel.classList.add('panel-resized');
   // Altura mínima = cabecera + barra de drag (sin contenido)
   const hdr  = panel.querySelector('.panel-hdr');
@@ -2319,7 +2349,9 @@ function panel(title, bodyHtml, style = '') {
       <h3>${title}</h3><span style="display:flex;gap:6px;align-items:center">${zoomBtn}<span class="panel-chevron">▼</span></span>
     </div>
     <div class="panel-body">${bodyHtml}</div>
-    <div class="panel-drag-bar" onpointerdown="startPanelDragResize(event,this.closest('.panel'))"></div>
+    <div class="panel-drag-bar" onpointerdown="startPanelDragResize(event,this.closest('.panel'))">
+      <button class="panel-resize-lock" onclick="togglePanelResizeLock(event,this.closest('.panel'))" title="Desbloquear resize">🔒</button>
+    </div>
   </div>`;
 }
 
@@ -2392,6 +2424,10 @@ function renderContent() {
 
   _bindCardDrag(el);
   _bindCardResize(el);
+  // Inicializar todos los paneles móviles en estado bloqueado
+  el.querySelectorAll('.panel').forEach(p => {
+    p.classList.add('panel-resize-locked');
+  });
 }
 
 // ── Drag & drop para reordenar tarjetas ──────────────────────────────────────
