@@ -1,4 +1,4 @@
-const CACHE = 'temp-072d9bb';const STATIC = [
+const CACHE = 'temp-67a9bb2';const STATIC = [
   './icon-192.png',
   './icon-512.png',
   './app.js',
