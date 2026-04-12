@@ -1,4 +1,4 @@
-const APP_VERSION = 'ec6e5bc · 2026-04-12';
+const APP_VERSION = '751731e · 2026-04-12';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -6887,17 +6887,20 @@ document.addEventListener('contextmenu', e => {
   if (!e.target.closest('input, textarea, [contenteditable]')) e.preventDefault();
 });
 
-// ── Altura dinámica de la barra de nav móvil ─────────────────────────────────
-// Actualiza --mob-nav-h para que el padding-bottom de #content sea exacto
-// y la última tarjeta nunca quede tapada por la barra de navegación.
+// ── Tamaño dinámico de la barra de nav móvil ─────────────────────────────────
+// En portrait: --mob-nav-h = altura de la barra (padding-bottom del content)
+// En landscape: --mob-nav-h = ancho del rail lateral (padding-left del content)
 (function syncMobNavHeight() {
   const nav = document.getElementById('mob-nav');
   if (!nav) return;
   function update() {
-    document.documentElement.style.setProperty('--mob-nav-h', nav.offsetHeight + 'px');
+    const landscape = window.matchMedia('(orientation: landscape) and (max-width: 767px)').matches;
+    const size = landscape ? nav.offsetWidth : nav.offsetHeight;
+    document.documentElement.style.setProperty('--mob-nav-h', size + 'px');
   }
   update();
   new ResizeObserver(update).observe(nav);
+  window.addEventListener('orientationchange', () => setTimeout(update, 100));
 })();
 
 // ══════════════════════════════════════════════
