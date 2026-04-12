@@ -30,16 +30,13 @@ const CARD_REGISTRY = {
 };
 
 const DEFAULT_WORKSPACE = {
-  version: 2,
+  version: 3,
   activeTabId: 'tab-default',
   tabs: [{
     id: 'tab-default',
     label: 'Vista general',
     cards: [
-      { id: 'card-1', type: 'circle'  },
-      { id: 'card-2', type: 'radar'   },
-      { id: 'card-3', type: 'offsets' },
-      { id: 'card-4', type: 'scatter' },
+      { id: 'card-default-hero', type: 'hero' },
     ]
   }]
 };
@@ -90,7 +87,18 @@ const WS = {
         const hasObsolete = ws.tabs?.some(t =>
           t.cards?.some(c => c.type && !CARD_REGISTRY[c.type])
         );
-        if (!hasObsolete) return; // workspace válido, no tocar
+        if (hasObsolete) throw new Error('obsolete');
+
+        // v3: asegurar que la pestaña "Vista general" tiene hero como primera tarjeta
+        if ((ws.version ?? 1) < 3) {
+          const overview = ws.tabs?.find(t => t.label === 'Vista general');
+          if (overview && !overview.cards?.some(c => c.type === 'hero')) {
+            overview.cards = [{ id: 'card-default-hero', type: 'hero' }, ...(overview.cards ?? [])];
+          }
+          ws.version = 3;
+          localStorage.setItem(WS_KEY, JSON.stringify(ws));
+        }
+        return; // workspace válido
       } catch(e) {}
       // Obsoleto o corrupto → reemplazar
     }
