@@ -494,14 +494,15 @@
   /* ── Móvil landscape: barra de nav como rail vertical izquierdo ── */
   /* max-height:500px filtra móviles en landscape (alto corto) vs tablets (alto mayor) */
   @media (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
-    #app { flex-direction: column !important; }
-    #main { display: flex; flex-direction: row; flex: 1; overflow: hidden; }
     #mob-nav {
       position: fixed !important;
-      top: 0 !important; left: 0 !important; bottom: 0 !important; right: auto !important;
+      top: var(--mob-header-h, 48px) !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: auto !important;
       flex-direction: column !important;
-      width: 56px !important;
-      height: 100% !important;
+      width: 64px !important;
+      height: auto !important;
       border-top: none !important;
       border-right: 1px solid #334155 !important;
       padding-bottom: env(safe-area-inset-bottom, 0px) !important;
@@ -509,16 +510,13 @@
       overflow-y: auto !important;
       z-index: 550 !important;
     }
-    .mob-nav-btn { flex: none !important; padding: 12px 0 !important; }
-    #mob-header { padding-left: 10px !important; }
+    .mob-nav-btn { flex: none !important; padding: 10px 4px !important; font-size: 10px !important; }
     #content {
       padding-bottom: 12px !important;
-      padding-left: calc(56px + 12px) !important;
+      padding-left: calc(64px + 12px) !important;
     }
     #tuner-screen, #medidor-screen {
-      left: 56px !important;
-      height: 100% !important;
-      top: 0 !important;
+      left: 64px !important;
     }
   }
 </style>

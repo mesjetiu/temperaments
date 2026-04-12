@@ -1,4 +1,4 @@
-const APP_VERSION = '0644f63 · 2026-04-12';
+const APP_VERSION = '7c7ad44 · 2026-04-12';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -6890,16 +6890,30 @@ document.addEventListener('contextmenu', e => {
 // ── Tamaño dinámico de la barra de nav móvil ─────────────────────────────────
 // En portrait: --mob-nav-h = altura de la barra (padding-bottom del content)
 // En landscape: --mob-nav-h = ancho del rail lateral (padding-left del content)
-(function syncMobNavHeight() {
+(function syncMobNavSize() {
   const nav = document.getElementById('mob-nav');
+  const hdr = document.getElementById('mob-header');
   if (!nav) return;
+  const mq = window.matchMedia('(pointer: coarse) and (orientation: landscape) and (max-height: 500px)');
   function update() {
-    const landscape = window.matchMedia('(orientation: landscape) and (max-width: 767px)').matches;
-    const size = landscape ? nav.offsetWidth : nav.offsetHeight;
-    document.documentElement.style.setProperty('--mob-nav-h', size + 'px');
+    // En portrait: --mob-nav-h = altura de la barra inferior (para padding-bottom del content)
+    // En landscape: --mob-nav-h = ancho del rail (calculado tras render)
+    // Usamos offsetHeight siempre para --mob-nav-h (padding-bottom en portrait)
+    // y --mob-nav-w para el ancho del rail en landscape
+    const isLandscape = mq.matches;
+    document.documentElement.style.setProperty('--mob-nav-h', nav.offsetHeight + 'px');
+    document.documentElement.style.setProperty('--mob-nav-w', nav.offsetWidth + 'px');
+    if (hdr) document.documentElement.style.setProperty('--mob-header-h', hdr.offsetHeight + 'px');
+    // En landscape el content necesita saber el ancho del rail
+    if (isLandscape) {
+      // El nav ya tiene width fijo en CSS, forzar --mob-nav-h al ancho para que padding-left funcione
+      document.documentElement.style.setProperty('--mob-nav-h', nav.offsetWidth + 'px');
+    }
   }
   update();
   new ResizeObserver(update).observe(nav);
+  if (hdr) new ResizeObserver(update).observe(hdr);
+  mq.addEventListener('change', () => setTimeout(update, 100));
   window.addEventListener('orientationchange', () => setTimeout(update, 100));
 })();
 
