@@ -1,4 +1,4 @@
-const APP_VERSION = '6ee820d · 2026-04-12';
+const APP_VERSION = '631a32b · 2026-04-12';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -6886,6 +6886,19 @@ document.addEventListener('contextmenu', e => {
   // Permitir menú contextual solo en inputs y textareas
   if (!e.target.closest('input, textarea, [contenteditable]')) e.preventDefault();
 });
+
+// ── Altura dinámica de la barra de nav móvil ─────────────────────────────────
+// Actualiza --mob-nav-h para que el padding-bottom de #content sea exacto
+// y la última tarjeta nunca quede tapada por la barra de navegación.
+(function syncMobNavHeight() {
+  const nav = document.getElementById('mob-nav');
+  if (!nav) return;
+  function update() {
+    document.documentElement.style.setProperty('--mob-nav-h', nav.offsetHeight + 'px');
+  }
+  update();
+  new ResizeObserver(update).observe(nav);
+})();
 
 // ══════════════════════════════════════════════
 // ARRANQUE

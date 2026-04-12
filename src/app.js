@@ -6887,6 +6887,19 @@ document.addEventListener('contextmenu', e => {
   if (!e.target.closest('input, textarea, [contenteditable]')) e.preventDefault();
 });
 
+// ── Altura dinámica de la barra de nav móvil ─────────────────────────────────
+// Actualiza --mob-nav-h para que el padding-bottom de #content sea exacto
+// y la última tarjeta nunca quede tapada por la barra de navegación.
+(function syncMobNavHeight() {
+  const nav = document.getElementById('mob-nav');
+  if (!nav) return;
+  function update() {
+    document.documentElement.style.setProperty('--mob-nav-h', nav.offsetHeight + 'px');
+  }
+  update();
+  new ResizeObserver(update).observe(nav);
+})();
+
 // ══════════════════════════════════════════════
 // ARRANQUE
 // ══════════════════════════════════════════════

@@ -115,7 +115,7 @@
     #main { flex: 1; overflow: hidden; }
     #mob-header { display: flex !important; padding-top: calc(6px + env(safe-area-inset-top, 0px)) !important; }
     #sidebar { padding-top: calc(14px + env(safe-area-inset-top, 0px)) !important; }
-    #content { flex-direction: column !important; flex-wrap: nowrap !important; padding: 12px !important; padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important; gap: 12px !important; }
+    #content { flex-direction: column !important; flex-wrap: nowrap !important; padding: 12px !important; padding-bottom: calc(var(--mob-nav-h, 72px) + 12px) !important; gap: 12px !important; }
     #add-card-btn { display: none !important; }
     #tuner-fab { display: none !important; }
     #mob-nav { display: flex !important; left: 0 !important; }
@@ -479,15 +479,15 @@
     #sidebar.open { transform: translateX(0); }
     #overlay.open { display: block; opacity: 1; }
     #main { flex: 1; overflow: hidden; }
-    #content { flex-direction: column !important; flex-wrap: nowrap !important; padding: 12px !important; padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important; gap: 12px !important; }
+    #content { flex-direction: column !important; flex-wrap: nowrap !important; padding: 12px !important; padding-bottom: calc(var(--mob-nav-h, 72px) + 12px) !important; gap: 12px !important; }
     #add-card-btn { display: none !important; }
     #tuner-fab { display: none !important; }
     #mob-nav { display: flex !important; left: 0 !important; }
     #mob-nav-temps { display: flex !important; }
     #sidebar-widen-btn { display: flex !important; }
     #audio-bar-pitch-a { display: none !important; }
-    #tuner-screen { top: env(safe-area-inset-top, 0px) !important; height: calc(100% - env(safe-area-inset-top, 0px) - 56px - env(safe-area-inset-bottom, 0px)) !important; }
-    #medidor-screen { top: env(safe-area-inset-top, 0px) !important; height: calc(100% - env(safe-area-inset-top, 0px) - 56px - env(safe-area-inset-bottom, 0px)) !important; }
+    #tuner-screen { top: env(safe-area-inset-top, 0px) !important; height: calc(100% - env(safe-area-inset-top, 0px) - var(--mob-nav-h, 56px) - env(safe-area-inset-bottom, 0px)) !important; }
+    #medidor-screen { top: env(safe-area-inset-top, 0px) !important; height: calc(100% - env(safe-area-inset-top, 0px) - var(--mob-nav-h, 56px) - env(safe-area-inset-bottom, 0px)) !important; }
     #tuner-big-note { font-size: 36px; }
   }
 </style>
