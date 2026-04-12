@@ -1,4 +1,4 @@
-const APP_VERSION = '6cd4e3d · 2026-04-12';
+const APP_VERSION = '90284a8 · 2026-04-12';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -305,8 +305,8 @@ let chartPlayMode = 'normal'; // 'normal' | 'legato'
 
 // ── Compensación térmica (órgano) ──
 let tempCompEnabled = _prefs.tempCompEnabled ?? false;
-let refTemp         = _prefs.refTemp ?? 20;      // temperatura de referencia en °C
-let currentTemp     = _prefs.currentTemp ?? 20;  // temperatura actual en °C
+let refTemp         = parseFloat((_prefs.refTemp ?? 20).toFixed(DISPLAY_PRECISION.temp));
+let currentTemp     = parseFloat((_prefs.currentTemp ?? 20).toFixed(DISPLAY_PRECISION.temp));
 let compensatedPitchA = pitchA;                   // La ponderado recalculado en tiempo real
 
 // ══════════════════════════════════════════════
@@ -619,7 +619,7 @@ const PitchADlg = {
           <!-- Temp de referencia -->
           <div style="margin-bottom:10px">
             <div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Temp. ref. (°C)</div>
-            <input id="pitchA-ref-temp" type="number" value="${refTemp}" min="-50" max="50" step="1"
+            <input id="pitchA-ref-temp" type="number" value="${fmt(refTemp,'temp')}" min="-50" max="50" step="1"
               onchange="PitchADlg.onRefTempChange()"
               style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:8px 10px;font-size:14px;text-align:center;outline:none">
           </div>
@@ -698,7 +698,7 @@ const PitchADlg = {
   onCurrTempChange() {
     const inp = document.getElementById('pitchA-curr-temp');
     if (inp) {
-      currentTemp = parseFloat(inp.value);
+      currentTemp = parseFloat(parseFloat(inp.value).toFixed(DISPLAY_PRECISION.temp));
       savePrefs({ currentTemp });
       updateCompensatedPitch();
     }
