@@ -492,8 +492,8 @@
   }
 
   /* ── Móvil landscape: barra de nav como rail vertical izquierdo ── */
-  /* Debe ir al final para sobreescribir los bloques portrait anteriores */
-  @media (max-width: 767px) and (orientation: landscape) {
+  /* max-height:500px filtra móviles en landscape (alto corto) vs tablets (alto mayor) */
+  @media (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
     #app { flex-direction: row !important; }
     #mob-nav {
       position: relative !important;
