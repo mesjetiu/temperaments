@@ -1,4 +1,4 @@
-const APP_VERSION = 'db4e8a4 · 2026-04-12';
+const APP_VERSION = '73db862 · 2026-04-12';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -776,7 +776,7 @@ const PitchADlg = {
         setPitchAGlobal(this._stableFreq);
         this.stopMic();
         const st2 = document.getElementById('pitchA-dlg-status');
-        if (st2) st2.textContent = `✓ ${pitchA} Hz`;
+        if (st2) st2.textContent = `✓ ${pitchA.toFixed(1)} Hz`;
       }
     });
   }
@@ -1964,7 +1964,7 @@ function restoreSession() {
   // Restaurar pitch A
   if (p.pitchA && p.pitchA > 0) {
     pitchA = p.pitchA;
-    document.querySelectorAll('.pitchA-label').forEach(el => el.textContent = p.pitchA + ' Hz');
+    document.querySelectorAll('.pitchA-label').forEach(el => el.textContent = p.pitchA.toFixed(1) + ' Hz');
   }
   // Restaurar onda
   if (p.wave) {
@@ -2938,7 +2938,7 @@ function _panel_keyboard(act, el) {
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:#4b5563;margin-bottom:10px">
         <span style="color:var(--muted)">La =</span>
-        <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${pitchA} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" onclick="PitchADlg.open()" title="Compensación térmica activa">🌡️</span>
+        <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${pitchA.toFixed(1)} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" onclick="PitchADlg.open()" title="Compensación térmica activa">🌡️</span>
         <span style="color:var(--border)">·</span>
         Temperamento: <span style="color:var(--c0)">${tempName}</span>
         ${!selected.find(Boolean) ? '<span style="color:#f87171"> — selecciona uno en la lista</span>' : ''}
@@ -3091,7 +3091,7 @@ function _panel_beats(act, el) {
     }
     html += panel(
       `Batidos — <span style="color:${COLORS[ti]}">${temp.name}</span>`,
-      `<p style="font-size:10px;color:var(--muted);margin-bottom:8px">Hz de batido. 0 = intervalo justo puro. La = ${pitchA} Hz.</p>
+      `<p style="font-size:10px;color:var(--muted);margin-bottom:8px">Hz de batido. 0 = intervalo justo puro. La = ${pitchA.toFixed(1)} Hz.</p>
        <div class="table-zoom-wrap" style="overflow:hidden;position:relative;height:260px;touch-action:none">
          <table style="border-collapse:collapse">
            <thead><tr><th style="padding:3px 6px;font-size:9px;color:var(--muted)"></th>${headerCols}</tr></thead>
@@ -3430,7 +3430,7 @@ function viewBeats(act) {
       rows += `<tr>${cells}</tr>`;
     }
     const tableHtml =
-      `<p style="font-size:10px;color:var(--muted);margin-bottom:8px">Hz de batido. 0 = intervalo justo puro. La = ${pitchA} Hz.</p>
+      `<p style="font-size:10px;color:var(--muted);margin-bottom:8px">Hz de batido. 0 = intervalo justo puro. La = ${pitchA.toFixed(1)} Hz.</p>
       <div class="table-zoom-wrap" style="overflow:hidden;position:relative;height:260px;touch-action:none">
         <table style="border-collapse:collapse">
           <thead><tr><th style="padding:3px 6px;font-size:9px;color:var(--muted)"></th>${headerCols}</tr></thead>
@@ -5258,7 +5258,7 @@ function viewKeyboard() {
       <!-- La + Temperamento en la misma fila -->
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:#4b5563;margin-bottom:10px">
         <span style="color:var(--muted)">La =</span>
-        <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${pitchA} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" onclick="PitchADlg.open()" title="Compensación térmica activa">🌡️</span>
+        <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${pitchA.toFixed(1)} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" onclick="PitchADlg.open()" title="Compensación térmica activa">🌡️</span>
         <span style="color:var(--border)">·</span>
         Temperamento: <span style="color:var(--c0)">${tempName}</span>
         ${!selected.find(Boolean) ? '<span style="color:#f87171"> — selecciona uno en la lista</span>' : ''}
@@ -6000,7 +6000,7 @@ function buildTunerScreen() {
         <div style="border-top:1px solid #334155;padding-top:8px;margin-top:2px">
           <div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="closeTunerMenu();PitchADlg.open()">
             <span style="font-size:10px;color:#64748b">La =</span>
-            <span class="pitchA-label" style="color:#93c5fd;font-size:13px;border-bottom:1px dashed #93c5fd;padding:2px 4px">${pitchA} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" title="Compensación térmica activa">🌡️</span>
+            <span class="pitchA-label" style="color:#93c5fd;font-size:13px;border-bottom:1px dashed #93c5fd;padding:2px 4px">${pitchA.toFixed(1)} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" title="Compensación térmica activa">🌡️</span>
           </div>
         </div>
         ${!window.matchMedia('(display-mode: standalone)').matches ? `<div style="border-top:1px solid #334155;padding-top:8px;margin-top:2px">
@@ -6129,7 +6129,7 @@ const DT = {
     this.notes[9] = 0;  // forzar 0 exacto (evitar residuo por redondeo)
     this._renderKeyboard();
     this._updatePitchRow();
-    this._updateStatus(`✓ Normalizado — La: ${pitchA} Hz`);
+    this._updateStatus(`✓ Normalizado — La: ${pitchA.toFixed(1)} Hz`);
   },
 
   _updatePitchRow() {
@@ -6138,7 +6138,7 @@ const DT = {
     const canNorm = this.notes[9] !== null && this.notes[9] !== 0;
     el.innerHTML =
       `<span style="font-size:11px;color:var(--muted)">La ref:</span>
-       <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${pitchA} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" onclick="PitchADlg.open()" title="Compensación térmica activa">🌡️</span>`
+       <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${pitchA.toFixed(1)} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" onclick="PitchADlg.open()" title="Compensación térmica activa">🌡️</span>`
       + (canNorm ? `<button class="icon-btn" onclick="DT.normalize()" style="font-size:10px;margin-left:4px;color:#fcd34d;border-color:#b45309">Normalizar A→0</button>` : '');
   },
 
