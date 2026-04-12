@@ -26,7 +26,9 @@
     --c2: #4ade80; --c2a: rgba(74,222,128,0.18);
   }
   html, body { height: 100%; overscroll-behavior: none; }
-  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.4; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.4; user-select: none; -webkit-user-select: none; }
+  /* Restaurar selección solo en campos de texto */
+  input, textarea, [contenteditable] { user-select: text; -webkit-user-select: text; }
 
   /* ═══ LAYOUT ═══ */
   #app { display: flex; height: 100vh; overflow: hidden; }

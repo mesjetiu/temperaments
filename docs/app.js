@@ -1,4 +1,4 @@
-const APP_VERSION = '808df08 · 2026-04-12';
+const APP_VERSION = '6e973f8 · 2026-04-12';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -1036,6 +1036,14 @@ function toggleContentFullscreen() {
 // ── Fullscreen API por panel individual ──
 let _fsPanelEl = null; // panel actualmente en fullscreen simulado
 
+// Oculta/muestra la status bar + navigation bar de Android via plugin nativo Immersive
+function _setImmersive(on) {
+  try {
+    const P = window.Capacitor?.Plugins?.Immersive;
+    if (P) { if (on) P.enter(); else P.exit(); }
+  } catch(e) {}
+}
+
 function togglePanelFullscreen(btn) {
   const panel = btn.closest('.panel');
   if (!panel) return;
@@ -1044,9 +1052,10 @@ function togglePanelFullscreen(btn) {
     // Salir de fullscreen
     _exitPanelFullscreen();
   } else {
-    // Entrar: requestFullscreen sobre el documento entero (oculta barra de notificaciones en Android)
+    // Entrar
     _fsPanelEl = panel;
     panel.classList.add('panel-fake-fs');
+    _setImmersive(true);
     const req = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
     if (req) req.call(document.documentElement).catch(() => {});
     _updateFsPanelIcons();
@@ -1058,6 +1067,7 @@ function _exitPanelFullscreen() {
     _fsPanelEl.classList.remove('panel-fake-fs');
     _fsPanelEl = null;
   }
+  _setImmersive(false);
   if (document.fullscreenElement || document.webkitFullscreenElement) {
     (document.exitFullscreen || document.webkitExitFullscreen).call(document).catch(() => {});
   }
@@ -1084,6 +1094,7 @@ function _onNativeFullscreenChange() {
   if (!document.fullscreenElement && !document.webkitFullscreenElement && _fsPanelEl) {
     _fsPanelEl.classList.remove('panel-fake-fs');
     _fsPanelEl = null;
+    _setImmersive(false);
     _updateFsPanelIcons();
     setTimeout(renderContent, 50);
   }
@@ -6831,6 +6842,14 @@ document.getElementById('share-confirm-btn').addEventListener('click', confirmSh
 document.getElementById('update-apply-btn').addEventListener('click', applyUpdate);
 document.getElementById('update-toast-dismiss').addEventListener('click', dismissUpdateToast);
 // (pitch-input change listener eliminado — ahora usa PitchADlg unificado)
+
+// ══════════════════════════════════════════════
+// COMPORTAMIENTO DE APP — sin selección ni menú contextual
+// ══════════════════════════════════════════════
+document.addEventListener('contextmenu', e => {
+  // Permitir menú contextual solo en inputs y textareas
+  if (!e.target.closest('input, textarea, [contenteditable]')) e.preventDefault();
+});
 
 // ══════════════════════════════════════════════
 // ARRANQUE
