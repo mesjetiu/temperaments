@@ -1,4 +1,4 @@
-const APP_VERSION = '62ff886 · 2026-04-12';
+const APP_VERSION = 'db4e8a4 · 2026-04-12';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -434,7 +434,7 @@ function setPitchAGlobal(val) {
   if (!v || v <= 0) return;
   pitchA = v; savePrefs({ pitchA: v });
   updateCompensatedPitch();
-  document.querySelectorAll('.pitchA-label').forEach(el => el.textContent = v + ' Hz');
+  document.querySelectorAll('.pitchA-label').forEach(el => el.textContent = v.toFixed(1) + ' Hz');
   if (TUNER.refOsc) TUNER.refOsc.frequency.setTargetAtTime(TUNER.getTargetFreq(), getCtx().currentTime, 0.01);
   // Actualizar input del dialog si está abierto
   const dlgInput = document.getElementById('pitchA-dlg-input');
@@ -458,7 +458,7 @@ function updateCompensatedPitch() {
   // Mostrar/ocultar indicadores de termómetro en toda la app (gestiona clases active/streaming)
   ruuviApplyStreamingClass();
   // Actualizar barra principal: Hz compensados + temperaturas
-  document.querySelectorAll('.compensated-hz-label').forEach(el => el.textContent = compensatedPitchA.toFixed(2));
+  document.querySelectorAll('.compensated-hz-label').forEach(el => el.textContent = compensatedPitchA.toFixed(1));
   const refDisp  = document.getElementById('temp-ref-display');
   const currDisp = document.getElementById('temp-curr-display');
   if (refDisp && currDisp) {
@@ -957,7 +957,7 @@ function ruuviApplyStreamingClass() {
   const continuous = _prefs.ruuviContinuous ?? false;
   const streaming  = (typeof RuuviScanner !== 'undefined') && RuuviScanner.streaming;
   console.log('[UI] applyStreamingClass — tempCompEnabled:', tempCompEnabled, 'streaming:', streaming, 'continuous:', continuous);
-  document.querySelectorAll('.temp-indicator').forEach(el => {
+  document.querySelectorAll('.temp-indicator, .mob-nav-pitch-comp-hz').forEach(el => {
     el.classList.toggle('streaming', tempCompEnabled && streaming && continuous);
     el.classList.toggle('active',    tempCompEnabled && !(streaming && continuous));
   });

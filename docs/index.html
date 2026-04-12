@@ -268,9 +268,13 @@
   .mob-nav-btn.active { color: #3b82f6; }
   .mob-nav-btn svg { flex-shrink: 0; }
   .mob-nav-pitch-ref { font-size: 13px; font-weight: 600; color: var(--accent); }
+  .mob-nav-pitch-icon-row { display: flex; align-items: center; justify-content: center; gap: 3px; }
   .mob-nav-pitch .temp-indicator { display: none; font-size: 11px; color: #94a3b8; }
   .mob-nav-pitch .temp-indicator.active,
-  .mob-nav-pitch .temp-indicator.streaming { display: block; }
+  .mob-nav-pitch .temp-indicator.streaming { display: inline; }
+  .mob-nav-pitch-comp-hz { display: none; font-size: 11px; color: #94a3b8; }
+  .mob-nav-pitch-comp-hz.active,
+  .mob-nav-pitch-comp-hz.streaming { display: block; }
   .tools-fab-item:hover { background: #334155; }
 
   /* ═══ AUDIO BAR ═══ */
@@ -648,9 +652,12 @@
     <span>Medidor</span>
   </button>
   <button class="mob-nav-btn mob-nav-pitch" onclick="PitchADlg.open()" id="mob-nav-pitch">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12 Q5 6 8 12 Q11 18 14 12 Q17 6 20 12 Q21.5 15 22 12"/></svg>
-    <span class="pitchA-label mob-nav-pitch-ref">440 Hz</span>
-    <span class="temp-indicator mob-nav-pitch-comp">🌡️ <span class="compensated-hz-label">440.00</span> Hz</span>
+    <span class="mob-nav-pitch-icon-row">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12 Q5 6 8 12 Q11 18 14 12 Q17 6 20 12 Q21.5 15 22 12"/></svg>
+      <span class="temp-indicator mob-nav-pitch-comp">🌡️</span>
+    </span>
+    <span class="pitchA-label mob-nav-pitch-ref">440.0 Hz</span>
+    <span class="temp-indicator mob-nav-pitch-comp-hz"><span class="compensated-hz-label">440.0</span> Hz</span>
   </button>
 </nav>
 
