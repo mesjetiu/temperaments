@@ -314,7 +314,7 @@
   /* Barra de resize táctil: solo paneles con contenido expandible */
   .panel-drag-bar { display:none; }
   @media (max-width: 767px) {
-    .panel { display:flex !important; flex-direction:column !important; }
+    .panel { display:flex !important; flex-direction:column !important; min-height:74px; overflow:hidden; }
     .panel-hdr { flex-shrink:0; }
     .panel-body { flex:1; min-height:0; overflow-y:auto; }
     .panel .panel-drag-bar { display:flex; align-items:center; justify-content:center; height:18px; margin:6px -16px -16px; border-top:1px solid var(--border); cursor:ns-resize; touch-action:none; -webkit-tap-highlight-color:transparent; flex-shrink:0; }
