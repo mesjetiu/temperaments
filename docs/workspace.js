@@ -405,7 +405,9 @@ const WS = {
       `<div class="ws-popover-sep"></div>` +
       loadItems +
       `<div class="ws-popover-sep"></div>` +
-      `<div class="ws-popover-item" onclick="WS._resetDefault();WS._closePopovers()">↺ Restablecer por defecto</div>`;
+      `<div class="ws-popover-item" onclick="WS._resetDefault();WS._closePopovers()">↺ Restablecer por defecto</div>` +
+      `<div class="ws-popover-sep"></div>` +
+      `<div class="ws-popover-item" onclick="PrecisionDlg.open();WS._closePopovers()">⚙ Decimales mostrados…</div>`;
     this._popover(html, event);
   },
 

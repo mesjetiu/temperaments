@@ -1,4 +1,4 @@
-const APP_VERSION = '2345779 · 2026-04-12';
+const APP_VERSION = '6cd4e3d · 2026-04-12';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -198,7 +198,7 @@ function openTempMenu(idx, event) {
 function _tempShareText(name, offsets, notes) {
   const lines = offsets.map((o, i) => {
     const sign = o >= 0 ? '+' : '';
-    return `  ${NOTES[i].padEnd(3)} ${sign}${o.toFixed(2)}¢`;
+    return `  ${NOTES[i].padEnd(3)} ${sign}${fmt(o,'cents')}¢`;
   });
   let text = `🎹 ${name}\n\nDesviaciones vs ET (cents):\n${lines.join('\n')}`;
   if (notes) text += `\n\n${notes}`;
@@ -273,6 +273,31 @@ function savePrefs(patch) {
   localStorage.setItem(PREF_KEY, JSON.stringify(p));
 }
 const _prefs = loadPrefs();
+
+// ══════════════════════════════════════════════
+// PRECISIÓN DE DECIMALES
+// ══════════════════════════════════════════════
+// Defaults por tipo de dato. El usuario puede personalizar cada uno.
+// Se guarda en prefs como displayPrecision: { global, hz, cents, temp, beats }
+const DISPLAY_PRECISION_DEFAULTS = { global: 2, hz: 2, cents: 2, temp: 2, beats: 2 };
+const DISPLAY_PRECISION = Object.assign(
+  {}, DISPLAY_PRECISION_DEFAULTS, _prefs.displayPrecision ?? {}
+);
+
+/** Formatea un número para mostrar. type: 'hz'|'cents'|'temp'|'beats'|undefined */
+function fmt(value, type) {
+  const d = (type && DISPLAY_PRECISION[type] != null)
+    ? DISPLAY_PRECISION[type]
+    : DISPLAY_PRECISION.global;
+  return value.toFixed(d);
+}
+
+/** Guarda la precisión de un tipo y actualiza DISPLAY_PRECISION en memoria */
+function setDisplayPrecision(type, decimals) {
+  DISPLAY_PRECISION[type] = decimals;
+  const patch = Object.assign({}, _prefs.displayPrecision ?? {}, { [type]: decimals });
+  savePrefs({ displayPrecision: patch });
+}
 
 let pitchA        = _prefs.pitchA ?? 440;
 let octaveShift   = _prefs.octaveShift ?? 0;
@@ -439,7 +464,7 @@ function setPitchAGlobal(val) {
   if (!v || v <= 0) return;
   pitchA = v; savePrefs({ pitchA: v });
   updateCompensatedPitch();
-  document.querySelectorAll('.pitchA-label').forEach(el => el.textContent = v.toFixed(2) + ' Hz');
+  document.querySelectorAll('.pitchA-label').forEach(el => el.textContent = fmt(v,'hz') + ' Hz');
   if (TUNER.refOsc) TUNER.refOsc.frequency.setTargetAtTime(TUNER.getTargetFreq(), getCtx().currentTime, 0.01);
   // Actualizar input del dialog si está abierto
   const dlgInput = document.getElementById('pitchA-dlg-input');
@@ -463,13 +488,13 @@ function updateCompensatedPitch() {
   // Mostrar/ocultar indicadores de termómetro en toda la app (gestiona clases active/streaming)
   ruuviApplyStreamingClass();
   // Actualizar barra principal: Hz compensados + temperaturas
-  document.querySelectorAll('.compensated-hz-label').forEach(el => el.textContent = compensatedPitchA.toFixed(2));
+  document.querySelectorAll('.compensated-hz-label').forEach(el => el.textContent = fmt(compensatedPitchA,'hz'));
   const refDisp  = document.getElementById('temp-ref-display');
   const currDisp = document.getElementById('temp-curr-display');
   if (refDisp && currDisp) {
     if (tempCompEnabled) {
       refDisp.textContent  = refTemp.toFixed(0) + '°→';
-      currDisp.textContent = currentTemp.toFixed(2) + '°';
+      currDisp.textContent = fmt(currentTemp,'temp') + '°';
     } else {
       refDisp.textContent  = '';
       currDisp.textContent = '';
@@ -501,7 +526,7 @@ function updateTempDisplay() {
   // Campo temp actual: si hay sensor conectado, actualizar con valor actual
   const currTempInp = document.getElementById('pitchA-curr-temp');
   if (currTempInp && streaming) {
-    currTempInp.value = currentTemp.toFixed(2);
+    currTempInp.value = fmt(currentTemp,'temp');
     currTempInp.style.borderColor = '#4ade80';
   } else if (currTempInp) {
     currTempInp.style.borderColor = '#334155';
@@ -520,7 +545,7 @@ function updateTempDisplay() {
   // Mostrar La ponderado
   const ponderadoEl = document.getElementById('pitchA-ponderado');
   if (ponderadoEl) {
-    ponderadoEl.textContent = compensatedPitchA.toFixed(2);
+    ponderadoEl.textContent = fmt(compensatedPitchA,'hz');
   }
 
   // Mostrar offset en cents
@@ -528,7 +553,7 @@ function updateTempDisplay() {
   if (centsEl) {
     const offset = getFreqOffsetInCents(compensatedPitchA, pitchA);
     const sign = offset > 0 ? '+' : '';
-    centsEl.textContent = sign + offset.toFixed(2);
+    centsEl.textContent = sign + fmt(offset,'cents');
   }
 
   // Mostrar estado de compensación
@@ -605,7 +630,7 @@ const PitchADlg = {
               <div style="font-size:11px;color:#9ca3af">Temp. actual (°C)</div>
               <span id="pitchA-sensor-badge" style="font-size:11px;color:#64748b;cursor:pointer" onclick="SensorDlg.open()">🔵 Sensor</span>
             </div>
-            <input id="pitchA-curr-temp" type="number" value="${currentTemp}" min="-50" max="50" step="0.1"
+            <input id="pitchA-curr-temp" type="number" value="${fmt(currentTemp,'temp')}" min="-50" max="50" step="0.1"
               onchange="PitchADlg.onCurrTempChange()"
               style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:8px 10px;font-size:14px;text-align:center;outline:none">
           </div>
@@ -626,7 +651,7 @@ const PitchADlg = {
           <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px;font-size:12px">
             <div style="display:flex;justify-content:space-between;margin-bottom:4px">
               <span style="color:#9ca3af">La ponderado:</span>
-              <span id="pitchA-ponderado" style="color:#60a5fa;font-weight:600">${compensatedPitchA.toFixed(2)} Hz</span>
+              <span id="pitchA-ponderado" style="color:#60a5fa;font-weight:600">${fmt(compensatedPitchA,'hz')} Hz</span>
             </div>
             <div style="display:flex;justify-content:space-between">
               <span style="color:#9ca3af">Offset:</span>
@@ -771,17 +796,17 @@ const PitchADlg = {
       this._stableCount++;
       const prog = Math.min(1, this._stableCount / this.FRAMES);
       const st = document.getElementById('pitchA-dlg-status');
-      if (st) st.textContent = `🎤 ${this._stableFreq.toFixed(2)} Hz`;
+      if (st) st.textContent = `🎤 ${fmt(this._stableFreq,'hz')} Hz`;
       const bar = document.getElementById('pitchA-dlg-bar-fill');
       if (bar) bar.style.width = (prog * 100) + '%';
       // Actualizar input en tiempo real
       const inp = document.getElementById('pitchA-dlg-input');
-      if (inp) inp.value = this._stableFreq.toFixed(2);
+      if (inp) inp.value = fmt(this._stableFreq,'hz');
       if (this._stableCount >= this.FRAMES) {
         setPitchAGlobal(this._stableFreq);
         this.stopMic();
         const st2 = document.getElementById('pitchA-dlg-status');
-        if (st2) st2.textContent = `✓ ${pitchA.toFixed(2)} Hz`;
+        if (st2) st2.textContent = `✓ ${fmt(pitchA,'hz')} Hz`;
       }
     });
   }
@@ -869,7 +894,7 @@ const SensorDlg = {
 
   _updateLive(t) {
     const el = document.getElementById('sensor-temp-val');
-    if (el) el.textContent = t.toFixed(2) + ' °C';
+    if (el) el.textContent = fmt(t,'temp') + ' °C';
     const row = document.getElementById('sensor-temp-live');
     if (row) row.style.removeProperty('display');
   },
@@ -932,6 +957,78 @@ const SensorDlg = {
 
 };
 
+// ── Diálogo de configuración de decimales ─────────────────────────────────
+const PrecisionDlg = {
+  open() {
+    if (document.getElementById('precision-dlg')) return;
+    const dlg = document.createElement('div');
+    dlg.id = 'precision-dlg';
+    dlg.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.65)';
+    const types = [
+      { key: 'global', label: 'Global (por defecto)' },
+      { key: 'hz',     label: 'Frecuencia (Hz)' },
+      { key: 'cents',  label: 'Cents (¢)' },
+      { key: 'temp',   label: 'Temperatura (°C)' },
+      { key: 'beats',  label: 'Batidos (Hz)' },
+    ];
+    const rows = types.map(({ key, label }) => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #1e293b">
+        <span style="font-size:13px;color:#e2e8f0">${label}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button onclick="PrecisionDlg._adj('${key}',-1)"
+            style="width:26px;height:26px;background:#334155;border:1px solid #475569;color:#e2e8f0;border-radius:5px;cursor:pointer;font-size:16px;line-height:1;padding:0">−</button>
+          <span id="pdlg-val-${key}" style="min-width:18px;text-align:center;font-size:14px;font-weight:600;color:#60a5fa">${DISPLAY_PRECISION[key]}</span>
+          <button onclick="PrecisionDlg._adj('${key}',+1)"
+            style="width:26px;height:26px;background:#334155;border:1px solid #475569;color:#e2e8f0;border-radius:5px;cursor:pointer;font-size:16px;line-height:1;padding:0">+</button>
+        </div>
+      </div>`).join('');
+    dlg.innerHTML = `
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px;width:340px;max-width:92vw;color:#e2e8f0;font-family:system-ui">
+        <div style="font-size:14px;font-weight:600;margin-bottom:4px">Decimales mostrados</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:14px">Rango: 0–4. El tipo específico tiene prioridad sobre Global.</div>
+        ${rows}
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button onclick="PrecisionDlg._reset()"
+            style="flex:1;background:#1e293b;border:1px solid #475569;color:#94a3b8;border-radius:6px;padding:8px;cursor:pointer;font-size:12px">
+            Restablecer
+          </button>
+          <button onclick="PrecisionDlg.close()"
+            style="flex:2;background:#3b82f6;border:none;color:#fff;border-radius:6px;padding:8px;cursor:pointer;font-size:13px;font-weight:600">
+            Cerrar
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(dlg);
+    dlg.addEventListener('click', e => { if (e.target === dlg) PrecisionDlg.close(); });
+  },
+
+  _adj(type, delta) {
+    const cur = DISPLAY_PRECISION[type] ?? DISPLAY_PRECISION.global;
+    const next = Math.min(4, Math.max(0, cur + delta));
+    setDisplayPrecision(type, next);
+    const el = document.getElementById('pdlg-val-' + type);
+    if (el) el.textContent = next;
+    renderContent();
+  },
+
+  _reset() {
+    Object.keys(DISPLAY_PRECISION_DEFAULTS).forEach(k => {
+      DISPLAY_PRECISION[k] = DISPLAY_PRECISION_DEFAULTS[k];
+    });
+    savePrefs({ displayPrecision: null });
+    // Actualizar valores mostrados en el diálogo
+    Object.keys(DISPLAY_PRECISION_DEFAULTS).forEach(k => {
+      const el = document.getElementById('pdlg-val-' + k);
+      if (el) el.textContent = DISPLAY_PRECISION_DEFAULTS[k];
+    });
+    renderContent();
+  },
+
+  close() {
+    document.getElementById('precision-dlg')?.remove();
+  },
+};
+
 // ── Integración RuuviScanner → app ────────────────────────────────────────
 
 /** Aplica la temperatura recibida del sensor a la app. */
@@ -942,7 +1039,7 @@ function ruuviOnTemperature(tempC) {
   updateCompensatedPitch();
   // Actualizar campo del diálogo de referencia si está abierto
   const inp = document.getElementById('pitchA-curr-temp');
-  if (inp) inp.value = tempC.toFixed(2);
+  if (inp) inp.value = fmt(tempC,'temp');
   // Actualizar osciladores activos del teclado (notas que están sonando ahora)
   // Escalamos por el ratio nuevo/anterior — preserva el intervalo del temperamento
   const newEffective = getEffectivePitchA();
@@ -1785,9 +1882,9 @@ const KB = {
       }).join(' + ');
       el.textContent = notes;
     } else {
-      const f = this.freq(ni, oct).toFixed(2);
+      const f = fmt(this.freq(ni, oct),'hz');
       const dev = this.getOffsets()[ni];
-      el.textContent = `${NOTES[ni]}${oct}  ·  ${f} Hz  ·  ${dev>=0?'+':''}${dev.toFixed(2)}¢ vs ET`;
+      el.textContent = `${NOTES[ni]}${oct}  ·  ${f} Hz  ·  ${dev>=0?'+':''}${fmt(dev,'cents')}¢ vs ET`;
     }
   },
 
@@ -1969,7 +2066,7 @@ function restoreSession() {
   // Restaurar pitch A
   if (p.pitchA && p.pitchA > 0) {
     pitchA = p.pitchA;
-    document.querySelectorAll('.pitchA-label').forEach(el => el.textContent = p.pitchA.toFixed(2) + ' Hz');
+    document.querySelectorAll('.pitchA-label').forEach(el => el.textContent = fmt(p.pitchA,'hz') + ' Hz');
   }
   // Restaurar onda
   if (p.wave) {
@@ -2153,7 +2250,7 @@ function drawCircle(selTemps) {
       svg+=`<path d="M${x1},${y1} A${ro},${ro} 0 0,1 ${x2},${y2} L${x3},${y3} A${ri},${ri} 0 0,0 ${x4},${y4} Z"
         fill="${fifthColor(f.dev)}" stroke="#111827" stroke-width="0.8"
         data-fi="${i}" data-ti="${ti}" style="cursor:crosshair">
-        <title>${f.from}→${f.to}: ${f.size.toFixed(2)}¢ (${f.dev>=0?'+':''}${f.dev.toFixed(2)}¢)</title></path>`;
+        <title>${f.from}→${f.to}: ${fmt(f.size,'cents')}¢ (${f.dev>=0?'+':''}${fmt(f.dev,'cents')}¢)</title></path>`;
     });
   });
   FIFTH_LBL.forEach((lbl,i)=>{
@@ -2193,15 +2290,15 @@ function statsTable(temp) {
   const avgF=fif.reduce((s,f)=>s+f.dev,0)/12;
   const wm=maj.reduce((a,b)=>Math.abs(a.dev)>Math.abs(b.dev)?a:b);
   const bm=maj.reduce((a,b)=>Math.abs(a.dev)<Math.abs(b.dev)?a:b);
-  const f=v=>`${v>=0?'+':''}${v.toFixed(2)}¢`;
+  const f=v=>`${v>=0?'+':''}${fmt(v,'cents')}¢`;
   const cc=v=>v>8?'#f87171':v<-4?'#fb923c':v>3?'#a78bfa':'#4ade80';
   return `<table>
     <tr><th>Métrica</th><th>Notas</th><th>Valor</th></tr>
-    <tr><td style="color:var(--muted)">Quinta más pura</td><td>${bf.from}→${bf.to}</td><td style="color:${cc(bf.dev)}">${bf.size.toFixed(2)}¢ (${f(bf.dev)})</td></tr>
-    <tr><td style="color:var(--muted)">Quinta más impura</td><td>${wf.from}→${wf.to}</td><td style="color:${cc(wf.dev)}">${wf.size.toFixed(2)}¢ (${f(wf.dev)})</td></tr>
+    <tr><td style="color:var(--muted)">Quinta más pura</td><td>${bf.from}→${bf.to}</td><td style="color:${cc(bf.dev)}">${fmt(bf.size,'cents')}¢ (${f(bf.dev)})</td></tr>
+    <tr><td style="color:var(--muted)">Quinta más impura</td><td>${wf.from}→${wf.to}</td><td style="color:${cc(wf.dev)}">${fmt(wf.size,'cents')}¢ (${f(wf.dev)})</td></tr>
     <tr><td style="color:var(--muted)">Desv. media quintas</td><td>—</td><td style="color:${cc(avgF)}">${f(avgF)}</td></tr>
-    <tr><td style="color:var(--muted)">3ª mayor más pura</td><td>${bm.from}→${bm.to}</td><td style="color:#4ade80">${bm.size.toFixed(2)}¢ (${f(bm.dev)})</td></tr>
-    <tr><td style="color:var(--muted)">3ª mayor más impura</td><td>${wm.from}→${wm.to}</td><td style="color:#f87171">${wm.size.toFixed(2)}¢ (${f(wm.dev)})</td></tr>
+    <tr><td style="color:var(--muted)">3ª mayor más pura</td><td>${bm.from}→${bm.to}</td><td style="color:#4ade80">${fmt(bm.size,'cents')}¢ (${f(bm.dev)})</td></tr>
+    <tr><td style="color:var(--muted)">3ª mayor más impura</td><td>${wm.from}→${wm.to}</td><td style="color:#f87171">${fmt(wm.size,'cents')}¢ (${f(wm.dev)})</td></tr>
   </table>`;
 }
 
@@ -2229,7 +2326,7 @@ function offsetsTable(temps) {
       temps.map(t => {
         const v = t.offsets[i];
         const c = Math.abs(v) < 1 ? '#4ade80' : Math.abs(v) < 5 ? '#facc15' : '#f87171';
-        return `<td style="text-align:right;padding:1px 0 1px 2px;color:${c};font-variant-numeric:tabular-nums;white-space:nowrap">${v>=0?'+':''}${v.toFixed(2)}¢</td>`;
+        return `<td style="text-align:right;padding:1px 0 1px 2px;color:${c};font-variant-numeric:tabular-nums;white-space:nowrap">${v>=0?'+':''}${fmt(v,'cents')}¢</td>`;
       }).join('')
     }</tr>`
   ).join('');
@@ -2242,14 +2339,14 @@ function offsetsTable(temps) {
 function fifthsTable(temp) {
   return `<table><tr><th>Quinta</th><th>¢</th><th>Desv.</th></tr>${getFifths(temp.offsets).map(f=>{
     const c=f.dev<-5?'#f87171':f.dev>2?'#a78bfa':f.dev<-1?'#fb923c':'#4ade80';
-    return `<tr><td style="color:var(--muted)">${f.from}→${f.to}</td><td>${f.size.toFixed(2)}</td><td style="color:${c};text-align:right">${f.dev>=0?'+':''}${f.dev.toFixed(2)}¢</td></tr>`;
+    return `<tr><td style="color:var(--muted)">${f.from}→${f.to}</td><td>${fmt(f.size,'cents')}</td><td style="color:${c};text-align:right">${f.dev>=0?'+':''}${fmt(f.dev,'cents')}¢</td></tr>`;
   }).join('')}</table>`;
 }
 
 function thirdsTableFn(temp) {
   return `<table><tr><th>3ª Mayor</th><th>¢</th><th>Desv.</th></tr>${getMaj3(temp.offsets).map(t=>{
     const c=t.dev>15?'#f87171':t.dev>6?'#fb923c':t.dev<0?'#60a5fa':'#4ade80';
-    return `<tr><td style="color:var(--muted)">${t.from}→${t.to}</td><td>${t.size.toFixed(2)}</td><td style="color:${c};text-align:right">${t.dev>=0?'+':''}${t.dev.toFixed(2)}¢</td></tr>`;
+    return `<tr><td style="color:var(--muted)">${t.from}→${t.to}</td><td>${fmt(t.size,'cents')}</td><td style="color:${c};text-align:right">${t.dev>=0?'+':''}${fmt(t.dev,'cents')}¢</td></tr>`;
   }).join('')}</table>`;
 }
 
@@ -2943,7 +3040,7 @@ function _panel_keyboard(act, el) {
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:#4b5563;margin-bottom:10px">
         <span style="color:var(--muted)">La =</span>
-        <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${pitchA.toFixed(2)} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" onclick="PitchADlg.open()" title="Compensación térmica activa">🌡️</span>
+        <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${fmt(pitchA,'hz')} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" onclick="PitchADlg.open()" title="Compensación térmica activa">🌡️</span>
         <span style="color:var(--border)">·</span>
         Temperamento: <span style="color:var(--c0)">${tempName}</span>
         ${!selected.find(Boolean) ? '<span style="color:#f87171"> — selecciona uno en la lista</span>' : ''}
@@ -2972,7 +3069,7 @@ function _panel_fifths_bar(act, el) {
   mkBar('c-fifths', fl,
     selected.map((t,i) => !t ? null : dsFifth(t, i, getFifths(t.offsets).map(f => f.dev))).filter(Boolean),
     'Desv. de quinta pura (¢)',
-    ctx => `${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢  (${(PURE_FIFTH+ctx.parsed.y).toFixed(2)}¢)`,
+    ctx => `${ctx.parsed.y>=0?'+':''}${fmt(ctx.parsed.y,'cents')}¢  (${fmt(PURE_FIFTH+ctx.parsed.y,'cents')}¢)`,
     'fifths', true);
 }
 
@@ -2986,7 +3083,7 @@ function _panel_maj3_bar(act, el) {
   mkBar('c-maj3', NOTES,
     selected.map((t,i) => !t ? null : dsMaj3(t, i, getMaj3(t.offsets).map(x => x.dev))).filter(Boolean),
     'Desv. de 3ª mayor pura (¢)',
-    ctx => `${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢  (${(PURE_MAJ3+ctx.parsed.y).toFixed(2)}¢)`,
+    ctx => `${ctx.parsed.y>=0?'+':''}${fmt(ctx.parsed.y,'cents')}¢  (${fmt(PURE_MAJ3+ctx.parsed.y,'cents')}¢)`,
     'maj3', true);
 }
 
@@ -3000,7 +3097,7 @@ function _panel_min3_bar(act, el) {
   mkBar('c-min3', NOTES,
     selected.map((t,i) => !t ? null : dsMaj3(t, i, getMin3(t.offsets).map(x => x.dev))).filter(Boolean),
     'Desv. de 3ª menor pura (¢)',
-    ctx => `${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢  (${(PURE_MIN3+ctx.parsed.y).toFixed(2)}¢)`,
+    ctx => `${ctx.parsed.y>=0?'+':''}${fmt(ctx.parsed.y,'cents')}¢  (${fmt(PURE_MIN3+ctx.parsed.y,'cents')}¢)`,
     'min3', true);
 }
 
@@ -3014,7 +3111,7 @@ function _panel_offsets_line(act, el) {
   mkLine('c-off', NOTES,
     selected.map((t,i) => !t ? null : ({...ds(t, i, t.offsets, {pointRadius:5, tension:0.3, fill:i===0})})).filter(Boolean),
     'Desviación del ET (¢)',
-    ctx => `${ctx.dataset.label}: ${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢`,
+    ctx => `${ctx.dataset.label}: ${ctx.parsed.y>=0?'+':''}${fmt(ctx.parsed.y,'cents')}¢`,
     'offsets');
 }
 
@@ -3039,8 +3136,8 @@ function _panel_intervals(act, el) {
         const actual = semi * 100 + temp.offsets[end] - temp.offsets[start];
         const dev = actual - JUST_REF[semi];
         const sign = dev >= 0 ? '+' : '';
-        const title = `${NOTES[start]}→${NOTES[end]} (${INT_NAMES[semi]}): ${actual.toFixed(2)}¢  desv. ${sign}${dev.toFixed(2)}¢ de la justa`;
-        cells += `<td title="${title}" style="background:${devColor(dev)};text-align:center;padding:3px 4px;font-size:9px;cursor:pointer;border:1px solid rgba(0,0,0,0.25)" onpointerdown="playHeatCell(${ti},${start},${semi})">${sign}${dev.toFixed(2)}</td>`;
+        const title = `${NOTES[start]}→${NOTES[end]} (${INT_NAMES[semi]}): ${fmt(actual,'cents')}¢  desv. ${sign}${fmt(dev,'cents')}¢ de la justa`;
+        cells += `<td title="${title}" style="background:${devColor(dev)};text-align:center;padding:3px 4px;font-size:9px;cursor:pointer;border:1px solid rgba(0,0,0,0.25)" onpointerdown="playHeatCell(${ti},${start},${semi})">${sign}${defmt(v,'cents')}</td>`;
       }
       rows += `<tr>${cells}</tr>`;
     }
@@ -3088,15 +3185,15 @@ function _panel_beats(act, el) {
         const actual = iv.semi * 100 + temp.offsets[end] - temp.offsets[start];
         const f2 = f1 * Math.pow(2, actual / 1200);
         const beat = Math.abs(iv.p * f1 - iv.q * f2);
-        const dispHz = beat < 0.05 ? '0' : beat < 10 ? beat.toFixed(2) : beat.toFixed(2);
-        const title = `${NOTES[start]}→${NOTES[end]} (${iv.name}): ${beat.toFixed(2)} Hz`;
+        const dispHz = beat < 0.05 ? '0' : beat < 10 ? fmt(beat,'beats') : fmt(beat,'beats');
+        const title = `${NOTES[start]}→${NOTES[end]} (${iv.name}): ${fmt(beat,'beats')} Hz`;
         cells += `<td title="${title}" style="background:${beatColor(beat)};text-align:center;padding:3px 5px;font-size:9px;cursor:pointer;border:1px solid rgba(0,0,0,0.25)" onpointerdown="playHeatCell(${ti},${start},${iv.semi})">${dispHz}</td>`;
       });
       rows += `<tr>${cells}</tr>`;
     }
     html += panel(
       `Batidos — <span style="color:${COLORS[ti]}">${temp.name}</span>`,
-      `<p style="font-size:10px;color:var(--muted);margin-bottom:8px">Hz de batido. 0 = intervalo justo puro. La = ${pitchA.toFixed(2)} Hz.</p>
+      `<p style="font-size:10px;color:var(--muted);margin-bottom:8px">Hz de batido. 0 = intervalo justo puro. La = ${fmt(pitchA,'hz')} Hz.</p>
        <div class="table-zoom-wrap" style="overflow:hidden;position:relative;height:260px;touch-action:none">
          <table style="border-collapse:collapse">
            <thead><tr><th style="padding:3px 6px;font-size:9px;color:var(--muted)"></th>${headerCols}</tr></thead>
@@ -3143,7 +3240,7 @@ function _panel_hero(act, el) {
   const wm = maj.reduce((a,b) => Math.abs(a.dev)>Math.abs(b.dev)?a:b);
   const bm = maj.reduce((a,b) => Math.abs(a.dev)<Math.abs(b.dev)?a:b);
   const avgF = fif.reduce((s,f) => s+f.dev, 0) / 12;
-  const f = v => `${v>=0?'+':''}${v.toFixed(2)}¢`;
+  const f = v => `${v>=0?'+':''}${fmt(v,'cents')}¢`;
   const cc = v => v>8?'#f87171':v<-4?'#fb923c':Math.abs(v)<0.5?'#4ade80':v>3?'#a78bfa':'#facc15';
   const statCard = (label, note, value, color) =>
     `<div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px 12px;flex:1;min-width:120px">
@@ -3165,10 +3262,10 @@ function _panel_hero(act, el) {
          onblur="saveTempNotes('${t.name.replace(/'/g,"\\'")}', this.value)">${getTempNotes(t.name)}</textarea>
      </div>
      <div style="display:flex;gap:8px;flex-wrap:wrap">
-       ${statCard('Quinta más pura',   bf.from+'→'+bf.to, bf.size.toFixed(2)+'¢ ('+f(bf.dev)+')', cc(bf.dev))}
-       ${statCard('Quinta más impura', wf.from+'→'+wf.to, wf.size.toFixed(2)+'¢ ('+f(wf.dev)+')', cc(wf.dev))}
-       ${statCard('3ª mayor más pura',   bm.from+'→'+bm.to, bm.size.toFixed(2)+'¢ ('+f(bm.dev)+')', '#4ade80')}
-       ${statCard('3ª mayor más impura', wm.from+'→'+wm.to, wm.size.toFixed(2)+'¢ ('+f(wm.dev)+')', '#f87171')}
+       ${statCard('Quinta más pura',   bf.from+'→'+bf.to, bfmt(f.size,'cents')+'¢ ('+f(bf.dev)+')', cc(bf.dev))}
+       ${statCard('Quinta más impura', wf.from+'→'+wf.to, wfmt(f.size,'cents')+'¢ ('+f(wf.dev)+')', cc(wf.dev))}
+       ${statCard('3ª mayor más pura',   bm.from+'→'+bm.to, fmt(bm.size,'cents')+'¢ ('+f(bm.dev)+')', '#4ade80')}
+       ${statCard('3ª mayor más impura', wm.from+'→'+wm.to, fmt(wm.size,'cents')+'¢ ('+f(wm.dev)+')', '#f87171')}
      </div>`;
   el.innerHTML = panel(t.name, bodyHtml, isMobile() ? '' : 'width:100%;box-sizing:border-box');
 }
@@ -3212,7 +3309,7 @@ function viewOverview(act) {
     const wm = maj.reduce((a,b) => Math.abs(a.dev)>Math.abs(b.dev)?a:b);
     const bm = maj.reduce((a,b) => Math.abs(a.dev)<Math.abs(b.dev)?a:b);
     const avgF = fif.reduce((s,f) => s+f.dev, 0) / 12;
-    const f = v => `${v>=0?'+':''}${v.toFixed(2)}¢`;
+    const f = v => `${v>=0?'+':''}${fmt(v,'cents')}¢`;
     const cc = v => v>8?'#f87171':v<-4?'#fb923c':Math.abs(v)<0.5?'#4ade80':v>3?'#a78bfa':'#facc15';
 
     // stat card html
@@ -3248,10 +3345,10 @@ function viewOverview(act) {
       </div>`
       // ── STAT CARDS ──
       + `<div style="width:100%;display:flex;gap:8px;flex-wrap:wrap">
-          ${statCard('Quinta más pura', bf.from+'→'+bf.to, bf.size.toFixed(2)+'¢ ('+f(bf.dev)+')', cc(bf.dev))}
-          ${statCard('Quinta más impura', wf.from+'→'+wf.to, wf.size.toFixed(2)+'¢ ('+f(wf.dev)+')', cc(wf.dev))}
-          ${statCard('3ª mayor más pura', bm.from+'→'+bm.to, bm.size.toFixed(2)+'¢ ('+f(bm.dev)+')', '#4ade80')}
-          ${statCard('3ª mayor más impura', wm.from+'→'+wm.to, wm.size.toFixed(2)+'¢ ('+f(wm.dev)+')', '#f87171')}
+          ${statCard('Quinta más pura', bf.from+'→'+bf.to, bfmt(f.size,'cents')+'¢ ('+f(bf.dev)+')', cc(bf.dev))}
+          ${statCard('Quinta más impura', wf.from+'→'+wf.to, wfmt(f.size,'cents')+'¢ ('+f(wf.dev)+')', cc(wf.dev))}
+          ${statCard('3ª mayor más pura', bm.from+'→'+bm.to, fmt(bm.size,'cents')+'¢ ('+f(bm.dev)+')', '#4ade80')}
+          ${statCard('3ª mayor más impura', wm.from+'→'+wm.to, fmt(wm.size,'cents')+'¢ ('+f(wm.dev)+')', '#f87171')}
         </div>`
       // ── CIRCLE + OFFSETS ──
       + panel('Círculo de quintas <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa un sector</small>',
@@ -3296,7 +3393,7 @@ function viewFifths(act) {
       return panel(`<span style="color:${COLORS[ci]}">${shortName(t,40)}</span>`, fifthsTable(t),
         mob?'':'flex:1;min-width:190px');}).join('');
   mkBar('c-fifths',fl,selected.map((t,i)=>!t?null:dsFifth(t,i,getFifths(t.offsets).map(f=>f.dev))).filter(Boolean),
-    'Desv. de quinta pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢  (${(PURE_FIFTH+ctx.parsed.y).toFixed(2)}¢)`,'fifths',true);
+    'Desv. de quinta pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${fmt(ctx.parsed.y,'cents')}¢  (${fmt(PURE_FIFTH+ctx.parsed.y,'cents')}¢)`,'fifths',true);
   bindCircleAudio();
 }
 
@@ -3312,9 +3409,9 @@ function viewThirds(act) {
       return panel(`<span style="color:${COLORS[ci]}">${shortName(t,40)}</span>`, thirdsTableFn(t),
         mob?'':'flex:1;min-width:190px');}).join('');
   mkBar('c-maj3',NOTES,selected.map((t,i)=>!t?null:dsMaj3(t,i,getMaj3(t.offsets).map(x=>x.dev))).filter(Boolean),
-    'Desv. de 3ª mayor pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢  (${(PURE_MAJ3+ctx.parsed.y).toFixed(2)}¢)`,'maj3',true);
+    'Desv. de 3ª mayor pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${fmt(ctx.parsed.y,'cents')}¢  (${fmt(PURE_MAJ3+ctx.parsed.y,'cents')}¢)`,'maj3',true);
   mkBar('c-min3',NOTES,selected.map((t,i)=>!t?null:dsMaj3(t,i,getMin3(t.offsets).map(x=>x.dev))).filter(Boolean),
-    'Desv. de 3ª menor pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢  (${(PURE_MIN3+ctx.parsed.y).toFixed(2)}¢)`,'min3',true);
+    'Desv. de 3ª menor pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${fmt(ctx.parsed.y,'cents')}¢  (${fmt(PURE_MIN3+ctx.parsed.y,'cents')}¢)`,'min3',true);
 }
 
 // ─── COMPARAR ───
@@ -3328,11 +3425,11 @@ function viewCompare(act) {
     + panel('Terceras mayores — desviación de pura <small style="color:#4b5563;font-size:10px;font-weight:400">— pulsa una barra</small>',
       (act.length>1?tempIdentityHtml(act):'')+`<canvas id="c-3rd" ${mob?'height="180"':'height="100"'}></canvas>`, 'width:100%');
   mkLine('c-off',NOTES,selected.map((t,i)=>!t?null:({...ds(t,i,t.offsets,{pointRadius:5,tension:0.3,fill:i===0})})).filter(Boolean),
-    'Desviación del ET (¢)',ctx=>`${ctx.dataset.label}: ${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢`,'offsets');
+    'Desviación del ET (¢)',ctx=>`${ctx.dataset.label}: ${ctx.parsed.y>=0?'+':''}${fmt(ctx.parsed.y,'cents')}¢`,'offsets');
   mkBar('c-fif',fl,selected.map((t,i)=>!t?null:dsFifth(t,i,getFifths(t.offsets).map(f=>f.dev))).filter(Boolean),
-    'Desv. de quinta pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢`,'fifths',true);
+    'Desv. de quinta pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${fmt(ctx.parsed.y,'cents')}¢`,'fifths',true);
   mkBar('c-3rd',NOTES,selected.map((t,i)=>!t?null:dsMaj3(t,i,getMaj3(t.offsets).map(x=>x.dev))).filter(Boolean),
-    'Desv. de 3ª mayor pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}¢`,'maj3',true);
+    'Desv. de 3ª mayor pura (¢)',ctx=>`${ctx.parsed.y>=0?'+':''}${fmt(ctx.parsed.y,'cents')}¢`,'maj3',true);
 }
 
 // ─── INTERVALOS (heatmap 12×12) ───
@@ -3369,8 +3466,8 @@ function viewIntervals(act) {
         const actual = semi * 100 + temp.offsets[end] - temp.offsets[start];
         const dev = actual - JUST_REF[semi];
         const sign = dev >= 0 ? '+' : '';
-        const title = `${NOTES[start]}→${NOTES[end]} (${INT_NAMES[semi]}): ${actual.toFixed(2)}¢  desv. ${sign}${dev.toFixed(2)}¢ de la justa`;
-        cells += `<td title="${title}" style="background:${devColor(dev)};text-align:center;padding:3px 4px;font-size:9px;cursor:pointer;border:1px solid rgba(0,0,0,0.25)" onpointerdown="playHeatCell(${ti},${start},${semi})">${sign}${dev.toFixed(2)}</td>`;
+        const title = `${NOTES[start]}→${NOTES[end]} (${INT_NAMES[semi]}): ${fmt(actual,'cents')}¢  desv. ${sign}${fmt(dev,'cents')}¢ de la justa`;
+        cells += `<td title="${title}" style="background:${devColor(dev)};text-align:center;padding:3px 4px;font-size:9px;cursor:pointer;border:1px solid rgba(0,0,0,0.25)" onpointerdown="playHeatCell(${ti},${start},${semi})">${sign}${defmt(v,'cents')}</td>`;
       }
       rows += `<tr>${cells}</tr>`;
     }
@@ -3428,14 +3525,14 @@ function viewBeats(act) {
         const actual = iv.semi * 100 + temp.offsets[end] - temp.offsets[start];
         const f2 = f1 * Math.pow(2, actual / 1200);
         const beat = Math.abs(iv.p * f1 - iv.q * f2);
-        const dispHz = beat < 0.05 ? '0' : beat < 10 ? beat.toFixed(2) : beat.toFixed(2);
-        const title = `${NOTES[start]}→${NOTES[end]} (${iv.name}): ${beat.toFixed(2)} Hz`;
+        const dispHz = beat < 0.05 ? '0' : beat < 10 ? fmt(beat,'beats') : fmt(beat,'beats');
+        const title = `${NOTES[start]}→${NOTES[end]} (${iv.name}): ${fmt(beat,'beats')} Hz`;
         cells += `<td title="${title}" style="background:${beatColor(beat)};text-align:center;padding:3px 5px;font-size:9px;cursor:pointer;border:1px solid rgba(0,0,0,0.25)" onpointerdown="playHeatCell(${ti},${start},${iv.semi})">${dispHz}</td>`;
       });
       rows += `<tr>${cells}</tr>`;
     }
     const tableHtml =
-      `<p style="font-size:10px;color:var(--muted);margin-bottom:8px">Hz de batido. 0 = intervalo justo puro. La = ${pitchA.toFixed(2)} Hz.</p>
+      `<p style="font-size:10px;color:var(--muted);margin-bottom:8px">Hz de batido. 0 = intervalo justo puro. La = ${fmt(pitchA,'hz')} Hz.</p>
       <div class="table-zoom-wrap" style="overflow:hidden;position:relative;height:260px;touch-action:none">
         <table style="border-collapse:collapse">
           <thead><tr><th style="padding:3px 6px;font-size:9px;color:var(--muted)"></th>${headerCols}</tr></thead>
@@ -3740,7 +3837,7 @@ function _drawHistogram(canvas, act) {
   for (let i = 0; i <= 4; i++) {
     const v = i / 4;
     const x = MX + v * PW;
-    ctx.fillText(v.toFixed(2), x, MY + PH + 28);
+    ctx.fillText(fmt(v,'cents'), x, MY + PH + 28);
   }
   ctx.fillStyle = '#6b7280'; ctx.font = `${fSz + 1}px monospace`;
   ctx.fillText('Consonancia teórica →', MX + PW / 2, MY + PH + 40);
@@ -3844,7 +3941,7 @@ function _drawConsonance(canvas, cursorCanvas, act) {
     ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1; ctx.setLineDash([]);
     ctx.beginPath(); ctx.moveTo(MX, y); ctx.lineTo(MX + PW, y); ctx.stroke();
     ctx.fillStyle = i === 4 ? '#4ade80' : '#475569';
-    ctx.fillText(v.toFixed(2), MX - 4, y + 3);
+    ctx.fillText(fmt(v,'cents'), MX - 4, y + 3);
   }
 
   // ── Líneas verticales just + etiquetas X ──
@@ -3999,7 +4096,7 @@ function _drawConsonance(canvas, cursorCanvas, act) {
           if (hz < 99) {
             cc.globalAlpha = 0.40 + pulse * 0.60;
             cc.fillStyle = color; cc.font = `${fSz}px monospace`; cc.textAlign = 'center';
-            cc.fillText(hz.toFixed(2) + ' Hz', toX(j.cents), toY(j.w) - 4);
+            cc.fillText(fmt(hz,'hz') + ' Hz', toX(j.cents), toY(j.w) - 4);
           }
         }
       }
@@ -4118,10 +4215,10 @@ function _drawConsonance(canvas, cursorCanvas, act) {
       for (const d of dots) { const dist = Math.hypot(d.x - mx, d.y - my); if (dist < minD) { minD = dist; nearPt = d; } }
       if (nearPt) {
         const s = nearPt.dev >= 0 ? '+' : '';
-        nfoEl.textContent = `${nearPt.fromNote}→${nearPt.toNote}  ${nearPt.cents.toFixed(2)}¢  [${nearPt.j.name}: ${s}${nearPt.dev.toFixed(2)}¢]`;
+        nfoEl.textContent = `${nearPt.fromNote}→${nearPt.toNote}  ${fmt(nearPt.cents,'cents')}¢  [${nearPt.j.name}: ${s}${nearPfmt(t.dev,'cents')}¢]`;
       } else {
         const { j, dev } = _nearestJust(cents);
-        nfoEl.textContent = `${cents.toFixed(2)}¢  —  ${j.name} justo=${j.cents.toFixed(2)}¢  (${dev >= 0 ? '+' : ''}${dev.toFixed(2)}¢)`;
+        nfoEl.textContent = `${fmt(cents,'cents')}¢  —  ${j.name} justo=${fmt(j.cents,'cents')}¢  (${dev >= 0 ? '+' : ''}${fmt(dev,'cents')}¢)`;
       }
     }
     if (_swOn('cons-audio-sw') && inPlot) {
@@ -4368,7 +4465,7 @@ function _drawLattice(canvas, act) {
     const { ni, px, py } = canvas._hoverNode;
     const freq = noteFreq(ni, t0.offsets, getEffectivePitchA(), octaveShift);
     const off  = t0.offsets[ni];
-    const txt  = `${NOTES[ni]}  ${freq.toFixed(2)} Hz  ${off >= 0 ? '+' : ''}${off.toFixed(2)}¢`;
+    const txt  = `${NOTES[ni]}  ${fmt(freq,'hz')} Hz  ${off >= 0 ? '+' : ''}${fmt(off,'cents')}¢`;
     const txW  = ctx.measureText(txt).width + 16;
     const txX  = Math.min(W - txW - 4, Math.max(4, px - txW / 2));
     const txY  = py - R - 28;
@@ -4611,7 +4708,7 @@ function _drawTriadsWheel(ctx, W, H, triads, t1, t2, act, canvas) {
   // ── Hover tooltip ──
   const hov = canvas._hoverTriad;
   if (hov && triads) {
-    const txt = `${NOTES[hov.root]}${hov.type==='M'?'':' m'}  3ª:${hov.dev3>=0?'+':''}${hov.dev3.toFixed(2)}¢  5ª:${hov.dev5>=0?'+':''}${hov.dev5.toFixed(2)}¢  Σ${hov.purity.toFixed(2)}¢`;
+    const txt = `${NOTES[hov.root]}${hov.type==='M'?'':' m'}  3ª:${hov.dev3>=0?'+':''}${hov.fmt(dev3,'cents')}¢  5ª:${hov.dev5>=0?'+':''}${hov.fmt(dev5,'cents')}¢  Σ${hov.fmt(purity,'cents')}¢`;
     const txW = ctx.measureText(txt).width + 16;
     const txX = Math.min(W - txW - 4, Math.max(4, hov.cx - txW / 2));
     const txY = Math.max(4, hov.cy - 28);
@@ -4696,7 +4793,7 @@ function _drawTriadsGrid(ctx, W, H, triads, t1, t2, act, canvas) {
   // ── Hover tooltip ──
   const hov = canvas._hoverTriad;
   if (hov) {
-    const txt = `${NOTES[hov.root]}${hov.type==='M'?'':' m'}  3ª:${hov.dev3>=0?'+':''}${hov.dev3.toFixed(2)}¢  5ª:${hov.dev5>=0?'+':''}${hov.dev5.toFixed(2)}¢  Σ${hov.purity.toFixed(2)}¢`;
+    const txt = `${NOTES[hov.root]}${hov.type==='M'?'':' m'}  3ª:${hov.dev3>=0?'+':''}${hov.fmt(dev3,'cents')}¢  5ª:${hov.dev5>=0?'+':''}${hov.fmt(dev5,'cents')}¢  Σ${hov.fmt(purity,'cents')}¢`;
     const txW = ctx.measureText(txt).width + 16;
     const txX = Math.min(W - txW - 4, Math.max(4, hov.x - 4));
     const txY = Math.max(4, hov.y - 24);
@@ -4875,7 +4972,7 @@ function _initTonnetz(canvas, nfoEl, temp, ti) {
     if (nd) {
       playNote(nd.n, temp.offsets);
       const off = temp.offsets[nd.n];
-      if (nfoEl) nfoEl.textContent = `${NOTES[nd.n]}  offset: ${off>=0?'+':''}${off.toFixed(2)}¢`;
+      if (nfoEl) nfoEl.textContent = `${NOTES[nd.n]}  offset: ${off>=0?'+':''}${fmt(off,'cents')}¢`;
       return;
     }
     const tr = tris.find(t => ptInTri(mx, my, t));
@@ -4883,7 +4980,7 @@ function _initTonnetz(canvas, nfoEl, temp, ti) {
       playFreqs(tr.ns.map(n => noteFreq(n, temp.offsets, getEffectivePitchA(), octaveShift)));
       const rn = NOTES[tr.root], type = tr.isMaj ? 'mayor' : 'menor';
       const dt = (tr.isMaj ? devM3 : devm3)(tr.root), df = devP5(tr.root);
-      const s = v => (v >= 0 ? '+' : '') + v.toFixed(2) + '¢';
+      const s = v => (v >= 0 ? '+' : '') + fmt(v,'cents') + '¢';
       if (nfoEl) nfoEl.textContent = `${rn} ${type}  ·  ${tr.isMaj ? '3ª M' : '3ª m'}: ${s(dt)}  ·  5ª: ${s(df)}`;
     }
   });
@@ -5113,7 +5210,7 @@ function _initScatter(canvas) {
     if(!already) savePrefs({selectedName:t.name});
     renderBadges(); refreshList(); draw();
     if(nfoEl) nfoEl.textContent = already ? 'pulsa un punto para seleccionarlo'
-      : `${t.name} [${t.source}]  ·  3ªM: ${np.x.toFixed(2)}¢  ·  5ª: ${np.y.toFixed(2)}¢`;
+      : `${t.name} [${t.source}]  ·  3ªM: ${fmt(np.x,'cents')}¢  ·  5ª: ${fmt(np.y,'cents')}¢`;
   }
 
   draw();
@@ -5263,7 +5360,7 @@ function viewKeyboard() {
       <!-- La + Temperamento en la misma fila -->
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:#4b5563;margin-bottom:10px">
         <span style="color:var(--muted)">La =</span>
-        <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${pitchA.toFixed(2)} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" onclick="PitchADlg.open()" title="Compensación térmica activa">🌡️</span>
+        <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${fmt(pitchA,'hz')} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" onclick="PitchADlg.open()" title="Compensación térmica activa">🌡️</span>
         <span style="color:var(--border)">·</span>
         Temperamento: <span style="color:var(--c0)">${tempName}</span>
         ${!selected.find(Boolean) ? '<span style="color:#f87171"> — selecciona uno en la lista</span>' : ''}
@@ -5365,7 +5462,7 @@ const TUNER = {
     const nEl = document.getElementById('tuner-big-note');
     const fEl = document.getElementById('tuner-target-hz');
     if (nEl) nEl.textContent = NOTES[this.targetNi] + this.targetOct;
-    if (fEl) fEl.textContent = this.getTargetFreq().toFixed(2) + ' Hz';
+    if (fEl) fEl.textContent = fmt(this.getTargetFreq(),'hz') + ' Hz';
   },
 
   shiftOct(d) {
@@ -5748,7 +5845,7 @@ const TUNER = {
     const nowMs = performance.now();
     if (!this._needleTextTs || nowMs - this._needleTextTs > 250) {
       this._needleTextTs = nowMs;
-      this._needleTextStr = has ? (raw >= 0 ? '+' : '') + raw.toFixed(2) + '¢' : '—';
+      this._needleTextStr = has ? (raw >= 0 ? '+' : '') + fmt(raw,'cents') + '¢' : '—';
     }
     ctx.fillStyle = col;
     ctx.font = `${Math.round(Math.min(H * 0.065, R * 0.13))}px monospace`;
@@ -5843,9 +5940,9 @@ const TUNER = {
         const dispNi  = has ? this.targetNi  : this._lastNi;
         const dispOct = has ? this.targetOct : this._lastOct;
         const noteCol = has ? col : 'rgba(180,180,180,0.35)';
-        const centsStr = has && c !== null ? (c >= 0 ? '+' : '') + c.toFixed(2) + '¢' : '';
-        const freqStr  = has ? this.detectedFreq.toFixed(2) + ' Hz'
-                              : this._lastFreq.toFixed(2) + ' Hz';
+        const centsStr = has && c !== null ? (c >= 0 ? '+' : '') + fmt(c,'cents') + '¢' : '';
+        const freqStr  = has ? fmt(this.detectedFreq,'hz') + ' Hz'
+                              : fmt(this._lastFreq,'hz') + ' Hz';
         ov.innerHTML = `
           <span style="font-size:clamp(80px,22vw,180px);font-weight:bold;color:${noteCol};text-shadow:0 0 16px rgba(0,0,0,0.95),0 0 4px rgba(0,0,0,1);line-height:1">${NOTES[dispNi] + dispOct}</span>
           ${centsStr ? `<span style="font-size:clamp(32px,8vw,64px);color:${col};margin-top:6px;background:rgba(0,0,0,0.45);border-radius:6px;padding:2px 10px;backdrop-filter:blur(2px)">${centsStr}</span>` : ''}
@@ -5869,9 +5966,9 @@ const TUNER = {
       needle.style.background = !has ? '#374151' : absCents < 2 ? '#4ade80' : absCents < 10 ? '#fbbf24' : '#f87171';
     }
     const cEl = document.getElementById('det-cents');
-    if (cEl) { cEl.textContent = has && c !== null ? (c >= 0 ? '+' : '') + c.toFixed(2) + '¢' : '—'; cEl.style.color = col; }
+    if (cEl) { cEl.textContent = has && c !== null ? (c >= 0 ? '+' : '') + fmt(c,'cents') + '¢' : '—'; cEl.style.color = col; }
     const fEl = document.getElementById('det-freq');
-    if (fEl) fEl.textContent = has ? this.detectedFreq.toFixed(2) + ' Hz' : '—';
+    if (fEl) fEl.textContent = has ? fmt(this.detectedFreq,'hz') + ' Hz' : '—';
     const nEl = document.getElementById('det-note-auto');
     if (nEl) nEl.textContent = has ? NOTES[this.targetNi] + this.targetOct : '—';
   },
@@ -6005,7 +6102,7 @@ function buildTunerScreen() {
         <div style="border-top:1px solid #334155;padding-top:8px;margin-top:2px">
           <div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="closeTunerMenu();PitchADlg.open()">
             <span style="font-size:10px;color:#64748b">La =</span>
-            <span class="pitchA-label" style="color:#93c5fd;font-size:13px;border-bottom:1px dashed #93c5fd;padding:2px 4px">${pitchA.toFixed(2)} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" title="Compensación térmica activa">🌡️</span>
+            <span class="pitchA-label" style="color:#93c5fd;font-size:13px;border-bottom:1px dashed #93c5fd;padding:2px 4px">${fmt(pitchA,'hz')} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" title="Compensación térmica activa">🌡️</span>
           </div>
         </div>
         ${!window.matchMedia('(display-mode: standalone)').matches ? `<div style="border-top:1px solid #334155;padding-top:8px;margin-top:2px">
@@ -6134,7 +6231,7 @@ const DT = {
     this.notes[9] = 0;  // forzar 0 exacto (evitar residuo por redondeo)
     this._renderKeyboard();
     this._updatePitchRow();
-    this._updateStatus(`✓ Normalizado — La: ${pitchA.toFixed(2)} Hz`);
+    this._updateStatus(`✓ Normalizado — La: ${fmt(pitchA,'hz')} Hz`);
   },
 
   _updatePitchRow() {
@@ -6143,7 +6240,7 @@ const DT = {
     const canNorm = this.notes[9] !== null && this.notes[9] !== 0;
     el.innerHTML =
       `<span style="font-size:11px;color:var(--muted)">La ref:</span>
-       <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${pitchA.toFixed(2)} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" onclick="PitchADlg.open()" title="Compensación térmica activa">🌡️</span>`
+       <span class="pitchA-label" onclick="PitchADlg.open()" style="cursor:pointer;color:var(--accent);border-bottom:1px dashed var(--accent);font-size:11px;padding:2px 4px">${fmt(pitchA,'hz')} Hz</span><span class="temp-indicator ${tempCompEnabled ? 'active' : ''}" onclick="PitchADlg.open()" title="Compensación térmica activa">🌡️</span>`
       + (canNorm ? `<button class="icon-btn" onclick="DT.normalize()" style="font-size:10px;margin-left:4px;color:#fcd34d;border-color:#b45309">Normalizar A→0</button>` : '');
   },
 
@@ -6245,7 +6342,7 @@ const DT = {
     }
     const prog = Math.min(1, this._stableCount / this.STABLE_FRAMES);
     const sign  = this._stableCents >= 0 ? '+' : '';
-    this._updateStatus(`${NOTES_NAMES[measureNi]}  ${sign}${this._stableCents.toFixed(2)}¢`, prog);
+    this._updateStatus(`${NOTES_NAMES[measureNi]}  ${sign}${fmt(this._stableCents,'cents')}¢`, prog);
     this._renderKeyboard();
 
     if (this._stableCount >= this.STABLE_FRAMES) {
@@ -6261,7 +6358,7 @@ const DT = {
         const oldPitchA = pitchA;
         setPitchAGlobal(this._stableFreq);
         this.notes[9] = 0;
-        this._updateStatus(`✓ La: ${oldPitchA.toFixed(2)} → ${pitchA.toFixed(2)} Hz`);
+        this._updateStatus(`✓ La: ${fmt(oldPitchA,'hz')} → ${fmt(pitchA,'hz')} Hz`);
         this._statusLock = Date.now() + 3000;
         this._updatePitchRow();
       }
@@ -6340,7 +6437,7 @@ const DT = {
       const prog       = detecting ? Math.min(1, this._stableCount / this.STABLE_FRAMES)
                        : (measured ? 1 : 0);
       const val        = measured ? this.notes[ni] : (detecting ? this._stableCents : null);
-      const valStr     = val !== null ? (val >= 0 ? '+' : '') + val.toFixed(2) + '¢' : '';
+      const valStr     = val !== null ? (val >= 0 ? '+' : '') + fmt(val,'cents') + '¢' : '';
 
       const fillColor  = measured ? 'rgba(74,222,128,0.45)' : 'rgba(96,165,250,0.40)';
       let bg, border, labelColor, valColor;
@@ -6547,7 +6644,7 @@ const DT = {
             <div style="width:${barW}%;height:100%;background:${col};border-radius:2px;transition:width 0.3s"></div>
           </div>
         </div>
-        <div style="font-size:11px;color:${col};flex-shrink:0;min-width:38px;text-align:right;font-variant-numeric:tabular-nums">~${dist.toFixed(2)}¢</div>
+        <div style="font-size:11px;color:${col};flex-shrink:0;min-width:38px;text-align:right;font-variant-numeric:tabular-nums">~${fmt(dist,'cents')}¢</div>
         <div style="font-size:9px;color:#4b5563;flex-shrink:0;max-width:54px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.source}</div>
       </div>`;
     }).join('');
