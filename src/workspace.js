@@ -77,6 +77,20 @@ const WS = {
     }
   },
 
+  // Persiste la posición libre (x,y) de una tarjeta SIN re-renderizar
+  saveCardPos(cardId, x, y) {
+    const ws = this.current();
+    for (const tab of ws.tabs) {
+      const card = tab.cards.find(c => c.id === cardId);
+      if (card) {
+        card.x = Math.round(x);
+        card.y = Math.round(y);
+        localStorage.setItem(WS_KEY, JSON.stringify(ws));
+        return;
+      }
+    }
+  },
+
   // Crea workspace por defecto si no existe todavía, o si contiene tipos obsoletos
   migrateFromLegacy(activeTabName) {
     const raw = localStorage.getItem(WS_KEY);

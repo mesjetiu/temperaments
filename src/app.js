@@ -611,13 +611,14 @@ const PitchADlg = {
           </div>
 
           <!-- Actualización continua desde sensor -->
-          <div id="pitchA-continuous-row" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;${(typeof RuuviScanner !== 'undefined' && RuuviScanner.streaming) ? '' : 'opacity:0.4;pointer-events:none'}">
+          <div id="pitchA-continuous-row" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;opacity:0.4;pointer-events:none">
             <div>
               <div style="font-size:11px;color:#9ca3af">Actualización continua</div>
               <div style="font-size:10px;color:#64748b">Sensor actualiza temp. en tiempo real</div>
             </div>
             <input type="checkbox" id="pitchA-continuous"
               onchange="PitchADlg.onContinuousChange()"
+              onclick="PitchADlg.onContinuousChange()"
               ${(_prefs.ruuviContinuous ?? false) ? 'checked' : ''}
               style="cursor:pointer;width:18px;height:18px">
           </div>
@@ -2351,7 +2352,7 @@ function panel(title, bodyHtml, style = '') {
     return `<div class="panel" style="${style}">${closeBtn}<div class="panel-h3-row"><h3>${title}</h3>${zoomBtn}</div>${bodyHtml}</div>`;
   }
   return `<div class="panel" style="width:100%;box-sizing:border-box">${closeBtn}
-    <div class="panel-hdr" onclick="togglePanelCollapse(this.closest('.panel'))">
+    <div class="panel-hdr">
       <h3>${title}</h3><span style="display:flex;gap:6px;align-items:center">${zoomBtn}<span class="panel-chevron">▼</span></span>
     </div>
     <div class="panel-body">${bodyHtml}</div>
@@ -2373,14 +2374,25 @@ function renderContent() {
   const act = selected.filter(Boolean);
   const ws  = WS.current();
   const tab = ws.tabs.find(t => t.id === ws.activeTabId);
-  const el  = document.getElementById('content');
+  // En modo libre usamos #canvas (lienzo scrollable); en móvil usamos #content directamente
+  const freeLayout = !isMobile();
+  const el  = freeLayout
+    ? document.getElementById('canvas')
+    : document.getElementById('canvas') || document.getElementById('content');
 
   if (!tab || !tab.cards.length) {
     el.innerHTML = '<div class="empty-state">Añade una tarjeta con el botón de abajo.</div>';
+    // Reset canvas size
+    if (freeLayout) { el.style.width = ''; el.style.height = ''; }
     return;
   }
 
   el.innerHTML = '';
+
+  // Auto-layout: calcular posiciones para tarjetas sin x/y
+  let autoX = 0, autoY = 0, autoRowH = 0;
+  const contentW = el.clientWidth || 600;
+  const defaultCardW = Math.min(420, contentW - 24);
 
   for (const card of tab.cards) {
     const desc = CARD_REGISTRY[card.type];
@@ -2388,25 +2400,39 @@ function renderContent() {
 
     const wrap = document.createElement('div');
     wrap.dataset.cardId = card.id;
-    wrap.style.cssText = 'display:contents';
+
+    if (freeLayout) {
+      // Pizarra libre: posición absoluta
+      const x = card.x ?? autoX;
+      const y = card.y ?? autoY;
+      const w = card.w ?? defaultCardW;
+      wrap.style.cssText = `position:absolute;left:${x}px;top:${y}px;z-index:1;`;
+      // Calcular siguiente posición automática en cascada
+      if (card.x == null || card.y == null) {
+        autoX += 30;
+        autoY += 40;
+        if (autoX + defaultCardW > contentW) { autoX = 0; autoY += 20; }
+      }
+    } else {
+      wrap.style.cssText = '';
+    }
+
     el.appendChild(wrap);
 
     if (desc.needsSelection && !act.length) {
-      // Panel vacío con toolbar para poder cerrarlo sin seleccionar temperatura
       const toolbar = WS.makeCardToolbar(card);
       const hdrHtml = isMobile()
         ? `<div class="panel-hdr" style="cursor:default"></div>`
         : `<div class="panel-h3-row"><h3>${desc.label}</h3></div>`;
-      wrap.innerHTML = `<div class="panel" style="width:100%;box-sizing:border-box">${hdrHtml}<div class="empty-state" style="padding:12px 0">Selecciona un temperamento de la lista para empezar.</div></div>`;
+      wrap.innerHTML = `<div class="panel" style="${freeLayout ? 'box-sizing:border-box' : 'width:100%;box-sizing:border-box'}">${hdrHtml}<div class="empty-state" style="padding:12px 0">Selecciona un temperamento de la lista para empezar.</div></div>`;
       const hdrRow = wrap.querySelector('.panel-h3-row');
       const hdrMob = wrap.querySelector('.panel-hdr');
       if (hdrRow) hdrRow.insertBefore(toolbar, hdrRow.querySelector('.panel-zoom-btn') || null);
       else if (hdrMob) hdrMob.appendChild(toolbar);
     } else {
       _PANEL_FN[card.type]?.(act, wrap);
-      // Inyectar toolbar en el header del panel
-      const hdrRow = wrap.querySelector('.panel-h3-row'); // desktop
-      const hdrMob = wrap.querySelector('.panel-hdr');    // móvil
+      const hdrRow = wrap.querySelector('.panel-h3-row');
+      const hdrMob = wrap.querySelector('.panel-hdr');
       if (hdrRow) {
         const zoomBtn = hdrRow.querySelector('.panel-zoom-btn');
         hdrRow.insertBefore(WS.makeCardToolbar(card), zoomBtn || null);
@@ -2415,43 +2441,151 @@ function renderContent() {
       }
     }
 
-    // Restaurar tamaño guardado (solo desktop; en móvil el ancho es siempre 100%)
-    if (!isMobile()) {
-      const panelEl = wrap.querySelector('.panel');
-      if (panelEl) {
-        if (card.w) { panelEl.style.width = card.w + 'px'; panelEl.style.flex = 'none'; }
+    // Restaurar tamaño guardado
+    const panelEl = wrap.querySelector('.panel');
+    if (panelEl) {
+      if (freeLayout) {
+        if (card.w) panelEl.style.width  = card.w + 'px';
+        if (card.h) panelEl.style.height = card.h + 'px';
+      } else {
         if (card.h) panelEl.style.height = card.h + 'px';
       }
-    } else if (card.h) {
-      const panelEl = wrap.querySelector('.panel');
-      if (panelEl) panelEl.style.height = card.h + 'px';
     }
   }
 
-  _bindCardDrag(el);
+  if (freeLayout) {
+    _bindCardDragFree(el);
+    _updateContentBounds(el);
+  }
   _bindCardResize(el);
-  // Inicializar todos los paneles móviles en estado bloqueado
   el.querySelectorAll('.panel').forEach(p => {
     p.classList.add('panel-resize-locked');
   });
 }
 
-// ── Drag & drop para reordenar tarjetas ──────────────────────────────────────
-function _bindCardDrag(container) {
-  // Evitar listeners duplicados al re-renderizar
-  if (container._dragHandler) container.removeEventListener('pointerdown', container._dragHandler);
+// Expande el canvas para que los scrollbars de #content cubran todas las tarjetas
+function _updateContentBounds(container) {
+  let maxRight = 0, maxBottom = 0;
+  container.querySelectorAll('[data-card-id]').forEach(wrap => {
+    const panel = wrap.querySelector('.panel');
+    const x = parseInt(wrap.style.left) || 0;
+    const y = parseInt(wrap.style.top)  || 0;
+    const w = panel?.offsetWidth  || 300;
+    const h = panel?.offsetHeight || 200;
+    if (x + w > maxRight)  maxRight  = x + w;
+    if (y + h > maxBottom) maxBottom = y + h;
+  });
+  // El canvas crece explícitamente; el #content (overflow:auto) ya hace scroll sobre él
+  const pad = 40;
+  container.style.width  = (maxRight  + pad) + 'px';
+  container.style.height = (maxBottom + pad) + 'px';
+}
 
+// ── Drag libre (pizarra) para tablet/desktop ─────────────────────────────────
+function _bindCardDragFree(container) {
+  // Z-index máximo para traer al frente la tarjeta tocada
+  let maxZ = 10;
+
+  container.querySelectorAll('[data-card-id]').forEach(wrap => {
+    const hdr = wrap.querySelector('.panel-h3-row, .panel-hdr');
+    if (!hdr) return;
+
+    if (hdr._dragFreeDown) hdr.removeEventListener('pointerdown', hdr._dragFreeDown);
+
+    hdr._dragFreeDown = e => {
+      if (e.target.closest('.card-toolbar, .panel-zoom-btn, .panel-fs-close, .panel-resize-e, .panel-resize-s, .panel-resize-se')) return;
+      e.preventDefault();
+
+      // Traer al frente
+      wrap.style.zIndex = ++maxZ;
+
+      // Posición del puntero al inicio y posición de la tarjeta al inicio
+      const startPtrX = e.clientX, startPtrY = e.clientY;
+      let   curLeft   = parseInt(wrap.style.left) || 0;
+      let   curTop    = parseInt(wrap.style.top)  || 0;
+      // Último puntero conocido (para auto-scroll continuo)
+      let   lastPtrX  = startPtrX, lastPtrY = startPtrY;
+      let moved = false;
+      const threshold = e.pointerType === 'touch' ? 8 : 4;
+
+      hdr.setPointerCapture(e.pointerId);
+
+      // Auto-scroll del contenedor al acercarse al borde durante el drag
+      const SCROLL_ZONE = 60, SCROLL_SPEED = 12;
+      let scrollRaf = null;
+      function stopAutoScroll() { if (scrollRaf) { cancelAnimationFrame(scrollRaf); scrollRaf = null; } }
+      function autoScroll() {
+        const cr = container.getBoundingClientRect();
+        let sx = 0, sy = 0;
+        if (lastPtrX > cr.right  - SCROLL_ZONE) sx =  SCROLL_SPEED;
+        if (lastPtrX < cr.left   + SCROLL_ZONE) sx = -SCROLL_SPEED;
+        if (lastPtrY > cr.bottom - SCROLL_ZONE) sy =  SCROLL_SPEED;
+        if (lastPtrY < cr.top    + SCROLL_ZONE) sy = -SCROLL_SPEED;
+        if (sx || sy) {
+          container.scrollLeft += sx;
+          container.scrollTop  += sy;
+          // Mover la tarjeta con el scroll para que permanezca bajo el dedo
+          curLeft += sx; curTop += sy;
+          wrap.style.left = curLeft + 'px';
+          wrap.style.top  = curTop  + 'px';
+          scrollRaf = requestAnimationFrame(autoScroll);
+        } else {
+          stopAutoScroll();
+        }
+      }
+
+      // Posición del puntero al inicio del drag (incluye scroll actual)
+      const startScrollL = container.scrollLeft;
+      const startScrollT = container.scrollTop;
+      const startLeft = curLeft, startTop = curTop;
+
+      function onMove(ev) {
+        lastPtrX = ev.clientX; lastPtrY = ev.clientY;
+        if (!moved && Math.hypot(ev.clientX - startPtrX, ev.clientY - startPtrY) < threshold) return;
+        moved = true;
+        // dx/dy = desplazamiento del puntero + cambio de scroll (para que el scroll no saque la tarjeta)
+        const dx = (ev.clientX - startPtrX) + (container.scrollLeft - startScrollL);
+        const dy = (ev.clientY - startPtrY) + (container.scrollTop  - startScrollT);
+        curLeft = startLeft + dx;
+        curTop  = startTop  + dy;
+        wrap.style.left = curLeft + 'px';
+        wrap.style.top  = curTop  + 'px';
+        stopAutoScroll();
+        autoScroll();
+      }
+
+      function onUp() {
+        stopAutoScroll();
+        hdr.removeEventListener('pointermove', onMove);
+        hdr.removeEventListener('pointerup',   onUp);
+        hdr.removeEventListener('pointercancel', onUp);
+        if (moved) {
+          const cardId = wrap.dataset.cardId;
+          WS.saveCardPos(cardId, parseInt(wrap.style.left), parseInt(wrap.style.top));
+          _updateContentBounds(container);
+        } else {
+          // Tap sin mover — toggle collapse
+          const panel = wrap.querySelector('.panel');
+          if (panel) togglePanelCollapse(panel);
+        }
+      }
+
+      hdr.addEventListener('pointermove', onMove);
+      hdr.addEventListener('pointerup',   onUp);
+      hdr.addEventListener('pointercancel', onUp);
+    };
+
+    hdr.addEventListener('pointerdown', hdr._dragFreeDown);
+  });
+}
+
+// ── Drag & drop para reordenar tarjetas (mobile: columna) ────────────────────
+function _bindCardDrag(container) {
   let dragSrcWrap = null;
   let ghost = null;
   let ghostOffX = 0, ghostOffY = 0;
   const placeholder = document.createElement('div');
   placeholder.className = 'card-drag-placeholder';
-
-  function getWrap(el) {
-    const panel = el.closest('.panel');
-    if (!panel) return null;
-    return panel.closest('[data-card-id]');
-  }
 
   function getPanelOf(wrap) {
     return wrap?.querySelector('.panel') || null;
@@ -2460,103 +2594,121 @@ function _bindCardDrag(container) {
   function getDropTarget(clientX, clientY) {
     const wraps = [...container.querySelectorAll('[data-card-id]')]
       .filter(w => w !== dragSrcWrap);
+
+    // Encontrar la tarjeta cuyo centro esté más cerca del puntero
+    let closest = null, closestDist = Infinity;
     for (const w of wraps) {
       const panel = getPanelOf(w);
       if (!panel) continue;
       const rect = panel.getBoundingClientRect();
-      // Usar mitad horizontal para decidir en layouts flex-wrap
-      if (clientY < rect.top + rect.height / 2) return { before: w };
+      const midX = rect.left + rect.width  / 2;
+      const midY = rect.top  + rect.height / 2;
+      const dist = Math.hypot(clientX - midX, clientY - midY);
+      if (dist < closestDist) { closestDist = dist; closest = { w, rect }; }
     }
-    return { before: null };
+    if (!closest) return { before: null };
+
+    const { w, rect } = closest;
+    const midX = rect.left + rect.width  / 2;
+    const midY = rect.top  + rect.height / 2;
+
+    // Misma fila (puntero dentro de la banda vertical de la tarjeta): decidir por X
+    // Filas distintas: decidir por Y
+    const sameRow = clientY >= rect.top && clientY <= rect.bottom;
+    const before  = sameRow ? clientX < midX : clientY < midY;
+
+    return before ? { before: w } : { before: w.nextElementSibling ?? null };
   }
 
-  const handler = e => {
-    const hdr = e.target.closest('.panel-h3-row, .panel-hdr');
-    if (!hdr) return;
-    if (e.target.closest('.card-toolbar, .panel-zoom-btn, .panel-fs-close, .panel-resize-e, .panel-resize-s, .panel-resize-se')) return;
+  function bindHdr(hdr, wrap) {
+    // Limpiar listener previo si lo hay
+    if (hdr._dragDown) hdr.removeEventListener('pointerdown', hdr._dragDown);
 
-    const wrap = getWrap(hdr);
-    if (!wrap) return;
-    const panel = getPanelOf(wrap);
-    if (!panel) return;
+    hdr._dragDown = e => {
+      if (e.target.closest('.card-toolbar, .panel-zoom-btn, .panel-fs-close, .panel-resize-e, .panel-resize-s, .panel-resize-se')) return;
 
-    dragSrcWrap = wrap;
-    let dragging = false;
-    const startX = e.clientX, startY = e.clientY;
-    const isTouch = e.pointerType === 'touch';
-    const dragThreshold = isTouch ? 12 : 6;
+      const panel = getPanelOf(wrap);
+      if (!panel) return;
 
-    hdr.setPointerCapture(e.pointerId);
-    // No preventDefault aquí — dejar que el click de collapse funcione si no hay drag
+      // Prevenir scroll del contenedor desde el primer toque — crítico en Android
+      e.preventDefault();
+      dragSrcWrap = wrap;
+      let dragging = false;
+      const startX = e.clientX, startY = e.clientY;
+      const dragThreshold = e.pointerType === 'touch' ? 8 : 5;
 
-    function startDrag(ev) {
-      dragging = true;
-      ev.preventDefault(); // ahora sí, cancelar scroll y click pendiente
-      const rect = panel.getBoundingClientRect();
-      ghostOffX = ev.clientX - rect.left;
-      ghostOffY = ev.clientY - rect.top;
+      hdr.setPointerCapture(e.pointerId);
 
-      // Placeholder: hueco del mismo tamaño
-      placeholder.style.width  = rect.width  + 'px';
-      placeholder.style.height = rect.height + 'px';
+      function startDrag(ev) {
+        dragging = true;
+        const rect = panel.getBoundingClientRect();
+        ghostOffX = ev.clientX - rect.left;
+        ghostOffY = ev.clientY - rect.top;
 
-      // Ghost: clon visual que sigue el puntero
-      ghost = panel.cloneNode(true);
-      ghost.className = 'card-ghost';
-      ghost.style.width  = rect.width  + 'px';
-      ghost.style.height = rect.height + 'px';
-      ghost.style.left   = (ev.clientX - ghostOffX) + 'px';
-      ghost.style.top    = (ev.clientY - ghostOffY)  + 'px';
-      document.body.appendChild(ghost);
+        placeholder.style.width  = rect.width  + 'px';
+        placeholder.style.height = rect.height + 'px';
 
-      // Ocultar la tarjeta original
-      panel.classList.add('card-dragging');
-    }
+        ghost = panel.cloneNode(true);
+        ghost.className = 'card-ghost';
+        ghost.style.width  = rect.width  + 'px';
+        ghost.style.height = rect.height + 'px';
+        ghost.style.left   = (ev.clientX - ghostOffX) + 'px';
+        ghost.style.top    = (ev.clientY - ghostOffY)  + 'px';
+        document.body.appendChild(ghost);
 
-    function onMove(ev) {
-      if (!dragging) {
-        if (Math.abs(ev.clientY - startY) < dragThreshold && Math.abs(ev.clientX - startX) < dragThreshold) return;
-        startDrag(ev);
+        panel.classList.add('card-dragging');
       }
-      // Mover ghost con el puntero
-      ghost.style.left = (ev.clientX - ghostOffX) + 'px';
-      ghost.style.top  = (ev.clientY - ghostOffY)  + 'px';
 
-      // Mover placeholder al destino
-      const { before } = getDropTarget(ev.clientX, ev.clientY);
-      if (before) container.insertBefore(placeholder, before);
-      else container.appendChild(placeholder);
-    }
+      function onMove(ev) {
+        if (!dragging) {
+          if (Math.abs(ev.clientY - startY) < dragThreshold && Math.abs(ev.clientX - startX) < dragThreshold) return;
+          startDrag(ev);
+        }
+        ghost.style.left = (ev.clientX - ghostOffX) + 'px';
+        ghost.style.top  = (ev.clientY - ghostOffY)  + 'px';
 
-    function onUp() {
-      hdr.removeEventListener('pointermove', onMove);
-      hdr.removeEventListener('pointerup',   onUp);
-      hdr.removeEventListener('pointercancel', onUp);
-      if (!dragging) return;
+        const { before } = getDropTarget(ev.clientX, ev.clientY);
+        if (before) container.insertBefore(placeholder, before);
+        else container.appendChild(placeholder);
+      }
 
-      panel.classList.remove('card-dragging');
-      ghost?.remove();
-      ghost = null;
+      function onUp() {
+        hdr.removeEventListener('pointermove', onMove);
+        hdr.removeEventListener('pointerup',   onUp);
+        hdr.removeEventListener('pointercancel', onUp);
+        if (!dragging) {
+          // Fue un tap, no drag — disparar collapse manualmente
+          togglePanelCollapse(panel);
+          return;
+        }
 
-      // Bloquar el click sintético de touch que dispararía togglePanelCollapse
-      const absorbClick = ev => { ev.stopPropagation(); ev.preventDefault(); };
-      hdr.addEventListener('click', absorbClick, { once: true, capture: true });
+        panel.classList.remove('card-dragging');
+        ghost?.remove();
+        ghost = null;
 
-      // Mover wrap al lugar del placeholder y persistir
-      if (placeholder.parentNode) container.insertBefore(dragSrcWrap, placeholder);
-      placeholder.remove();
+        if (placeholder.parentNode) container.insertBefore(dragSrcWrap, placeholder);
+        placeholder.remove();
 
-      const wraps = [...container.querySelectorAll('[data-card-id]')];
-      WS.reorderCards(wraps.map(w => w.dataset.cardId));
-    }
+        const wraps = [...container.querySelectorAll('[data-card-id]')];
+        WS.reorderCards(wraps.map(w => w.dataset.cardId));
+      }
 
-    hdr.addEventListener('pointermove', onMove);
-    hdr.addEventListener('pointerup',   onUp);
-    hdr.addEventListener('pointercancel', onUp);
+      hdr.addEventListener('pointermove', onMove);
+      hdr.addEventListener('pointerup',   onUp);
+      hdr.addEventListener('pointercancel', onUp);
+    };
+
+    hdr.addEventListener('pointerdown', hdr._dragDown);
+  }
+
+  // Enlazar cada header individualmente (no delegación al container)
+  container._bindDragHeaders = () => {
+    container.querySelectorAll('[data-card-id]').forEach(wrap => {
+      const hdr = wrap.querySelector('.panel-h3-row, .panel-hdr');
+      if (hdr) bindHdr(hdr, wrap);
+    });
   };
-
-  container._dragHandler = handler;
-  container.addEventListener('pointerdown', handler);
+  container._bindDragHeaders();
 }
 
 // ── Resize de tarjetas ───────────────────────────────────────────────────────
