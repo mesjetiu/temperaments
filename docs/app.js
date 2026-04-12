@@ -1,4 +1,4 @@
-const APP_VERSION = '90284a8 · 2026-04-12';
+const APP_VERSION = '629847a · 2026-04-12';
 
 // ── Update toast ──
 let _pendingUpdateSW = null;
@@ -3262,8 +3262,8 @@ function _panel_hero(act, el) {
          onblur="saveTempNotes('${t.name.replace(/'/g,"\\'")}', this.value)">${getTempNotes(t.name)}</textarea>
      </div>
      <div style="display:flex;gap:8px;flex-wrap:wrap">
-       ${statCard('Quinta más pura',   bf.from+'→'+bf.to, bfmt(f.size,'cents')+'¢ ('+f(bf.dev)+')', cc(bf.dev))}
-       ${statCard('Quinta más impura', wf.from+'→'+wf.to, wfmt(f.size,'cents')+'¢ ('+f(wf.dev)+')', cc(wf.dev))}
+       ${statCard('Quinta más pura',   bf.from+'→'+bf.to, fmt(bf.size,'cents')+'¢ ('+f(bf.dev)+')', cc(bf.dev))}
+       ${statCard('Quinta más impura', wf.from+'→'+wf.to, fmt(wf.size,'cents')+'¢ ('+f(wf.dev)+')', cc(wf.dev))}
        ${statCard('3ª mayor más pura',   bm.from+'→'+bm.to, fmt(bm.size,'cents')+'¢ ('+f(bm.dev)+')', '#4ade80')}
        ${statCard('3ª mayor más impura', wm.from+'→'+wm.to, fmt(wm.size,'cents')+'¢ ('+f(wm.dev)+')', '#f87171')}
      </div>`;
@@ -3345,8 +3345,8 @@ function viewOverview(act) {
       </div>`
       // ── STAT CARDS ──
       + `<div style="width:100%;display:flex;gap:8px;flex-wrap:wrap">
-          ${statCard('Quinta más pura', bf.from+'→'+bf.to, bfmt(f.size,'cents')+'¢ ('+f(bf.dev)+')', cc(bf.dev))}
-          ${statCard('Quinta más impura', wf.from+'→'+wf.to, wfmt(f.size,'cents')+'¢ ('+f(wf.dev)+')', cc(wf.dev))}
+          ${statCard('Quinta más pura', bf.from+'→'+bf.to, fmt(bf.size,'cents')+'¢ ('+f(bf.dev)+')', cc(bf.dev))}
+          ${statCard('Quinta más impura', wf.from+'→'+wf.to, fmt(wf.size,'cents')+'¢ ('+f(wf.dev)+')', cc(wf.dev))}
           ${statCard('3ª mayor más pura', bm.from+'→'+bm.to, fmt(bm.size,'cents')+'¢ ('+f(bm.dev)+')', '#4ade80')}
           ${statCard('3ª mayor más impura', wm.from+'→'+wm.to, fmt(wm.size,'cents')+'¢ ('+f(wm.dev)+')', '#f87171')}
         </div>`
