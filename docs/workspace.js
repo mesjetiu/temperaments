@@ -436,7 +436,7 @@ const WS = {
 
   _resetDefault() {
     if (!confirm('¿Restablecer el workspace por defecto? Se perderá la configuración actual.')) return;
-    localStorage.removeItem(WS_KEY);
+    localStorage.setItem(WS_KEY, JSON.stringify(JSON.parse(JSON.stringify(DEFAULT_WORKSPACE))));
     this.renderTabBar();
     if (typeof renderContent === 'function') renderContent();
   },
