@@ -133,35 +133,6 @@
     #audio-bar .ab-sep { display: none; }
   }
 
-  /* ── Móvil landscape: barra de nav como rail vertical izquierdo ── */
-  @media (max-width: 767px) and (orientation: landscape) {
-    #app { flex-direction: row !important; }
-    #main { flex-direction: column; }
-    #mob-nav {
-      position: relative !important;
-      bottom: auto !important; left: auto !important; right: auto !important;
-      flex-direction: column !important;
-      width: var(--mob-nav-h, 56px) !important;
-      height: 100% !important;
-      border-top: none !important;
-      border-right: 1px solid #334155 !important;
-      padding-bottom: env(safe-area-inset-bottom, 0px) !important;
-      padding-left: env(safe-area-inset-left, 0px) !important;
-      overflow-y: auto;
-    }
-    .mob-nav-btn { flex: none !important; padding: 12px 0 !important; }
-    #content {
-      padding-bottom: 12px !important;
-      padding-left: 12px !important;
-    }
-    #mob-header { padding-left: 10px !important; }
-    #tuner-screen, #medidor-screen {
-      left: var(--mob-nav-h, 56px) !important;
-      height: 100% !important;
-      top: 0 !important;
-    }
-  }
-
   /* ═══ MOB HEADER ═══ */
   #mob-header { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); padding: 6px 10px; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
   #hamburger { background: none; border: none; color: var(--accent); cursor: pointer; padding: 4px; flex-shrink: 0; display: flex; align-items: center; }
@@ -518,6 +489,36 @@
     #tuner-screen { top: env(safe-area-inset-top, 0px) !important; height: calc(100% - env(safe-area-inset-top, 0px) - var(--mob-nav-h, 56px) - env(safe-area-inset-bottom, 0px)) !important; }
     #medidor-screen { top: env(safe-area-inset-top, 0px) !important; height: calc(100% - env(safe-area-inset-top, 0px) - var(--mob-nav-h, 56px) - env(safe-area-inset-bottom, 0px)) !important; }
     #tuner-big-note { font-size: 36px; }
+  }
+
+  /* ── Móvil landscape: barra de nav como rail vertical izquierdo ── */
+  /* Debe ir al final para sobreescribir los bloques portrait anteriores */
+  @media (max-width: 767px) and (orientation: landscape) {
+    #app { flex-direction: row !important; }
+    #mob-nav {
+      position: relative !important;
+      bottom: auto !important; left: auto !important; right: auto !important;
+      top: auto !important;
+      flex-direction: column !important;
+      width: 56px !important;
+      height: 100% !important;
+      border-top: none !important;
+      border-right: 1px solid #334155 !important;
+      padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+      padding-left: env(safe-area-inset-left, 0px) !important;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+    .mob-nav-btn { flex: none !important; padding: 12px 0 !important; }
+    #content {
+      padding-bottom: 12px !important;
+      padding-left: 12px !important;
+    }
+    #tuner-screen, #medidor-screen {
+      left: 56px !important;
+      height: 100% !important;
+      top: 0 !important;
+    }
   }
 </style>
 </head>
