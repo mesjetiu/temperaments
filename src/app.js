@@ -17,14 +17,17 @@ function applyUpdate() {
   }
 }
 
-// ── Service Worker — no usar en Electron (sin red que cachear) ──
+// ── Detectar entorno Capacitor (Android/iOS nativo) ──
+const _isCapacitor = !!(window.Capacitor?.isNativePlatform?.());
+
+// ── Service Worker — no usar en Electron ni Capacitor ──
 if ('serviceWorker' in navigator && window.__ELECTRON__) {
   // Desregistrar cualquier SW previo que pudiera haber quedado
   navigator.serviceWorker.getRegistrations().then(regs => {
     for (const r of regs) r.unregister();
   });
 }
-if ('serviceWorker' in navigator && !window.__ELECTRON__) {
+if ('serviceWorker' in navigator && !window.__ELECTRON__ && !_isCapacitor) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     window.location.reload();
   });
@@ -69,10 +72,12 @@ async function checkForNewVersion() {
     showUpdateToast(reg?.waiting || null);
   } catch (e) {}
 }
-window.addEventListener('load', () => setTimeout(checkForNewVersion, 3000));
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') checkForNewVersion();
-});
+if (!_isCapacitor) {
+  window.addEventListener('load', () => setTimeout(checkForNewVersion, 3000));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkForNewVersion();
+  });
+}
 
 // CONSTANTES y funciones puras → vienen de core.js (cargado antes como módulo)
 // NOTES, FIFTH_IDX, FIFTH_LBL, ET_FROM_A, PURE_FIFTH, PURE_MAJ3, PURE_MIN3
