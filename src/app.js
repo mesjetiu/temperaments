@@ -1034,29 +1034,59 @@ function toggleContentFullscreen() {
 }
 
 // ── Fullscreen API por panel individual ──
+let _fsPanelEl = null; // panel actualmente en fullscreen simulado
+
 function togglePanelFullscreen(btn) {
   const panel = btn.closest('.panel');
   if (!panel) return;
-  if (document.fullscreenElement === panel || document.webkitFullscreenElement === panel) {
-    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+
+  if (_fsPanelEl) {
+    // Salir de fullscreen
+    _exitPanelFullscreen();
   } else {
-    const req = panel.requestFullscreen || panel.webkitRequestFullscreen;
-    if (req) req.call(panel);
+    // Entrar: requestFullscreen sobre el documento entero (oculta barra de notificaciones en Android)
+    _fsPanelEl = panel;
+    panel.classList.add('panel-fake-fs');
+    const req = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
+    if (req) req.call(document.documentElement).catch(() => {});
+    _updateFsPanelIcons();
   }
 }
 
-document.addEventListener('fullscreenchange', _onPanelFullscreenChange);
-document.addEventListener('webkitfullscreenchange', _onPanelFullscreenChange);
-function _onPanelFullscreenChange() {
-  const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
-  // Actualizar icono de todos los botones de zoom de paneles
+function _exitPanelFullscreen() {
+  if (_fsPanelEl) {
+    _fsPanelEl.classList.remove('panel-fake-fs');
+    _fsPanelEl = null;
+  }
+  if (document.fullscreenElement || document.webkitFullscreenElement) {
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document).catch(() => {});
+  }
+  _updateFsPanelIcons();
+  setTimeout(renderContent, 50);
+}
+
+function _updateFsPanelIcons() {
   document.querySelectorAll('.panel-zoom-btn').forEach(btn => {
     const panel = btn.closest('.panel');
-    btn.innerHTML = (panel && panel === fsEl) ? ICON_COLLAPSE : ICON_EXPAND;
+    btn.innerHTML = (panel && panel === _fsPanelEl) ? ICON_COLLAPSE : ICON_EXPAND;
   });
-  // Al salir de fullscreen sí redibujamos (el panel vuelve a su tamaño original).
-  // Al entrar NO: renderContent destruye el DOM y el navegador cancela el fullscreen.
-  if (!fsEl) setTimeout(renderContent, 50);
+  // Botón ✕: visible solo en el panel en fullscreen
+  document.querySelectorAll('.panel-fs-close').forEach(btn => {
+    const panel = btn.closest('.panel');
+    btn.style.display = (panel && panel === _fsPanelEl) ? 'flex' : '';
+  });
+}
+
+document.addEventListener('fullscreenchange', _onNativeFullscreenChange);
+document.addEventListener('webkitfullscreenchange', _onNativeFullscreenChange);
+function _onNativeFullscreenChange() {
+  // Si el usuario sale con el botón del sistema (back / Esc), limpiar estado
+  if (!document.fullscreenElement && !document.webkitFullscreenElement && _fsPanelEl) {
+    _fsPanelEl.classList.remove('panel-fake-fs');
+    _fsPanelEl = null;
+    _updateFsPanelIcons();
+    setTimeout(renderContent, 50);
+  }
 }
 
 // ── ResizeObserver para canvas custom (scatter, tonnetz) y tablas ──
@@ -2505,7 +2535,7 @@ function _bindCardResize(container) {
 
     function startResize(ev, mode) {
       // No redimensionar en fullscreen
-      if (document.fullscreenElement === panel) return;
+      if (panel.classList.contains('panel-fake-fs')) return;
       ev.preventDefault();
       ev.stopPropagation();
       ev.target.setPointerCapture(ev.pointerId);

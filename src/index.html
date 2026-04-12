@@ -142,32 +142,26 @@
   .badge-menu-btn { cursor:pointer; background:rgba(255,255,255,0.08); border-radius:5px; padding:1px 5px; font-size:16px; font-weight:700; line-height:1.4; letter-spacing:1px; color:#e2e8f0; -webkit-tap-highlight-color:transparent; flex-shrink:0; }
   .badge-close-btn { cursor:pointer; font-size:14px; opacity:0.7; padding:0 2px; line-height:1; flex-shrink:0; }
 
-  /* ═══ PANEL FULLSCREEN (Fullscreen API) ═══ */
-  .panel:fullscreen {
+  /* ═══ PANEL FULLSCREEN ═══ */
+  .panel-fake-fs {
+    position: fixed !important; inset: 0 !important; z-index: 1800 !important;
+    width: 100% !important; height: 100% !important;
     background: var(--surface) !important;
-    padding: 16px !important;
-    overflow-y: auto !important;
+    padding: 16px !important; overflow-y: auto !important;
     box-sizing: border-box !important;
-  }
-  /* Fallback webkit */
-  .panel:-webkit-full-screen {
-    background: var(--surface) !important;
-    padding: 16px !important;
-    overflow-y: auto !important;
-    box-sizing: border-box !important;
+    border-radius: 0 !important;
   }
   /* Botón ✕ dentro del panel, visible solo en fullscreen */
   .panel-fs-close { display: none; position: fixed; top: 10px; right: 10px; z-index: 9999; background: rgba(15,23,42,0.85); border: 1px solid #334155; color: #e2e8f0; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
-  .panel:fullscreen .panel-fs-close,
-  .panel:-webkit-full-screen .panel-fs-close { display: flex; }
   /* En fullscreen: ocultar botón ⛶ y toolbar de gestión */
-  .panel:fullscreen .panel-zoom-btn,
-  .panel:-webkit-full-screen .panel-zoom-btn { display: none !important; }
-  .panel:fullscreen .card-toolbar,
-  .panel:-webkit-full-screen .card-toolbar { display: none !important; }
+  .panel-fake-fs .panel-zoom-btn { display: none !important; }
+  .panel-fake-fs .card-toolbar   { display: none !important; }
   /* En fullscreen: forzar panel-body visible aunque el panel esté colapsado */
-  .panel:fullscreen .panel-body,
-  .panel:-webkit-full-screen .panel-body { display: block !important; }
+  .panel-fake-fs .panel-body { display: block !important; }
+  /* En fullscreen: ocultar handles de resize */
+  .panel-fake-fs .panel-resize-e,
+  .panel-fake-fs .panel-resize-s,
+  .panel-fake-fs .panel-resize-se { display: none !important; }
   /* CONTENT FULLSCREEN (legacy — mantenido solo para teclado y desk-btn, se retira en futuro) */
   #content-fullscreen-close { display: none; }
   #content.content-fullscreen { position: fixed !important; inset: 0 !important; z-index: 950 !important; overflow-y: auto !important; padding: 12px !important; box-sizing: border-box !important; }
